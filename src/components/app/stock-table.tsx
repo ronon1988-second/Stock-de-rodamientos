@@ -14,21 +14,27 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import UpdateStockDialog from "./update-stock-dialog";
 import type { Bearing } from "@/lib/types";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, PlusCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import AddBearingDialog from "./add-bearing-dialog";
 
 type StockTableProps = {
   bearings: Bearing[];
   onLogUsage: (bearingId: string, quantity: number) => void;
+  onAddBearing: (newBearing: Omit<Bearing, 'id'>) => void;
+  onUpdateBearing: (bearing: Bearing) => void;
 };
 
-export default function StockTable({ bearings, onLogUsage }: StockTableProps) {
-  const [selectedBearing, setSelectedBearing] = useState<Bearing | null>(null);
+export default function StockTable({ bearings, onLogUsage, onAddBearing, onUpdateBearing }: StockTableProps) {
+  const [logUsageBearing, setLogUsageBearing] = useState<Bearing | null>(null);
+  const [isAddBearingOpen, setIsAddBearingOpen] = useState(false);
+  const [editingBearing, setEditingBearing] = useState<Bearing | null>(null);
 
   const getStatus = (bearing: Bearing) => {
     if (bearing.stock === 0) return "Sin Stock";
@@ -45,11 +51,17 @@ export default function StockTable({ bearings, onLogUsage }: StockTableProps) {
   return (
     <>
       <Card>
-        <CardHeader>
-          <CardTitle>Inventario de Rodamientos</CardTitle>
-          <CardDescription>
-            Vista en vivo de todos los rodamientos en stock en todos los sectores.
-          </CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Inventario de Rodamientos</CardTitle>
+            <CardDescription>
+              Vista en vivo de todos los rodamientos en stock en todos los sectores.
+            </CardDescription>
+          </div>
+          <Button size="sm" onClick={() => setIsAddBearingOpen(true)}>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Añadir Rodamiento
+          </Button>
         </CardHeader>
         <CardContent>
           <Table>
@@ -86,10 +98,12 @@ export default function StockTable({ bearings, onLogUsage }: StockTableProps) {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                            <DropdownMenuItem onSelect={() => setSelectedBearing(bearing)}>
+                            <DropdownMenuItem onSelect={() => setLogUsageBearing(bearing)}>
                               Registrar Uso
                             </DropdownMenuItem>
-                            <DropdownMenuItem>Ver Detalles</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => setEditingBearing(bearing)}>
+                              Editar
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -99,7 +113,7 @@ export default function StockTable({ bearings, onLogUsage }: StockTableProps) {
               ) : (
                 <TableRow>
                   <TableCell colSpan={5} className="h-24 text-center">
-                    Sin datos de rodamientos. Por favor, importe sus datos.
+                    No hay rodamientos en el inventario.
                   </TableCell>
                 </TableRow>
               )}
@@ -107,11 +121,32 @@ export default function StockTable({ bearings, onLogUsage }: StockTableProps) {
           </Table>
         </CardContent>
       </Card>
-      {selectedBearing && (
+      
+      {logUsageBearing && (
         <UpdateStockDialog
-          bearing={selectedBearing}
-          onClose={() => setSelectedBearing(null)}
+          bearing={logUsageBearing}
+          onClose={() => setLogUsageBearing(null)}
           onConfirm={onLogUsage}
+        />
+      )}
+
+      {isAddBearingOpen && (
+        <AddBearingDialog
+            onClose={() => setIsAddBearingOpen(false)}
+            onConfirm={onAddBearing}
+        />
+      )}
+
+      {editingBearing && (
+         <AddBearingDialog
+            key={editingBearing.id}
+            bearing={editingBearing}
+            onClose={() => setEditingBearing(null)}
+            onConfirm={(data) => {
+              if ('id' in data) {
+                 onUpdateBearing(data as Bearing);
+              }
+            }}
         />
       )}
     </>

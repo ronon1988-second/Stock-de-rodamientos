@@ -15,12 +15,16 @@ type DashboardProps = {
   bearings: Bearing[];
   usageLog: UsageLog[];
   onLogUsage: (bearingId: string, quantity: number) => void;
+  onAddBearing: (newBearing: Omit<Bearing, 'id'>) => void;
+  onUpdateBearing: (bearing: Bearing) => void;
 };
 
 export default function Dashboard({
   bearings,
   usageLog,
   onLogUsage,
+  onAddBearing,
+  onUpdateBearing,
 }: DashboardProps) {
   const totalStock = bearings.reduce((sum, b) => sum + b.stock, 0);
   const lowStockCount = bearings.filter((b) => b.stock <= b.threshold).length;
@@ -72,7 +76,12 @@ export default function Dashboard({
       </div>
       <div className="grid gap-4 md:gap-8 lg:grid-cols-5">
         <div className="lg:col-span-3">
-          <StockTable bearings={bearings} onLogUsage={onLogUsage} />
+          <StockTable 
+            bearings={bearings} 
+            onLogUsage={onLogUsage}
+            onAddBearing={onAddBearing}
+            onUpdateBearing={onUpdateBearing}
+          />
         </div>
         <div className="lg:col-span-2">
           <ReorderCard bearings={bearings} usageLog={usageLog} />

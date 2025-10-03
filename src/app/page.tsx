@@ -53,6 +53,26 @@ export default function App() {
     });
   };
 
+  const handleAddBearing = (newBearing: Omit<Bearing, "id">) => {
+    const bearingWithId: Bearing = {
+      ...newBearing,
+      id: `b${(bearings.length + 1).toString().padStart(3, '0')}`,
+    };
+    setBearings(prev => [...prev, bearingWithId]);
+    toast({
+        title: "Rodamiento Añadido",
+        description: `Se ha añadido ${newBearing.name} al inventario.`
+    });
+  };
+
+  const handleUpdateBearing = (updatedBearing: Bearing) => {
+    setBearings(prev => prev.map(b => b.id === updatedBearing.id ? updatedBearing : b));
+     toast({
+        title: "Rodamiento Actualizado",
+        description: `Se ha actualizado ${updatedBearing.name}.`
+    });
+  }
+
   const handleLogUsage = (bearingId: string, quantity: number) => {
     let updatedBearing: Bearing | undefined;
     setBearings((prevBearings) =>
@@ -254,6 +274,8 @@ export default function App() {
               bearings={bearings}
               usageLog={usageLog}
               onLogUsage={handleLogUsage}
+              onAddBearing={handleAddBearing}
+              onUpdateBearing={handleUpdateBearing}
             />
           )}
           {view === "reports" && (
@@ -266,11 +288,11 @@ export default function App() {
                   Sin Datos de Rodamientos
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  Importe sus datos para comenzar a gestionar su inventario.
+                  Importe sus datos o añada un rodamiento para comenzar a gestionar su inventario.
                 </p>
                 <Button className="mt-4" onClick={handleImportData}>
                   <FileUp className="mr-2 h-4 w-4" />
-                  Importar Datos
+                  Importar Datos de Muestra
                 </Button>
               </div>
             </div>
