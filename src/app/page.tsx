@@ -3,13 +3,9 @@
 import React, { useState, useEffect } from "react";
 import {
   Bell,
-  FileUp,
   Home,
   LineChart,
   Menu,
-  Package,
-  Package2,
-  Users,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -17,9 +13,9 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
+  CardDescription,
 } from "@/components/ui/card";
 import {
   DropdownMenu,
@@ -41,19 +37,13 @@ type View = "dashboard" | "reports";
 
 export default function App() {
   const [view, setView] = useState<View>("dashboard");
-  const [bearings, setBearings] = useState<Bearing[]>([]);
+  const [bearings, setBearings] = useState<Bearing[]>(initialBearings);
   const [usageLog, setUsageLog] = useState<UsageLog[]>([]);
   const { toast } = useToast();
 
-  const handleImportData = () => {
-    setBearings(initialBearings);
-    toast({
-      title: "Datos Importados",
-      description: "Se han cargado los datos de stock de rodamientos de muestra.",
-    });
-  };
-
   const handleAddBearing = (newBearing: Omit<Bearing, "id">) => {
+    // This function is kept for compatibility but might be phased out
+    // as the new workflow is to update existing bearings from the master list.
     const bearingWithId: Bearing = {
       ...newBearing,
       id: `b${(bearings.length + 1).toString().padStart(3, '0')}`,
@@ -69,41 +59,56 @@ export default function App() {
     setBearings(prev => prev.map(b => b.id === updatedBearing.id ? updatedBearing : b));
      toast({
         title: "Rodamiento Actualizado",
-        description: `Se ha actualizado ${updatedBearing.name}.`
+        description: `Se ha actualizado el stock de ${updatedBearing.name}.`
     });
   }
 
-  const handleLogUsage = (bearingId: string, quantity: number) => {
+  const handleLogUsage = (bearingId: string, quantity: number, sector: Bearing['sector']) => {
     let updatedBearing: Bearing | undefined;
     setBearings((prevBearings) =>
       prevBearings.map((bearing) => {
         if (bearing.id === bearingId) {
+          if (bearing.stock < quantity) {
+             toast({
+              variant: "destructive",
+              title: "Error de Stock",
+              description: `No hay suficiente stock para ${bearing.name}.`,
+            });
+            updatedBearing = bearing; // Keep it as is
+            return bearing;
+          }
           updatedBearing = { ...bearing, stock: bearing.stock - quantity };
           return updatedBearing;
         }
         return bearing;
       })
     );
-
-    if (updatedBearing) {
+    
+    // This part runs only if the stock was sufficient
+    if (updatedBearing && updatedBearing.stock >= 0) {
       const newLog: UsageLog = {
         id: `usage-${Date.now()}`,
         bearingId: bearingId,
         bearingName: updatedBearing.name,
         quantity,
         date: new Date().toISOString(),
-        sector: updatedBearing.sector,
+        sector: sector,
       };
       setUsageLog((prevLogs) => [newLog, ...prevLogs]);
 
+      toast({
+        title: "Uso Registrado",
+        description: `Se han usado ${quantity} unidades de ${updatedBearing.name} en ${sector}.`
+      });
+
       if (
         updatedBearing.stock <= updatedBearing.threshold &&
-        updatedBearing.stock + quantity > updatedBearing.threshold
+        (updatedBearing.stock + quantity) > updatedBearing.threshold
       ) {
         toast({
           variant: "destructive",
           title: "Alerta de Stock Bajo",
-          description: `El rodamiento ${updatedBearing.name} en ${updatedBearing.sector} se está agotando.`,
+          description: `El rodamiento ${updatedBearing.name} ha entrado en nivel de stock bajo.`,
         });
       }
     }
@@ -174,18 +179,17 @@ export default function App() {
               />
             </nav>
           </div>
-          <div className="mt-auto p-4">
-            <Card>
+           <div className="mt-auto p-4">
+            <Card x-chunk="dashboard-02-chunk-0">
               <CardHeader className="p-2 pt-0 md:p-4">
-                <CardTitle>Importar Datos</CardTitle>
+                <CardTitle>¿Necesitas Ayuda?</CardTitle>
                 <CardDescription>
-                  Cargue sus datos de stock de rodamientos para comenzar.
+                  Contacta a soporte si tienes problemas o quieres nuevas funcionalidades.
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-2 pt-0 md:p-4 md:pt-0">
-                <Button size="sm" className="w-full" onClick={handleImportData}>
-                  <FileUp className="mr-2 h-4 w-4" />
-                  Importar Datos
+                <Button size="sm" className="w-full">
+                  Contactar a Soporte
                 </Button>
               </CardContent>
             </Card>
@@ -225,26 +229,6 @@ export default function App() {
                   label="Reportes"
                 />
               </nav>
-              <div className="mt-auto">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Importar Datos</CardTitle>
-                    <CardDescription>
-                      Cargue sus datos de stock de rodamientos.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Button
-                      size="sm"
-                      className="w-full"
-                      onClick={handleImportData}
-                    >
-                      <FileUp className="mr-2 h-4 w-4" />
-                      Importar Datos
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
             </SheetContent>
           </Sheet>
 
@@ -254,7 +238,7 @@ export default function App() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="secondary" size="icon" className="rounded-full">
-                <Users className="h-5 w-5" />
+                 <img src="https://images.unsplash.com/photo-1628157588553-5ee30a682e5e?q=80&w=200&h=200&auto=format&fit=crop" alt="Avatar" className="rounded-full" />
                 <span className="sr-only">Alternar menú de usuario</span>
               </Button>
             </DropdownMenuTrigger>
@@ -280,22 +264,6 @@ export default function App() {
           )}
           {view === "reports" && (
             <Reports bearings={bearings} usageLog={usageLog} />
-          )}
-          {bearings.length === 0 && view === "dashboard" && (
-            <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed shadow-sm">
-              <div className="flex flex-col items-center gap-1 text-center">
-                <h3 className="text-2xl font-bold tracking-tight">
-                  Sin Datos de Rodamientos
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Importe sus datos o añada un rodamiento para comenzar a gestionar su inventario.
-                </p>
-                <Button className="mt-4" onClick={handleImportData}>
-                  <FileUp className="mr-2 h-4 w-4" />
-                  Importar Datos de Muestra
-                </Button>
-              </div>
-            </div>
           )}
         </main>
       </div>
