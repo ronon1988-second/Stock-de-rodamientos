@@ -1,4 +1,4 @@
-export const SECTORS = ['Envasadora 1', 'Envasadora 2', 'Línea de Galletitas'] as const;
+export const SECTORS = ['Moduus', 'Alipack', 'Horno Linea 1', 'Horno Linea 2', 'Curva', 'Stock General'] as const;
 export type Sector = typeof SECTORS[number];
 
 export type Bearing = {

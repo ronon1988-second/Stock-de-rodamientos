@@ -6,18 +6,14 @@ import {
   ChartLegend,
 } from "@/components/ui/chart";
 import type { Sector, UsageLog } from "@/lib/types";
+import { SECTORS } from "@/lib/types";
 
 type UsageChartProps = {
   usageData: UsageLog[];
 };
 
 export default function UsageChart({ usageData }: UsageChartProps) {
-  const sectors: Sector[] = [
-    "Envasadora 1",
-    "Envasadora 2",
-    "Línea de Galletitas",
-  ];
-  const chartData = sectors.map((sector) => {
+  const chartData = SECTORS.map((sector) => {
     const totalUsage = usageData
       .filter((log) => log.sector === sector)
       .reduce((sum, log) => sum + log.quantity, 0);
@@ -41,7 +37,7 @@ export default function UsageChart({ usageData }: UsageChartProps) {
          <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="name" tickLine={false} axisLine={false} />
+            <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
             <YAxis tickLine={false} axisLine={false} />
             <Tooltip
                 cursor={{ fill: 'hsl(var(--muted))' }}
