@@ -48,8 +48,8 @@ export default function App() {
   const handleImportData = () => {
     setBearings(initialBearings);
     toast({
-      title: "Data Imported",
-      description: "Sample bearing stock data has been loaded.",
+      title: "Datos Importados",
+      description: "Se han cargado los datos de stock de rodamientos de muestra.",
     });
   };
 
@@ -82,8 +82,8 @@ export default function App() {
       ) {
         toast({
           variant: "destructive",
-          title: "Low Stock Alert",
-          description: `${updatedBearing.name} in ${updatedBearing.sector} is running low.`,
+          title: "Alerta de Stock Bajo",
+          description: `El rodamiento ${updatedBearing.name} en ${updatedBearing.sector} se está agotando.`,
         });
       }
     }
@@ -131,12 +131,12 @@ export default function App() {
           <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
             <a href="/" className="flex items-center gap-2 font-semibold">
               <Logo className="h-8 w-8 text-primary" />
-              <span className="">Bearing Balance</span>
+              <span className="">Balance de Rodamientos</span>
             </a>
             {lowStockCount > 0 && (
               <Button variant="outline" size="icon" className="ml-auto h-8 w-8">
                 <Bell className="h-4 w-4" />
-                <span className="sr-only">Toggle notifications</span>
+                <span className="sr-only">Alternar notificaciones</span>
               </Button>
             )}
           </div>
@@ -145,28 +145,27 @@ export default function App() {
               <NavLink
                 targetView="dashboard"
                 icon={<Home className="h-4 w-4" />}
-                label="Dashboard"
+                label="Panel de control"
               />
               <NavLink
                 targetView="reports"
                 icon={<LineChart className="h-4 w-4" />}
-                label="Reports"
+                label="Reportes"
               />
             </nav>
           </div>
           <div className="mt-auto p-4">
             <Card>
               <CardHeader className="p-2 pt-0 md:p-4">
-                <CardTitle>Data Import</CardTitle>
+                <CardTitle>Importar Datos</CardTitle>
                 <CardDescription>
-                  Load your bearing stock data from an Excel file to get
-                  started.
+                  Cargue sus datos de stock de rodamientos para comenzar.
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-2 pt-0 md:p-4 md:pt-0">
                 <Button size="sm" className="w-full" onClick={handleImportData}>
                   <FileUp className="mr-2 h-4 w-4" />
-                  Import Data
+                  Importar Datos
                 </Button>
               </CardContent>
             </Card>
@@ -183,7 +182,7 @@ export default function App() {
                 className="shrink-0 md:hidden"
               >
                 <Menu className="h-5 w-5" />
-                <span className="sr-only">Toggle navigation menu</span>
+                <span className="sr-only">Alternar menú de navegación</span>
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="flex flex-col">
@@ -193,25 +192,25 @@ export default function App() {
                   className="flex items-center gap-2 text-lg font-semibold mb-4"
                 >
                   <Logo className="h-8 w-8 text-primary" />
-                  <span className="sr-only">Bearing Balance</span>
+                  <span className="sr-only">Balance de Rodamientos</span>
                 </a>
                 <NavLink
                   targetView="dashboard"
                   icon={<Home className="h-5 w-5" />}
-                  label="Dashboard"
+                  label="Panel de control"
                 />
                 <NavLink
                   targetView="reports"
                   icon={<LineChart className="h-5 w-5" />}
-                  label="Reports"
+                  label="Reportes"
                 />
               </nav>
               <div className="mt-auto">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Data Import</CardTitle>
+                    <CardTitle>Importar Datos</CardTitle>
                     <CardDescription>
-                      Load your bearing stock data.
+                      Cargue sus datos de stock de rodamientos.
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -221,7 +220,7 @@ export default function App() {
                       onClick={handleImportData}
                     >
                       <FileUp className="mr-2 h-4 w-4" />
-                      Import Data
+                      Importar Datos
                     </Button>
                   </CardContent>
                 </Card>
@@ -230,22 +229,22 @@ export default function App() {
           </Sheet>
 
           <div className="w-full flex-1">
-             <h1 className="font-semibold text-xl capitalize">{view}</h1>
+             <h1 className="font-semibold text-xl capitalize">{view === 'dashboard' ? 'Panel de control' : 'Reportes'}</h1>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="secondary" size="icon" className="rounded-full">
                 <Users className="h-5 w-5" />
-                <span className="sr-only">Toggle user menu</span>
+                <span className="sr-only">Alternar menú de usuario</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>My Account</DropdownMenuLabel>
+              <DropdownMenuLabel>Mi Cuenta</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>Settings</DropdownMenuItem>
-              <DropdownMenuItem>Support</DropdownMenuItem>
+              <DropdownMenuItem>Configuración</DropdownMenuItem>
+              <DropdownMenuItem>Soporte</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>Logout</DropdownMenuItem>
+              <DropdownMenuItem>Cerrar Sesión</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </header>
@@ -264,14 +263,14 @@ export default function App() {
             <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed shadow-sm">
               <div className="flex flex-col items-center gap-1 text-center">
                 <h3 className="text-2xl font-bold tracking-tight">
-                  No Bearing Data
+                  Sin Datos de Rodamientos
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  Import your data to start managing your inventory.
+                  Importe sus datos para comenzar a gestionar su inventario.
                 </p>
                 <Button className="mt-4" onClick={handleImportData}>
                   <FileUp className="mr-2 h-4 w-4" />
-                  Import Data
+                  Importar Datos
                 </Button>
               </div>
             </div>

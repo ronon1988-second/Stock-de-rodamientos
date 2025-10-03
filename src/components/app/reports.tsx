@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import type { Bearing, UsageLog } from "@/lib/types";
 import UsageChart from "./usage-chart";
 
@@ -28,9 +29,9 @@ export default function Reports({ bearings, usageLog }: ReportsProps) {
     <div className="grid auto-rows-max items-start gap-4 md:gap-8">
       <Card>
         <CardHeader>
-          <CardTitle>Usage by Sector</CardTitle>
+          <CardTitle>Uso por Sector</CardTitle>
           <CardDescription>
-            Visual representation of bearing consumption per sector.
+            Representación visual del consumo de rodamientos por sector.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -39,17 +40,17 @@ export default function Reports({ bearings, usageLog }: ReportsProps) {
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Usage History</CardTitle>
-          <CardDescription>A detailed log of all bearing usage.</CardDescription>
+          <CardTitle>Historial de Uso</CardTitle>
+          <CardDescription>Un registro detallado de todo el uso de rodamientos.</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Bearing</TableHead>
+                <TableHead>Rodamiento</TableHead>
                 <TableHead>Sector</TableHead>
-                <TableHead className="text-right">Quantity</TableHead>
-                <TableHead>Date</TableHead>
+                <TableHead className="text-right">Cantidad</TableHead>
+                <TableHead>Fecha</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -62,14 +63,14 @@ export default function Reports({ bearings, usageLog }: ReportsProps) {
                     <TableCell>{log.sector}</TableCell>
                     <TableCell className="text-right">{log.quantity}</TableCell>
                     <TableCell>
-                      {format(new Date(log.date), "PPP p")}
+                      {format(new Date(log.date), "PPP p", { locale: es })}
                     </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
                   <TableCell colSpan={4} className="h-24 text-center">
-                    No usage data available.
+                    No hay datos de uso disponibles.
                   </TableCell>
                 </TableRow>
               )}

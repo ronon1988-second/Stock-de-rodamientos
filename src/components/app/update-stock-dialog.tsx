@@ -40,8 +40,8 @@ export default function UpdateStockDialog({
     quantity: z.coerce
       .number()
       .int()
-      .positive("Quantity must be positive.")
-      .max(bearing.stock, `Cannot use more than available stock (${bearing.stock}).`),
+      .positive("La cantidad debe ser positiva.")
+      .max(bearing.stock, `No se puede usar más que el stock disponible (${bearing.stock}).`),
   });
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -60,10 +60,10 @@ export default function UpdateStockDialog({
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Log Usage for {bearing.name}</DialogTitle>
+          <DialogTitle>Registrar Uso para {bearing.name}</DialogTitle>
           <DialogDescription>
-            Enter the quantity of bearings used. This will update the stock level.
-            Current stock: {bearing.stock}
+            Ingrese la cantidad de rodamientos utilizados. Esto actualizará el nivel de stock.
+            Stock actual: {bearing.stock}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -73,7 +73,7 @@ export default function UpdateStockDialog({
               name="quantity"
               render={({ field }) => (
                 <FormItem className="grid grid-cols-4 items-center gap-4">
-                  <FormLabel className="text-right">Quantity</FormLabel>
+                  <FormLabel className="text-right">Cantidad</FormLabel>
                   <div className="col-span-3">
                     <FormControl>
                       <Input type="number" {...field} />
@@ -84,8 +84,8 @@ export default function UpdateStockDialog({
               )}
             />
             <DialogFooter>
-                <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-                <Button type="submit">Confirm Usage</Button>
+                <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
+                <Button type="submit">Confirmar Uso</Button>
             </DialogFooter>
           </form>
         </Form>

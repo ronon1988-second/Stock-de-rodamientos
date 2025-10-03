@@ -31,8 +31,8 @@ export default function Dashboard({
       <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle>Total Stock</CardTitle>
-            <CardDescription>Total units of all bearings</CardDescription>
+            <CardTitle>Stock Total</CardTitle>
+            <CardDescription>Unidades totales de todos los rodamientos</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-bold">{totalStock}</div>
@@ -40,8 +40,8 @@ export default function Dashboard({
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle>Bearing Types</CardTitle>
-            <CardDescription>Distinct bearing types in inventory</CardDescription>
+            <CardTitle>Tipos de Rodamiento</CardTitle>
+            <CardDescription>Tipos de rodamientos distintos en inventario</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-bold">{bearings.length}</div>
@@ -49,8 +49,8 @@ export default function Dashboard({
         </Card>
         <Card className={lowStockCount > 0 ? "border-destructive" : ""}>
           <CardHeader className="pb-2">
-            <CardTitle>Low Stock</CardTitle>
-            <CardDescription>Items below threshold</CardDescription>
+            <CardTitle>Stock Bajo</CardTitle>
+            <CardDescription>Artículos por debajo del umbral</CardDescription>
           </CardHeader>
           <CardContent>
             <div className={`text-4xl font-bold ${lowStockCount > 0 ? "text-destructive" : ""}`}>
@@ -60,8 +60,8 @@ export default function Dashboard({
         </Card>
         <Card className={outOfStockCount > 0 ? "border-destructive/50" : ""}>
           <CardHeader className="pb-2">
-            <CardTitle>Out of Stock</CardTitle>
-            <CardDescription>Items with zero stock</CardDescription>
+            <CardTitle>Sin Stock</CardTitle>
+            <CardDescription>Artículos con stock cero</CardDescription>
           </CardHeader>
           <CardContent>
              <div className={`text-4xl font-bold ${outOfStockCount > 0 ? "text-destructive/80" : ""}`}>

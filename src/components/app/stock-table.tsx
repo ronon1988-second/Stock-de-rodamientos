@@ -31,14 +31,14 @@ export default function StockTable({ bearings, onLogUsage }: StockTableProps) {
   const [selectedBearing, setSelectedBearing] = useState<Bearing | null>(null);
 
   const getStatus = (bearing: Bearing) => {
-    if (bearing.stock === 0) return "Out of Stock";
-    if (bearing.stock <= bearing.threshold) return "Low Stock";
-    return "In Stock";
+    if (bearing.stock === 0) return "Sin Stock";
+    if (bearing.stock <= bearing.threshold) return "Stock Bajo";
+    return "En Stock";
   };
 
   const getStatusVariant = (status: string) => {
-    if (status === "Out of Stock") return "destructive";
-    if (status === "Low Stock") return "secondary";
+    if (status === "Sin Stock") return "destructive";
+    if (status === "Stock Bajo") return "secondary";
     return "default";
   };
 
@@ -46,21 +46,21 @@ export default function StockTable({ bearings, onLogUsage }: StockTableProps) {
     <>
       <Card>
         <CardHeader>
-          <CardTitle>Bearing Inventory</CardTitle>
+          <CardTitle>Inventario de Rodamientos</CardTitle>
           <CardDescription>
-            Live view of all bearings in stock across all sectors.
+            Vista en vivo de todos los rodamientos en stock en todos los sectores.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
+                <TableHead>Nombre</TableHead>
                 <TableHead>Sector</TableHead>
                 <TableHead className="text-right">Stock</TableHead>
-                <TableHead className="text-center">Status</TableHead>
+                <TableHead className="text-center">Estado</TableHead>
                 <TableHead>
-                  <span className="sr-only">Actions</span>
+                  <span className="sr-only">Acciones</span>
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -69,7 +69,7 @@ export default function StockTable({ bearings, onLogUsage }: StockTableProps) {
                 bearings.map((bearing) => {
                   const status = getStatus(bearing);
                   return (
-                    <TableRow key={bearing.id} className={status !== 'In Stock' ? 'bg-destructive/5' : ''}>
+                    <TableRow key={bearing.id} className={status !== 'En Stock' ? 'bg-destructive/5' : ''}>
                       <TableCell className="font-medium">{bearing.name}</TableCell>
                       <TableCell>{bearing.sector}</TableCell>
                       <TableCell className="text-right">{bearing.stock}</TableCell>
@@ -81,15 +81,15 @@ export default function StockTable({ bearings, onLogUsage }: StockTableProps) {
                           <DropdownMenuTrigger asChild>
                             <Button aria-haspopup="true" size="icon" variant="ghost">
                               <MoreHorizontal className="h-4 w-4" />
-                              <span className="sr-only">Toggle menu</span>
+                              <span className="sr-only">Alternar menú</span>
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                             <DropdownMenuItem onSelect={() => setSelectedBearing(bearing)}>
-                              Log Usage
+                              Registrar Uso
                             </DropdownMenuItem>
-                            <DropdownMenuItem>View Details</DropdownMenuItem>
+                            <DropdownMenuItem>Ver Detalles</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -99,7 +99,7 @@ export default function StockTable({ bearings, onLogUsage }: StockTableProps) {
               ) : (
                 <TableRow>
                   <TableCell colSpan={5} className="h-24 text-center">
-                    No bearing data. Please import your data.
+                    Sin datos de rodamientos. Por favor, importe sus datos.
                   </TableCell>
                 </TableRow>
               )}

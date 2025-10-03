@@ -30,7 +30,7 @@ export default function UsageChart({ usageData }: UsageChartProps) {
   if (usageData.length === 0) {
     return (
         <div className="h-[300px] w-full flex items-center justify-center text-muted-foreground">
-            No chart data available.
+            No hay datos disponibles para el gráfico.
         </div>
     )
   }

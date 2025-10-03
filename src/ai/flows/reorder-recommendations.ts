@@ -1,11 +1,11 @@
 'use server';
 
 /**
- * @fileOverview Reorder recommendation AI agent.
+ * @fileOverview Agente de IA para recomendaciones de reposición.
  *
- * - getReorderRecommendations - A function that suggests the optimal quantity of each bearing type to reorder.
- * - ReorderRecommendationsInput - The input type for the getReorderRecommendations function.
- * - ReorderRecommendationsOutput - The return type for the getReorderRecommendations function.
+ * - getReorderRecommendations - Una función que sugiere la cantidad óptima de cada tipo de rodamiento a reponer.
+ * - ReorderRecommendationsInput - El tipo de entrada para la función getReorderRecommendations.
+ * - ReorderRecommendationsOutput - El tipo de retorno para la función getReorderRecommendations.
  */
 
 import {ai} from '@/ai/genkit';
@@ -14,23 +14,23 @@ import {z} from 'genkit';
 const ReorderRecommendationsInputSchema = z.object({
   bearingTypes: z
     .array(z.string())
-    .describe('A list of bearing types to get reorder recommendations for.'),
+    .describe('Una lista de tipos de rodamientos para obtener recomendaciones de reposición.'),
   historicalUsageData: z
     .string()
     .describe(
-      'Historical usage data for each bearing type, including dates and quantities used.'
+      'Datos históricos de uso para cada tipo de rodamiento, incluyendo fechas y cantidades utilizadas.'
     ),
   currentStockLevels: z
     .string()
-    .describe('The current stock levels for each bearing type.'),
+    .describe('Los niveles de stock actuales para cada tipo de rodamiento.'),
   reorderThreshold: z
     .number()
     .describe(
-      'The stock level at which a reorder should be triggered for all bearing types.'
+      'El nivel de stock en el que se debe activar una reposición para todos los tipos de rodamientos.'
     ),
   leadTimeDays: z
     .number()
-    .describe('The lead time in days for reordering bearings.'),
+    .describe('El tiempo de entrega en días para la reposición de rodamientos.'),
 });
 export type ReorderRecommendationsInput = z.infer<
   typeof ReorderRecommendationsInputSchema
@@ -39,18 +39,18 @@ export type ReorderRecommendationsInput = z.infer<
 const ReorderRecommendationsOutputSchema = z.object({
   recommendations: z.array(
     z.object({
-      bearingType: z.string().describe('The type of bearing.'),
+      bearingType: z.string().describe('El tipo de rodamiento.'),
       quantityToReorder: z
         .number()
-        .describe('The optimal quantity to reorder.'),
+        .describe('La cantidad óptima a reponer.'),
       reasoning: z
         .string()
-        .describe('The reasoning behind the reorder recommendation.'),
+        .describe('El razonamiento detrás de la recomendación de reposición.'),
     })
   ),
   totalValue: z
     .number()
-    .describe('The total value of all bearing types needed and reordered.'),
+    .describe('El valor total de todos los tipos de rodamientos necesarios y repuestos.'),
 });
 export type ReorderRecommendationsOutput = z.infer<
   typeof ReorderRecommendationsOutputSchema
@@ -66,20 +66,20 @@ const prompt = ai.definePrompt({
   name: 'reorderRecommendationsPrompt',
   input: {schema: ReorderRecommendationsInputSchema},
   output: {schema: ReorderRecommendationsOutputSchema},
-  prompt: `You are a stock manager providing reorder recommendations for bearings.
+  prompt: `Eres un gerente de stock que proporciona recomendaciones de reposición para rodamientos.
 
-  Based on the historical usage data, current stock levels, reorder threshold, and lead time, suggest the optimal quantity of each bearing type to reorder.
+  Basado en los datos históricos de uso, los niveles de stock actuales, el umbral de reposición y el tiempo de entrega, sugiere la cantidad óptima de cada tipo de rodamiento a reponer.
 
-  Historical Usage Data: {{{historicalUsageData}}}
-  Current Stock Levels: {{{currentStockLevels}}}
-  Reorder Threshold: {{{reorderThreshold}}}
-  Lead Time (Days): {{{leadTimeDays}}}
-  Bearing Types: {{#each bearingTypes}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}
+  Datos Históricos de Uso: {{{historicalUsageData}}}
+  Niveles de Stock Actuales: {{{currentStockLevels}}}
+  Umbral de Reposición: {{{reorderThreshold}}}
+  Tiempo de Entrega (Días): {{{leadTimeDays}}}
+  Tipos de Rodamientos: {{#each bearingTypes}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}
 
-  Provide clear reasoning for each recommendation.
-  Also, compute the total value for all bearing types needed and reordered. Assume 1 unit of each bearing type costs $10.
+  Proporciona un razonamiento claro para cada recomendación.
+  Además, calcula el valor total para todos los tipos de rodamientos necesarios y repuestos. Asume que 1 unidad de cada tipo de rodamiento cuesta $10.
 
-  Ensure the output is a JSON object conforming to the following schema:
+  Asegúrate de que la salida sea un objeto JSON que se ajuste al siguiente esquema:
   ${JSON.stringify(ReorderRecommendationsOutputSchema.shape, null, 2)}`,
 });
 

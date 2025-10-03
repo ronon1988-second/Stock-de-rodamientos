@@ -62,7 +62,7 @@ export default function ReorderCard({ bearings, usageLog }: ReorderCardProps) {
     if (result.success && result.data) {
       setRecommendations(result.data);
     } else {
-      setError(result.error || "An unknown error occurred.");
+      setError(result.error || "Ocurrió un error desconocido.");
     }
 
     setIsLoading(false);
@@ -73,16 +73,16 @@ export default function ReorderCard({ bearings, usageLog }: ReorderCardProps) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <BrainCircuit className="text-primary" />
-          AI Reorder Advisor
+          Asesor de Reposición con IA
         </CardTitle>
         <CardDescription>
-          Get intelligent reorder recommendations based on your usage data.
+          Obtenga recomendaciones inteligentes de reposición basadas en sus datos de uso.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="reorder-threshold">Reorder Threshold</Label>
+            <Label htmlFor="reorder-threshold">Umbral de Reposición</Label>
             <Input
               id="reorder-threshold"
               type="number"
@@ -91,7 +91,7 @@ export default function ReorderCard({ bearings, usageLog }: ReorderCardProps) {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="lead-time">Lead Time (Days)</Label>
+            <Label htmlFor="lead-time">Tiempo de Entrega (Días)</Label>
             <Input
               id="lead-time"
               type="number"
@@ -110,7 +110,7 @@ export default function ReorderCard({ bearings, usageLog }: ReorderCardProps) {
           ) : (
             <BrainCircuit className="mr-2 h-4 w-4" />
           )}
-          Generate Recommendations
+          Generar Recomendaciones
         </Button>
         {error && (
           <Alert variant="destructive">
@@ -124,20 +124,20 @@ export default function ReorderCard({ bearings, usageLog }: ReorderCardProps) {
         <>
           <Separator />
           <CardContent className="pt-6">
-            <h3 className="font-semibold mb-4">Recommendations</h3>
+            <h3 className="font-semibold mb-4">Recomendaciones</h3>
             <div className="space-y-4">
               {recommendations.recommendations.map((rec, index) => (
                 <div key={index} className="p-3 bg-muted/50 rounded-lg">
                   <div className="flex justify-between items-center">
                     <p className="font-medium">{rec.bearingType}</p>
-                    <p className="font-bold text-lg text-primary">{rec.quantityToReorder} units</p>
+                    <p className="font-bold text-lg text-primary">{rec.quantityToReorder} unidades</p>
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">{rec.reasoning}</p>
                 </div>
               ))}
               <div className="p-3 bg-primary/10 rounded-lg mt-4">
                 <div className="flex justify-between items-center font-bold">
-                  <p>Total Estimated Value</p>
+                  <p>Valor Total Estimado</p>
                   <p className="text-xl">
                     ${recommendations.totalValue.toFixed(2)}
                   </p>
