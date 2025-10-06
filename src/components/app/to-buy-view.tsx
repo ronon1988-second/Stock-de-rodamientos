@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
@@ -108,7 +109,7 @@ export default function ToBuyView({ inventory, sectorAssignments }: ToBuyViewPro
   
   // Effect to open all groups only when the list is first populated or search term changes
   useEffect(() => {
-    if (itemsToReorder.length > 0) {
+    if (itemsToReorder.length > 0 && openCollapsibles.length === 0) {
         const groups = itemsToReorder.reduce((acc, item) => {
             const series = getItemSeries(item.item.name);
             if (!acc.includes(series)) {
@@ -117,10 +118,8 @@ export default function ToBuyView({ inventory, sectorAssignments }: ToBuyViewPro
             return acc;
         }, [] as string[]);
         setOpenCollapsibles(groups);
-    } else {
-        setOpenCollapsibles([]);
     }
-  }, [itemsToReorder]);
+  }, [itemsToReorder, openCollapsibles]);
 
 
   const groupedItems = useMemo(() => {
@@ -257,11 +256,11 @@ export default function ToBuyView({ inventory, sectorAssignments }: ToBuyViewPro
                 <TableHead className="text-right font-bold">Sugerencia IA</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
+            
               {groupedItems.length > 0 ? (
                 groupedItems.map(([series, itemsInGroup]) => (
                   <Collapsible asChild key={series} open={openCollapsibles.includes(series)} onOpenChange={() => toggleCollapsible(series)}>
-                    <>
+                    <tbody className="w-full">
                       <CollapsibleTrigger asChild>
                          <TableRow className="bg-muted/50 hover:bg-muted cursor-pointer">
                             <TableCell colSpan={6} className="font-bold">
@@ -296,21 +295,23 @@ export default function ToBuyView({ inventory, sectorAssignments }: ToBuyViewPro
                           )})}
                         </>
                       </CollapsibleContent>
-                    </>
+                    </tbody>
                   </Collapsible>
                 ))
               ) : (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-48 text-center">
-                     <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
-                        <CheckCircle className="h-10 w-10 text-green-500"/>
-                        <p className="text-lg font-semibold">¡Todo en orden!</p>
-                        <p className="text-sm">No hay artículos que necesiten reposición en este momento.</p>
-                     </div>
-                  </TableCell>
-                </TableRow>
+                <TableBody>
+                    <TableRow>
+                    <TableCell colSpan={6} className="h-48 text-center">
+                        <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                            <CheckCircle className="h-10 w-10 text-green-500"/>
+                            <p className="text-lg font-semibold">¡Todo en orden!</p>
+                            <p className="text-sm">No hay artículos que necesiten reposición en este momento.</p>
+                        </div>
+                    </TableCell>
+                    </TableRow>
+                </TableBody>
               )}
-            </TableBody>
+            
           </Table>
         </CardContent>
         {recommendations && (

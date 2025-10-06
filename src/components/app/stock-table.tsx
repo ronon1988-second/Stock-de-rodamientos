@@ -157,11 +157,10 @@ export default function StockTable({ inventory, onLogUsage, onUpdateItem, onAddI
                   </TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
                 {groupedItems.length > 0 ? (
                   groupedItems.map(([series, itemsInGroup]) => (
                     <Collapsible asChild key={series} open={openCollapsibles.includes(series)} onOpenChange={() => toggleCollapsible(series)}>
-                      <React.Fragment>
+                      <tbody className="w-full">
                         <CollapsibleTrigger asChild>
                            <TableRow className="bg-muted/50 hover:bg-muted cursor-pointer">
                               <TableCell colSpan={4} className="font-bold">
@@ -173,7 +172,7 @@ export default function StockTable({ inventory, onLogUsage, onUpdateItem, onAddI
                            </TableRow>
                         </CollapsibleTrigger>
                         <CollapsibleContent asChild>
-                          <React.Fragment>
+                          <>
                             {itemsInGroup.map((item) => {
                               const status = getStatus(item);
                               return (
@@ -205,19 +204,20 @@ export default function StockTable({ inventory, onLogUsage, onUpdateItem, onAddI
                                 </TableRow>
                               );
                             })}
-                          </React.Fragment>
+                          </>
                         </CollapsibleContent>
-                      </React.Fragment>
+                      </tbody>
                     </Collapsible>
                   ))
                 ) : (
-                  <TableRow>
-                    <TableCell colSpan={4} className="h-24 text-center">
-                      {searchTerm ? "No se encontraron artículos." : "No hay artículos en el inventario."}
-                    </TableCell>
-                  </TableRow>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell colSpan={4} className="h-24 text-center">
+                        {searchTerm ? "No se encontraron artículos." : "No hay artículos en el inventario."}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
                 )}
-              </TableBody>
             </Table>
           </div>
         </CardContent>
