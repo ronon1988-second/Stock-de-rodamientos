@@ -4,29 +4,29 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Bearing, Sector, SectorInventory } from '@/lib/types';
+import { InventoryItem, Sector, SectorAssignment } from '@/lib/types';
 import { PackagePlus, Trash2 } from 'lucide-react';
-import AssignBearingDialog from './assign-bearing-dialog';
+import AssignItemDialog from './assign-bearing-dialog';
 
 type SectorViewProps = {
     sector: Sector;
-    allBearings: Bearing[];
-    sectorInventory: SectorInventory[];
-    onAssignBearing: (bearingId: string, sector: Sector, quantity: number) => void;
-    onRemoveBearing: (assignmentId: string) => void;
+    allInventory: InventoryItem[];
+    sectorAssignments: SectorAssignment[];
+    onAssignItem: (itemId: string, sector: Sector, quantity: number) => void;
+    onRemoveItem: (assignmentId: string) => void;
 };
 
-export default function SectorView({ sector, allBearings, sectorInventory, onAssignBearing, onRemoveBearing }: SectorViewProps) {
+export default function SectorView({ sector, allInventory, sectorAssignments, onAssignItem, onRemoveItem }: SectorViewProps) {
     const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
 
-    // Get full bearing info for items in this sector's inventory
-    const assignedBearingsDetails = sectorInventory.map(item => {
-        const bearingDetails = allBearings.find(b => b.id === item.bearingId);
+    // Get full item info for items in this sector's inventory
+    const assignedItemsDetails = sectorAssignments.map(item => {
+        const itemDetails = allInventory.find(b => b.id === item.itemId);
         return {
             ...item,
-            stock: bearingDetails?.stock ?? 'N/A',
+            stock: itemDetails?.stock ?? 'N/A',
         };
-    }).sort((a, b) => a.bearingName.localeCompare(b.bearingName));
+    }).sort((a, b) => a.itemName.localeCompare(b.itemName));
 
     return (
         <>
@@ -34,39 +34,39 @@ export default function SectorView({ sector, allBearings, sectorInventory, onAss
                 <Card>
                     <CardHeader className="flex flex-row items-start justify-between">
                         <div>
-                            <CardTitle>Rodamientos en {sector}</CardTitle>
+                            <CardTitle>Artículos en {sector}</CardTitle>
                             <CardDescription>
-                                Esta es la lista de rodamientos asignados a este sector y la cantidad requerida.
+                                Esta es la lista de artículos asignados a este sector y la cantidad requerida.
                             </CardDescription>
                         </div>
                         <Button onClick={() => setIsAssignDialogOpen(true)}>
                             <PackagePlus className="mr-2 h-4 w-4" />
-                            Asignar Rodamiento
+                            Asignar Artículo
                         </Button>
                     </CardHeader>
                     <CardContent>
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Rodamiento</TableHead>
+                                    <TableHead>Artículo</TableHead>
                                     <TableHead className="text-right">Cantidad Asignada</TableHead>
                                     <TableHead className="text-right">Stock General Actual</TableHead>
                                     <TableHead className="w-[80px]">Acciones</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {assignedBearingsDetails.length > 0 ? (
-                                    assignedBearingsDetails.map(item => (
+                                {assignedItemsDetails.length > 0 ? (
+                                    assignedItemsDetails.map(item => (
                                         <TableRow key={item.id}>
-                                            <TableCell className="font-medium">{item.bearingName}</TableCell>
+                                            <TableCell className="font-medium">{item.itemName}</TableCell>
                                             <TableCell className="text-right font-semibold">{item.quantity}</TableCell>
                                             <TableCell className="text-right">{item.stock}</TableCell>
                                             <TableCell>
                                                 <Button 
                                                     variant="ghost" 
                                                     size="icon" 
-                                                    onClick={() => onRemoveBearing(item.id)}
-                                                    aria-label={`Quitar ${item.bearingName}`}
+                                                    onClick={() => onRemoveItem(item.id)}
+                                                    aria-label={`Quitar ${item.itemName}`}
                                                 >
                                                     <Trash2 className="h-4 w-4 text-destructive" />
                                                 </Button>
@@ -76,7 +76,7 @@ export default function SectorView({ sector, allBearings, sectorInventory, onAss
                                 ) : (
                                     <TableRow>
                                         <TableCell colSpan={4} className="h-24 text-center">
-                                            Aún no se han asignado rodamientos a este sector.
+                                            Aún no se han asignado artículos a este sector.
                                         </TableCell>
                                     </TableRow>
                                 )}
@@ -86,11 +86,11 @@ export default function SectorView({ sector, allBearings, sectorInventory, onAss
                 </Card>
             </div>
             {isAssignDialogOpen && (
-                <AssignBearingDialog
+                <AssignItemDialog
                     sector={sector}
-                    allBearings={allBearings}
+                    allInventory={allInventory}
                     onClose={() => setIsAssignDialogOpen(false)}
-                    onAssign={onAssignBearing}
+                    onAssign={onAssignItem}
                 />
             )}
         </>

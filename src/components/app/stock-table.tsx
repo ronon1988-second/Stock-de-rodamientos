@@ -18,22 +18,22 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import UpdateStockDialog from "./update-stock-dialog";
-import type { Bearing, Sector } from "@/lib/types";
+import type { InventoryItem, Sector } from "@/lib/types";
 import { MoreHorizontal, Search, ChevronRight } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 type StockTableProps = {
-  bearings: Bearing[];
-  onLogUsage: (bearingId: string, quantity: number, sector: Sector) => void;
-  onUpdateBearing: (bearing: Bearing) => void;
+  inventory: InventoryItem[];
+  onLogUsage: (itemId: string, quantity: number, sector: Sector) => void;
+  onUpdateItem: (item: InventoryItem) => void;
   title?: string;
   description?: string;
 };
 
-// Function to determine bearing series
-const getBearingSeries = (name: string): string => {
+// Function to determine item series
+const getItemSeries = (name: string): string => {
   const normalizedName = name.toUpperCase().trim();
   if (normalizedName.startsWith('6')) {
     const series = normalizedName.substring(0, 2);
@@ -55,30 +55,32 @@ const getBearingSeries = (name: string): string => {
   if (normalizedName.startsWith('NK') || normalizedName.startsWith('RNA') || normalizedName.startsWith('HK')) return 'Rodamientos de Agujas';
   if (normalizedName.startsWith('PHS') || normalizedName.startsWith('POS')) return 'Terminales de Rótula';
   if (normalizedName.startsWith('H')) return 'Manguitos de Montaje';
+  if (normalizedName.startsWith('HTD')) return 'Correas';
+  if (normalizedName.startsWith('AEVU')) return 'Pistones';
   
   return 'Otros';
 };
 
 
-export default function StockTable({ bearings, onLogUsage, onUpdateBearing, title, description }: StockTableProps) {
-  const [logUsageBearing, setLogUsageBearing] = useState<Bearing | null>(null);
-  const [editingBearing, setEditingBearing] = useState<Bearing | null>(null);
+export default function StockTable({ inventory, onLogUsage, onUpdateItem, title, description }: StockTableProps) {
+  const [logUsageItem, setLogUsageItem] = useState<InventoryItem | null>(null);
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [openCollapsibles, setOpenCollapsibles] = useState<string[]>([]);
 
-  const groupedBearings = useMemo(() => {
-    const filtered = bearings.filter(bearing => 
-      bearing.name.toLowerCase().includes(searchTerm.toLowerCase())
+  const groupedItems = useMemo(() => {
+    const filtered = inventory.filter(item => 
+      item.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const groups = filtered.reduce((acc, bearing) => {
-      const series = getBearingSeries(bearing.name);
+    const groups = filtered.reduce((acc, item) => {
+      const series = getItemSeries(item.name);
       if (!acc[series]) {
         acc[series] = [];
       }
-      acc[series].push(bearing);
+      acc[series].push(item);
       return acc;
-    }, {} as Record<string, Bearing[]>);
+    }, {} as Record<string, InventoryItem[]>);
 
     // Sort groups
     Object.values(groups).forEach(group => group.sort((a, b) => a.name.localeCompare(b.name)));
@@ -91,7 +93,7 @@ export default function StockTable({ bearings, onLogUsage, onUpdateBearing, titl
     }
 
     return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
-  }, [bearings, searchTerm]);
+  }, [inventory, searchTerm]);
 
   const toggleCollapsible = (series: string) => {
     setOpenCollapsibles(prev => 
@@ -99,9 +101,9 @@ export default function StockTable({ bearings, onLogUsage, onUpdateBearing, titl
     );
   };
 
-  const getStatus = (bearing: Bearing) => {
-    if (bearing.stock === 0) return "Sin Stock";
-    if (bearing.stock < bearing.threshold) return "Stock Bajo";
+  const getStatus = (item: InventoryItem) => {
+    if (item.stock === 0) return "Sin Stock";
+    if (item.stock < item.threshold) return "Stock Bajo";
     return "En Stock";
   };
 
@@ -115,15 +117,15 @@ export default function StockTable({ bearings, onLogUsage, onUpdateBearing, titl
     <>
       <Card>
         <CardHeader>
-          <CardTitle>{title || 'Inventario de Rodamientos'}</CardTitle>
+          <CardTitle>{title || 'Inventario General'}</CardTitle>
           <CardDescription>
-            {description || 'Busca, visualiza y gestiona todo tu inventario de rodamientos.'}
+            {description || 'Busca, visualiza y gestiona todo tu inventario.'}
           </CardDescription>
           <div className="relative mt-2">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
-              placeholder="Buscar por código de rodamiento..."
+              placeholder="Buscar por código de artículo..."
               className="pl-8 sm:w-full"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -144,8 +146,8 @@ export default function StockTable({ bearings, onLogUsage, onUpdateBearing, titl
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {groupedBearings.length > 0 ? (
-                  groupedBearings.map(([series, bearingsInGroup]) => (
+                {groupedItems.length > 0 ? (
+                  groupedItems.map(([series, itemsInGroup]) => (
                     <Collapsible asChild key={series} open={openCollapsibles.includes(series)} onOpenChange={() => toggleCollapsible(series)}>
                       <>
                         <CollapsibleTrigger asChild>
@@ -153,19 +155,19 @@ export default function StockTable({ bearings, onLogUsage, onUpdateBearing, titl
                               <TableCell colSpan={4} className="font-bold">
                                 <div className="flex items-center gap-2">
                                   <ChevronRight className={`h-4 w-4 transition-transform ${openCollapsibles.includes(series) ? 'rotate-90' : ''}`} />
-                                  {series} ({bearingsInGroup.length})
+                                  {series} ({itemsInGroup.length})
                                 </div>
                               </TableCell>
                            </TableRow>
                         </CollapsibleTrigger>
                         <CollapsibleContent asChild>
                           <>
-                            {bearingsInGroup.map((bearing) => {
-                              const status = getStatus(bearing);
+                            {itemsInGroup.map((item) => {
+                              const status = getStatus(item);
                               return (
-                                <TableRow key={bearing.id} className={status === 'Stock Bajo' ? 'bg-amber-500/10' : status === 'Sin Stock' ? 'bg-destructive/10' : ''}>
-                                  <TableCell className="font-medium pl-12">{bearing.name}</TableCell>
-                                  <TableCell className="text-right">{bearing.stock}</TableCell>
+                                <TableRow key={item.id} className={status === 'Stock Bajo' ? 'bg-amber-500/10' : status === 'Sin Stock' ? 'bg-destructive/10' : ''}>
+                                  <TableCell className="font-medium pl-12">{item.name}</TableCell>
+                                  <TableCell className="text-right">{item.stock}</TableCell>
                                   <TableCell className="text-center">
                                     <Badge variant={getStatusVariant(status)}>{status}</Badge>
                                   </TableCell>
@@ -179,10 +181,10 @@ export default function StockTable({ bearings, onLogUsage, onUpdateBearing, titl
                                       </DropdownMenuTrigger>
                                       <DropdownMenuContent align="end">
                                         <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                        <DropdownMenuItem onSelect={() => setLogUsageBearing(bearing)}>
+                                        <DropdownMenuItem onSelect={() => setLogUsageItem(item)}>
                                           Registrar Uso
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem onSelect={() => setEditingBearing(bearing)}>
+                                        <DropdownMenuItem onSelect={() => setEditingItem(item)}>
                                           Actualizar Stock
                                         </DropdownMenuItem>
                                       </DropdownMenuContent>
@@ -199,7 +201,7 @@ export default function StockTable({ bearings, onLogUsage, onUpdateBearing, titl
                 ) : (
                   <TableRow>
                     <TableCell colSpan={4} className="h-24 text-center">
-                      {searchTerm ? "No se encontraron rodamientos." : "No hay rodamientos en el inventario."}
+                      {searchTerm ? "No se encontraron artículos." : "No hay artículos en el inventario."}
                     </TableCell>
                   </TableRow>
                 )}
@@ -209,23 +211,23 @@ export default function StockTable({ bearings, onLogUsage, onUpdateBearing, titl
         </CardContent>
       </Card>
       
-      {logUsageBearing && (
+      {logUsageItem && (
         <UpdateStockDialog
-          key={`log-${logUsageBearing.id}`}
-          bearing={logUsageBearing}
-          onClose={() => setLogUsageBearing(null)}
-          onConfirm={(bearingId, quantity, sector) => onLogUsage(bearingId, quantity, sector!)}
+          key={`log-${logUsageItem.id}`}
+          item={logUsageItem}
+          onClose={() => setLogUsageItem(null)}
+          onConfirm={(itemId, quantity, sector) => onLogUsage(itemId, quantity, sector!)}
           mode="logUsage"
         />
       )}
 
-      {editingBearing && (
+      {editingItem && (
          <UpdateStockDialog
-            key={`edit-${editingBearing.id}`}
-            bearing={editingBearing}
-            onClose={() => setEditingBearing(null)}
-            onConfirm={(bearingId, newStock) => {
-              onUpdateBearing({ ...editingBearing, stock: newStock });
+            key={`edit-${editingItem.id}`}
+            item={editingItem}
+            onClose={() => setEditingItem(null)}
+            onConfirm={(itemId, newStock) => {
+              onUpdateItem({ ...editingItem, stock: newStock });
             }}
             mode="updateStock"
         />

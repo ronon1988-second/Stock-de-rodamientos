@@ -1,29 +1,29 @@
 export const SECTORS = ['Modulus', 'Alipack', 'Horno Linea 1', 'Horno Linea 2', 'Curva'] as const;
 export type Sector = typeof SECTORS[number];
 
-export type Bearing = {
+// Renamed from Bearing to be more generic
+export type InventoryItem = {
   id: string;
   name: string;
-  // The 'sector' property is removed from Bearing, as stock is now centralized.
   stock: number;
   threshold: number;
 };
 
-// Represents the usage of a bearing in a specific sector at a specific time
+// Represents the usage of an item in a specific sector at a specific time
 export type UsageLog = {
   id: string;
-  bearingId: string;
-  bearingName: string;
+  itemId: string;
+  itemName: string;
   quantity: number;
   date: string;
   sector: Sector; // The sector where it was used
 };
 
-// Represents the specific bearings assigned to a machine/sector (Bill of Materials)
-export type SectorInventory = {
+// Represents the specific items assigned to a machine/sector (Bill of Materials)
+export type SectorAssignment = {
   id: string; // Unique ID for the assignment
   sector: Sector;
-  bearingId: string;
-  bearingName: string;
+  itemId: string;
+  itemName: string;
   quantity: number; // Quantity installed in this machine/sector
 };

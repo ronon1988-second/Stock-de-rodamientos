@@ -21,8 +21,8 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Bearing, UsageLog, Sector, SECTORS, SectorInventory } from "@/lib/types";
-import { initialBearings, initialSectorInventory } from "@/lib/data";
+import { InventoryItem, UsageLog, Sector, SECTORS, SectorAssignment } from "@/lib/types";
+import { initialInventory, initialSectorAssignments } from "@/lib/data";
 import Dashboard from "@/components/app/dashboard";
 import Reports from "@/components/app/reports";
 import { useToast } from "@/hooks/use-toast";
@@ -35,95 +35,95 @@ type View = "dashboard" | "reports" | "to-buy" | `sector-${Sector}`;
 
 export default function App() {
   const [view, setView] = useState<View>("dashboard");
-  const [bearings, setBearings] = useState<Bearing[]>(initialBearings);
+  const [inventory, setInventory] = useState<InventoryItem[]>(initialInventory);
   const [usageLog, setUsageLog] = useState<UsageLog[]>([]);
-  const [sectorInventory, setSectorInventory] = useState<SectorInventory[]>(initialSectorInventory);
+  const [sectorAssignments, setSectorAssignments] = useState<SectorAssignment[]>(initialSectorAssignments);
   const { toast } = useToast();
   const [isSectorsOpen, setIsSectorsOpen] = useState(true);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
 
-  const handleUpdateBearing = (updatedBearing: Bearing) => {
-    setBearings(prev => prev.map(b => b.id === updatedBearing.id ? updatedBearing : b));
+  const handleUpdateItem = (updatedItem: InventoryItem) => {
+    setInventory(prev => prev.map(b => b.id === updatedItem.id ? updatedItem : b));
      toast({
-        title: "Rodamiento Actualizado",
-        description: `Se ha actualizado el stock de ${updatedBearing.name}.`
+        title: "Artículo Actualizado",
+        description: `Se ha actualizado el stock de ${updatedItem.name}.`
     });
   }
 
-  const handleAssignBearingToSector = (bearingId: string, sector: Sector, quantity: number) => {
-    const bearing = bearings.find(b => b.id === bearingId);
-    if (!bearing) return;
+  const handleAssignItemToSector = (itemId: string, sector: Sector, quantity: number) => {
+    const item = inventory.find(b => b.id === itemId);
+    if (!item) return;
 
-    setSectorInventory(prevInventory => {
-      const existingAssignment = prevInventory.find(
-        item => item.sector === sector && item.bearingId === bearingId
+    setSectorAssignments(prevAssignments => {
+      const existingAssignment = prevAssignments.find(
+        i => i.sector === sector && i.itemId === itemId
       );
 
       if (existingAssignment) {
         // If it exists, update the quantity
-        return prevInventory.map(item =>
-          item.id === existingAssignment.id
-            ? { ...item, quantity: item.quantity + quantity }
-            : item
+        return prevAssignments.map(i =>
+          i.id === existingAssignment.id
+            ? { ...i, quantity: i.quantity + quantity }
+            : i
         );
       } else {
         // If it doesn't exist, add a new assignment
-        const newAssignment: SectorInventory = {
+        const newAssignment: SectorAssignment = {
           id: `si-${Date.now()}`,
           sector,
-          bearingId,
-          bearingName: bearing.name,
+          itemId,
+          itemName: item.name,
           quantity: quantity
         };
-        return [...prevInventory, newAssignment];
+        return [...prevAssignments, newAssignment];
       }
     });
 
     toast({
-      title: "Rodamiento Asignado",
-      description: `Se han asignado ${quantity} unidades de ${bearing.name} al sector ${sector}.`,
+      title: "Artículo Asignado",
+      description: `Se han asignado ${quantity} unidades de ${item.name} al sector ${sector}.`,
     });
   };
 
-  const handleRemoveBearingFromSector = (assignmentId: string) => {
-    const assignment = sectorInventory.find(item => item.id === assignmentId);
+  const handleRemoveItemFromSector = (assignmentId: string) => {
+    const assignment = sectorAssignments.find(item => item.id === assignmentId);
     if (!assignment) return;
 
-    setSectorInventory(prev => prev.filter(item => item.id !== assignmentId));
+    setSectorAssignments(prev => prev.filter(item => item.id !== assignmentId));
     toast({
       title: "Asignación Eliminada",
-      description: `Se ha quitado el rodamiento ${assignment.bearingName} del sector ${assignment.sector}.`,
+      description: `Se ha quitado el artículo ${assignment.itemName} del sector ${assignment.sector}.`,
     });
   };
 
-  const handleLogUsage = (bearingId: string, quantity: number, sector: Sector) => {
-    let updatedBearing: Bearing | undefined;
-    setBearings((prevBearings) =>
-      prevBearings.map((bearing) => {
-        if (bearing.id === bearingId) {
-          if (bearing.stock < quantity) {
+  const handleLogUsage = (itemId: string, quantity: number, sector: Sector) => {
+    let updatedItem: InventoryItem | undefined;
+    setInventory((prevInventory) =>
+      prevInventory.map((item) => {
+        if (item.id === itemId) {
+          if (item.stock < quantity) {
              toast({
               variant: "destructive",
               title: "Error de Stock",
-              description: `No hay suficiente stock para ${bearing.name}.`,
+              description: `No hay suficiente stock para ${item.name}.`,
             });
-            updatedBearing = bearing; // Keep it as is
-            return bearing;
+            updatedItem = item; // Keep it as is
+            return item;
           }
-          updatedBearing = { ...bearing, stock: bearing.stock - quantity };
-          return updatedBearing;
+          updatedItem = { ...item, stock: item.stock - quantity };
+          return updatedItem;
         }
-        return bearing;
+        return item;
       })
     );
     
-    const originalStock = bearings.find(b => b.id === bearingId)?.stock;
-    if (updatedBearing && originalStock && updatedBearing.stock < originalStock) {
+    const originalStock = inventory.find(b => b.id === itemId)?.stock;
+    if (updatedItem && originalStock && updatedItem.stock < originalStock) {
       const newLog: UsageLog = {
         id: `usage-${Date.now()}`,
-        bearingId: bearingId,
-        bearingName: updatedBearing.name,
+        itemId: itemId,
+        itemName: updatedItem.name,
         quantity,
         date: new Date().toISOString(),
         sector: sector,
@@ -132,38 +132,38 @@ export default function App() {
 
       toast({
         title: "Uso Registrado",
-        description: `Se han usado ${quantity} unidades de ${updatedBearing.name} en ${sector}.`
+        description: `Se han usado ${quantity} unidades de ${updatedItem.name} en ${sector}.`
       });
 
       if (
-        updatedBearing.stock <= updatedBearing.threshold &&
-        (updatedBearing.stock + quantity) > updatedBearing.threshold
+        updatedItem.stock <= updatedItem.threshold &&
+        (updatedItem.stock + quantity) > updatedItem.threshold
       ) {
         toast({
           variant: "destructive",
           title: "Alerta de Stock Bajo",
-          description: `El rodamiento ${updatedBearing.name} ha entrado en nivel de stock bajo.`,
+          description: `El artículo ${updatedItem.name} ha entrado en nivel de stock bajo.`,
         });
       }
     }
   };
 
   const lowStockCount = useMemo(() => {
-    const requiredBySector: { [bearingId: string]: number } = {};
-    sectorInventory.forEach(item => {
-        if (!requiredBySector[item.bearingId]) {
-            requiredBySector[item.bearingId] = 0;
+    const requiredBySector: { [itemId: string]: number } = {};
+    sectorAssignments.forEach(item => {
+        if (!requiredBySector[item.itemId]) {
+            requiredBySector[item.itemId] = 0;
         }
-        requiredBySector[item.bearingId] += item.quantity;
+        requiredBySector[item.itemId] += item.quantity;
     });
 
-    return bearings.filter(b => {
+    return inventory.filter(b => {
         const totalRequired = requiredBySector[b.id] || 0;
         const safetyStock = b.threshold;
         const totalDemand = totalRequired + safetyStock;
         return b.stock < totalDemand;
     }).length;
-  }, [bearings, sectorInventory]);
+  }, [inventory, sectorAssignments]);
 
   const NavLink = ({
     targetView,
@@ -203,7 +203,7 @@ export default function App() {
   const getViewTitle = () => {
     if (view === 'dashboard') return 'Panel de control';
     if (view === 'reports') return 'Reportes';
-    if (view === 'to-buy') return 'Rodamientos a Comprar';
+    if (view === 'to-buy') return 'Artículos a Comprar';
     if (view.startsWith('sector-')) {
         const sector = view.replace('sector-', '');
         return `Sector: ${sector}`;
@@ -214,25 +214,25 @@ export default function App() {
   const renderContent = () => {
     if (view === 'dashboard') {
       return <Dashboard
-        bearings={bearings}
+        inventory={inventory}
         onLogUsage={handleLogUsage}
-        onUpdateBearing={handleUpdateBearing}
+        onUpdateItem={handleUpdateItem}
       />
     }
     if (view === 'reports') {
-      return <Reports bearings={bearings} usageLog={usageLog} />
+      return <Reports usageLog={usageLog} />
     }
     if (view === 'to-buy') {
-        return <ToBuyView bearings={bearings} sectorInventory={sectorInventory}/>
+        return <ToBuyView inventory={inventory} sectorAssignments={sectorAssignments}/>
     }
     if (view.startsWith('sector-')) {
         const sector = view.replace('sector-', '') as Sector;
         return <SectorView 
             sector={sector} 
-            allBearings={bearings} 
-            sectorInventory={sectorInventory.filter(item => item.sector === sector)}
-            onAssignBearing={handleAssignBearingToSector}
-            onRemoveBearing={handleRemoveBearingFromSector}
+            allInventory={inventory} 
+            sectorAssignments={sectorAssignments.filter(item => item.sector === sector)}
+            onAssignItem={handleAssignItemToSector}
+            onRemoveItem={handleRemoveItemFromSector}
         />
     }
     return null;
@@ -276,7 +276,7 @@ export default function App() {
       <NavLink
         targetView="to-buy"
         icon={<ShoppingCart className={isMobile ? "h-5 w-5" : "h-4 w-4"} />}
-        label="Rodamientos a Comprar"
+        label="Artículos a Comprar"
         badgeCount={lowStockCount}
         onClick={handleNavClick}
       />

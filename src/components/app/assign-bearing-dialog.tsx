@@ -29,38 +29,38 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Bearing, Sector } from "@/lib/types";
+import { InventoryItem, Sector } from "@/lib/types";
 
-type AssignBearingDialogProps = {
+type AssignItemDialogProps = {
   sector: Sector;
-  allBearings: Bearing[];
+  allInventory: InventoryItem[];
   onClose: () => void;
-  onAssign: (bearingId: string, sector: Sector, quantity: number) => void;
+  onAssign: (itemId: string, sector: Sector, quantity: number) => void;
 };
 
-const AssignBearingSchema = z.object({
-  bearingId: z.string({
-    required_error: "Por favor seleccione un rodamiento.",
+const AssignItemSchema = z.object({
+  itemId: z.string({
+    required_error: "Por favor seleccione un artículo.",
   }),
   quantity: z.coerce.number().int().positive("La cantidad debe ser mayor que cero."),
 });
 
-export default function AssignBearingDialog({
+export default function AssignItemDialog({
   sector,
-  allBearings,
+  allInventory,
   onClose,
   onAssign,
-}: AssignBearingDialogProps) {
+}: AssignItemDialogProps) {
 
-  const form = useForm<z.infer<typeof AssignBearingSchema>>({
-    resolver: zodResolver(AssignBearingSchema),
+  const form = useForm<z.infer<typeof AssignItemSchema>>({
+    resolver: zodResolver(AssignItemSchema),
     defaultValues: {
       quantity: 1,
     }
   });
 
-  function onSubmit(values: z.infer<typeof AssignBearingSchema>) {
-    onAssign(values.bearingId, sector, values.quantity);
+  function onSubmit(values: z.infer<typeof AssignItemSchema>) {
+    onAssign(values.itemId, sector, values.quantity);
     onClose();
   }
 
@@ -68,29 +68,29 @@ export default function AssignBearingDialog({
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Asignar Rodamiento a {sector}</DialogTitle>
+          <DialogTitle>Asignar Artículo a {sector}</DialogTitle>
           <DialogDescription>
-            Seleccione un rodamiento y la cantidad a asignar a este sector.
+            Seleccione un artículo y la cantidad a asignar a este sector.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 py-4">
             <FormField
               control={form.control}
-              name="bearingId"
+              name="itemId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Rodamiento</FormLabel>
+                  <FormLabel>Artículo</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Seleccione un rodamiento" />
+                        <SelectValue placeholder="Seleccione un artículo" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {allBearings.sort((a,b) => a.name.localeCompare(b.name)).map(bearing => (
-                        <SelectItem key={bearing.id} value={bearing.id}>
-                          {bearing.name} (Stock: {bearing.stock})
+                      {allInventory.sort((a,b) => a.name.localeCompare(b.name)).map(item => (
+                        <SelectItem key={item.id} value={item.id}>
+                          {item.name} (Stock: {item.stock})
                         </SelectItem>
                       ))}
                     </SelectContent>

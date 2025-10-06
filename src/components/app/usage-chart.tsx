@@ -34,15 +34,15 @@ export default function UsageChart({ usageData }: UsageChartProps) {
         });
         chartData = Object.entries(dataBySector).map(([name, usage]) => ({ name, usage })).filter(d => d.usage > 0);
     } else {
-        // Aggregate by bearing name
-        const dataByBearing = usageData.reduce((acc, log) => {
-            if (!acc[log.bearingName]) {
-                acc[log.bearingName] = 0;
+        // Aggregate by item name
+        const dataByItem = usageData.reduce((acc, log) => {
+            if (!acc[log.itemName]) {
+                acc[log.itemName] = 0;
             }
-            acc[log.bearingName] += log.quantity;
+            acc[log.itemName] += log.quantity;
             return acc;
         }, {} as { [key: string]: number });
-        chartData = Object.entries(dataByBearing).map(([name, usage]) => ({ name, usage })).sort((a,b) => b.usage - a.usage).slice(0, 10);
+        chartData = Object.entries(dataByItem).map(([name, usage]) => ({ name, usage })).sort((a,b) => b.usage - a.usage).slice(0, 10);
     }
 
   if (chartData.length === 0) {

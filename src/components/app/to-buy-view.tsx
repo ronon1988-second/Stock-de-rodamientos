@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { BrainCircuit, Loader2, Info, ShoppingCart, FileDown, CheckCircle, ChevronRight } from "lucide-react";
 import { getAIReorderRecommendations } from "@/app/actions";
-import type { Bearing, SectorInventory } from "@/lib/types";
+import type { InventoryItem, SectorAssignment } from "@/lib/types";
 import { ReorderRecommendationsOutput } from "@/ai/flows/reorder-recommendations";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -28,17 +28,17 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 
 
 type ToBuyViewProps = {
-  bearings: Bearing[];
-  sectorInventory: SectorInventory[];
+  inventory: InventoryItem[];
+  sectorAssignments: SectorAssignment[];
 };
 
 type ReorderInfo = {
-    bearing: Bearing;
+    item: InventoryItem;
     totalRequired: number;
     toBuy: number;
 }
 
-const getBearingSeries = (name: string): string => {
+const getItemSeries = (name: string): string => {
   const normalizedName = name.toUpperCase().trim();
   if (normalizedName.startsWith('6')) {
     const series = normalizedName.substring(0, 2);
@@ -60,12 +60,14 @@ const getBearingSeries = (name: string): string => {
   if (normalizedName.startsWith('NK') || normalizedName.startsWith('RNA') || normalizedName.startsWith('HK')) return 'Rodamientos de Agujas';
   if (normalizedName.startsWith('PHS') || normalizedName.startsWith('POS')) return 'Terminales de Rótula';
   if (normalizedName.startsWith('H')) return 'Manguitos de Montaje';
+  if (normalizedName.startsWith('HTD')) return 'Correas';
+  if (normalizedName.startsWith('AEVU')) return 'Pistones';
   
   return 'Otros';
 };
 
 
-export default function ToBuyView({ bearings, sectorInventory }: ToBuyViewProps) {
+export default function ToBuyView({ inventory, sectorAssignments }: ToBuyViewProps) {
   const [recommendations, setRecommendations] =
     useState<ReorderRecommendationsOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -75,40 +77,40 @@ export default function ToBuyView({ bearings, sectorInventory }: ToBuyViewProps)
 
   const leadTime = 7;
 
-  const bearingsToReorder: ReorderInfo[] = useMemo(() => {
-    const requiredBySector: { [bearingId: string]: number } = {};
-    sectorInventory.forEach(item => {
-        if (!requiredBySector[item.bearingId]) {
-            requiredBySector[item.bearingId] = 0;
+  const itemsToReorder: ReorderInfo[] = useMemo(() => {
+    const requiredBySector: { [itemId: string]: number } = {};
+    sectorAssignments.forEach(item => {
+        if (!requiredBySector[item.itemId]) {
+            requiredBySector[item.itemId] = 0;
         }
-        requiredBySector[item.bearingId] += item.quantity;
+        requiredBySector[item.itemId] += item.quantity;
     });
 
     const result: ReorderInfo[] = [];
 
-    bearings.forEach(bearing => {
-        const totalRequired = requiredBySector[bearing.id] || 0;
-        const safetyStock = bearing.threshold; // Now 2 for all
+    inventory.forEach(item => {
+        const totalRequired = requiredBySector[item.id] || 0;
+        const safetyStock = item.threshold; // Now 2 for all
         const totalDemand = totalRequired + safetyStock;
-        const toBuy = totalDemand - bearing.stock;
+        const toBuy = totalDemand - item.stock;
 
         if (toBuy > 0) {
             result.push({
-                bearing,
+                item,
                 totalRequired,
                 toBuy,
             });
         }
     });
 
-    return result.sort((a,b) => a.bearing.name.localeCompare(b.bearing.name));
-  }, [bearings, sectorInventory]);
+    return result.sort((a,b) => a.item.name.localeCompare(b.item.name));
+  }, [inventory, sectorAssignments]);
   
-  // Effect to open all groups only when the list is first populated
+  // Effect to open all groups only when the list is first populated or search term changes
   useEffect(() => {
-    if (bearingsToReorder.length > 0) {
-        const groups = bearingsToReorder.reduce((acc, item) => {
-            const series = getBearingSeries(item.bearing.name);
+    if (itemsToReorder.length > 0) {
+        const groups = itemsToReorder.reduce((acc, item) => {
+            const series = getItemSeries(item.item.name);
             if (!acc.includes(series)) {
                 acc.push(series);
             }
@@ -118,12 +120,12 @@ export default function ToBuyView({ bearings, sectorInventory }: ToBuyViewProps)
     } else {
         setOpenCollapsibles([]);
     }
-  }, [bearingsToReorder]);
+  }, [itemsToReorder]);
 
 
-  const groupedBearings = useMemo(() => {
-    const groups = bearingsToReorder.reduce((acc, item) => {
-      const series = getBearingSeries(item.bearing.name);
+  const groupedItems = useMemo(() => {
+    const groups = itemsToReorder.reduce((acc, item) => {
+      const series = getItemSeries(item.item.name);
       if (!acc[series]) {
         acc[series] = [];
       }
@@ -132,7 +134,7 @@ export default function ToBuyView({ bearings, sectorInventory }: ToBuyViewProps)
     }, {} as Record<string, ReorderInfo[]>);
     
     return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
-  }, [bearingsToReorder]);
+  }, [itemsToReorder]);
 
   const toggleCollapsible = (series: string) => {
     setOpenCollapsibles(prev => 
@@ -150,10 +152,10 @@ export default function ToBuyView({ bearings, sectorInventory }: ToBuyViewProps)
     const reorderThreshold = 2;
 
     const input = {
-      bearingTypes: bearings.map((b) => b.name),
+      bearingTypes: inventory.map((b) => b.name),
       historicalUsageData: "N/A", // Simplified for this view
       currentStockLevels: JSON.stringify(
-        bearings.map((b) => ({
+        inventory.map((b) => ({
           bearing: b.name,
           stock: b.stock,
         }))
@@ -176,25 +178,25 @@ export default function ToBuyView({ bearings, sectorInventory }: ToBuyViewProps)
     setIsLoading(false);
   };
   
-  const getAIRecommendationFor = (bearingName: string) => {
+  const getAIRecommendationFor = (itemName: string) => {
     if (!recommendations) return null;
-    const rec = recommendations.recommendations.find(r => r.bearingType === bearingName);
+    const rec = recommendations.recommendations.find(r => r.bearingType === itemName);
     return rec ? rec.quantityToReorder : null;
   }
   
   const exportToCSV = () => {
-    let csvContent = "data:text/csv;charset=utf-8,Rodamiento,Stock Actual,Total Requerido en Sectores,Stock de Seguridad,Cantidad a Comprar (Calculado),Cantidad a Comprar (IA)\n";
+    let csvContent = "data:text/csv;charset=utf-8,Artículo,Stock Actual,Total Requerido en Sectores,Stock de Seguridad,Cantidad a Comprar (Calculado),Cantidad a Comprar (IA)\n";
     
-    bearingsToReorder.forEach(item => {
-      const { bearing, totalRequired, toBuy } = item;
-      const aiQty = getAIRecommendationFor(bearing.name) ?? "";
-      csvContent += `${bearing.name},${bearing.stock},${totalRequired},${bearing.threshold},${toBuy},${aiQty}\n`;
+    itemsToReorder.forEach(item => {
+      const { item: inventoryItem, totalRequired, toBuy } = item;
+      const aiQty = getAIRecommendationFor(inventoryItem.name) ?? "";
+      csvContent += `${inventoryItem.name},${inventoryItem.stock},${totalRequired},${inventoryItem.threshold},${toBuy},${aiQty}\n`;
     });
 
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "orden_de_compra_rodamientos.csv");
+    link.setAttribute("download", "orden_de_compra_articulos.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -207,7 +209,7 @@ export default function ToBuyView({ bearings, sectorInventory }: ToBuyViewProps)
             <div>
                 <CardTitle className="flex items-center gap-2">
                 <ShoppingCart className="text-primary" />
-                Lista de Rodamientos para Comprar
+                Lista de Artículos para Comprar
                 </CardTitle>
                 <CardDescription>
                   Estos artículos se calculan en función de la demanda total de los sectores más un stock de seguridad.
@@ -216,7 +218,7 @@ export default function ToBuyView({ bearings, sectorInventory }: ToBuyViewProps)
             <div className="flex gap-2">
                 <Button
                     onClick={handleGetAIRecommendations}
-                    disabled={isLoading || bearingsToReorder.length === 0}
+                    disabled={isLoading || itemsToReorder.length === 0}
                 >
                     {isLoading ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -227,7 +229,7 @@ export default function ToBuyView({ bearings, sectorInventory }: ToBuyViewProps)
                 </Button>
                  <Button 
                     onClick={exportToCSV}
-                    disabled={bearingsToReorder.length === 0}
+                    disabled={itemsToReorder.length === 0}
                     variant="outline"
                 >
                     <FileDown className="mr-2 h-4 w-4" />
@@ -247,7 +249,7 @@ export default function ToBuyView({ bearings, sectorInventory }: ToBuyViewProps)
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Rodamiento</TableHead>
+                <TableHead>Artículo</TableHead>
                 <TableHead className="text-right">Stock Actual</TableHead>
                 <TableHead className="text-right">Requerido (Sectores)</TableHead>
                 <TableHead className="text-right">Stock de Seguridad</TableHead>
@@ -256,8 +258,8 @@ export default function ToBuyView({ bearings, sectorInventory }: ToBuyViewProps)
               </TableRow>
             </TableHeader>
             <TableBody>
-              {groupedBearings.length > 0 ? (
-                groupedBearings.map(([series, itemsInGroup]) => (
+              {groupedItems.length > 0 ? (
+                groupedItems.map(([series, itemsInGroup]) => (
                   <Collapsible asChild key={series} open={openCollapsibles.includes(series)} onOpenChange={() => toggleCollapsible(series)}>
                     <>
                       <CollapsibleTrigger asChild>
@@ -273,14 +275,14 @@ export default function ToBuyView({ bearings, sectorInventory }: ToBuyViewProps)
                       <CollapsibleContent asChild>
                         <>
                           {itemsInGroup.map((item) => {
-                            const { bearing, totalRequired, toBuy } = item;
-                            const aiRecommendation = getAIRecommendationFor(bearing.name);
+                            const { item: inventoryItem, totalRequired, toBuy } = item;
+                            const aiRecommendation = getAIRecommendationFor(inventoryItem.name);
                             return (
-                            <TableRow key={bearing.id} className="bg-amber-500/5">
-                              <TableCell className="font-medium pl-12">{bearing.name}</TableCell>
-                              <TableCell className="text-right text-destructive font-semibold">{bearing.stock}</TableCell>
+                            <TableRow key={inventoryItem.id} className="bg-amber-500/5">
+                              <TableCell className="font-medium pl-12">{inventoryItem.name}</TableCell>
+                              <TableCell className="text-right text-destructive font-semibold">{inventoryItem.stock}</TableCell>
                               <TableCell className="text-right">{totalRequired}</TableCell>
-                              <TableCell className="text-right">{bearing.threshold}</TableCell>
+                              <TableCell className="text-right">{inventoryItem.threshold}</TableCell>
                               <TableCell className="text-right font-bold text-primary">{toBuy}</TableCell>
                               <TableCell className="text-right font-bold">
                                   {aiRecommendation !== null ? (

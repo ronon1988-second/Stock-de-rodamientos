@@ -21,18 +21,18 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Bearing, SECTORS, Sector } from "@/lib/types";
+import { InventoryItem, SECTORS, Sector } from "@/lib/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type UpdateStockDialogProps = {
-  bearing: Bearing;
+  item: InventoryItem;
   onClose: () => void;
-  onConfirm: (bearingId: string, quantity: number, sector?: Sector) => void;
+  onConfirm: (itemId: string, quantity: number, sector?: Sector) => void;
   mode: "logUsage" | "updateStock";
 };
 
 export default function UpdateStockDialog({
-  bearing,
+  item,
   onClose,
   onConfirm,
   mode
@@ -43,7 +43,7 @@ export default function UpdateStockDialog({
       .number()
       .int()
       .positive("La cantidad debe ser positiva.")
-      .max(bearing.stock, `No se puede usar más que el stock disponible (${bearing.stock}).`),
+      .max(item.stock, `No se puede usar más que el stock disponible (${item.stock}).`),
     sector: z.enum(SECTORS, {
       errorMap: () => ({ message: "Por favor seleccione un sector." }),
     }),
@@ -61,17 +61,17 @@ export default function UpdateStockDialog({
       quantity: 1,
       sector: undefined,
     } : {
-      stock: bearing.stock,
+      stock: item.stock,
     },
   });
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     if (mode === 'logUsage') {
       const { quantity, sector } = values as z.infer<typeof logUsageSchema>;
-      onConfirm(bearing.id, quantity, sector);
+      onConfirm(item.id, quantity, sector);
     } else {
       const { stock } = values as z.infer<typeof updateStockSchema>;
-      onConfirm(bearing.id, stock);
+      onConfirm(item.id, stock);
     }
     onClose();
   }
@@ -82,13 +82,13 @@ export default function UpdateStockDialog({
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{isLogUsage ? 'Registrar Uso' : 'Actualizar Stock'} de {bearing.name}</DialogTitle>
+          <DialogTitle>{isLogUsage ? 'Registrar Uso' : 'Actualizar Stock'} de {item.name}</DialogTitle>
           <DialogDescription>
              {isLogUsage 
                 ? 'Seleccione el sector e ingrese la cantidad utilizada.' 
-                : 'Ingrese el nuevo total de stock para este rodamiento.'}
+                : 'Ingrese el nuevo total de stock para este artículo.'}
              <br />
-             Stock actual: <strong>{bearing.stock} unidades</strong>
+             Stock actual: <strong>{item.stock} unidades</strong>
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>

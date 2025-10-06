@@ -1,8 +1,7 @@
-import { Bearing, SectorInventory, Sector } from './types';
+import { InventoryItem, SectorAssignment } from './types';
 
-// The 'sector' property has been removed from the initial data,
-// as all stock is now considered part of a central inventory.
-export const initialBearings: Bearing[] = [
+// The 'sector' property has been removed, as all stock is part of a central inventory.
+export const initialInventory: InventoryItem[] = [
   { id: 'b001', name: '698', stock: 0, threshold: 2 },
   { id: 'b002', name: '6000', stock: 2, threshold: 2 },
   { id: 'b003', name: '6001', stock: 3, threshold: 2 },
@@ -98,39 +97,62 @@ export const initialBearings: Bearing[] = [
   { id: 'b093', name: '32010', stock: 5, threshold: 2 },
   { id: 'b094', name: 'LM 25 UU', stock: 5, threshold: 2 },
   { id: 'b095', name: '1207kc4', stock: 0, threshold: 2 },
+  // Modulus - Correas
+  { id: 'c001', name: 'HTD-740-5M (26mm)', stock: 0, threshold: 2 },
+  { id: 'c002', name: 'HTD-6005M (15mm) X2', stock: 0, threshold: 2 },
+  { id: 'c003', name: 'HTD-750-5M', stock: 0, threshold: 2 },
+  { id: 'c004', name: 'HTD-550-5M (30mm) Doble Dentado', stock: 0, threshold: 2 },
+  { id: 'c005', name: 'HTD-1270-5M (30mm)', stock: 0, threshold: 2 },
+  { id: 'c006', name: 'HTD-425-5M (30mm)', stock: 0, threshold: 2 },
+  { id: 'c007', name: 'HTD-825-5M', stock: 0, threshold: 2 },
+  { id: 'c008', name: 'HTD-670-5M', stock: 0, threshold: 2 },
+  // Modulus - Piston
+  { id: 'p001', name: 'AEVU-20-4-PA', stock: 0, threshold: 2 },
+  // Modulus - Rotulas
+  { id: 'r001', name: 'POS 10A (5)', stock: 0, threshold: 2 },
+  { id: 'r002', name: 'POS 10LA (5)', stock: 0, threshold: 2 },
 ];
 
-export const initialSectorInventory: SectorInventory[] = [
+export const initialSectorAssignments: SectorAssignment[] = [
   // Modulus
-  { id: 'si001', sector: 'Modulus', bearingId: 'b021', bearingName: '6205', quantity: 1 },
-  { id: 'si002', sector: 'Modulus', bearingId: 'b022', bearingName: '6206', quantity: 1 },
-  { id: 'si003', sector: 'Modulus', bearingId: 'b035', bearingName: '6305', quantity: 2 },
-  { id: 'si004', sector: 'Modulus', bearingId: 'b040', bearingName: '6903', quantity: 1 },
-  { id: 'si005', sector: 'Modulus', bearingId: 'b041', bearingName: 'FL 002', quantity: 1 },
+  { id: 'si001', sector: 'Modulus', itemId: 'b021', itemName: '6205', quantity: 1 },
+  { id: 'si002', sector: 'Modulus', itemId: 'b022', itemName: '6206', quantity: 1 },
+  { id: 'si003', sector: 'Modulus', itemId: 'b035', itemName: '6305', quantity: 2 },
+  { id: 'si004', sector: 'Modulus', itemId: 'b040', itemName: '6903', quantity: 1 },
+  { id: 'si005', sector: 'Modulus', itemId: 'b041', itemName: 'FL 002', quantity: 1 },
+  { id: 'sa001', sector: 'Modulus', itemId: 'c001', itemName: 'HTD-740-5M (26mm)', quantity: 1 },
+  { id: 'sa002', sector: 'Modulus', itemId: 'c002', itemName: 'HTD-6005M (15mm) X2', quantity: 1 },
+  { id: 'sa003', sector: 'Modulus', itemId: 'c003', itemName: 'HTD-750-5M', quantity: 1 },
+  { id: 'sa004', sector: 'Modulus', itemId: 'c004', itemName: 'HTD-550-5M (30mm) Doble Dentado', quantity: 1 },
+  { id: 'sa005', sector: 'Modulus', itemId: 'c005', itemName: 'HTD-1270-5M (30mm)', quantity: 1 },
+  { id: 'sa006', sector: 'Modulus', itemId: 'c006', itemName: 'HTD-425-5M (30mm)', quantity: 1 },
+  { id: 'sa007', sector: 'Modulus', itemId: 'c007', itemName: 'HTD-825-5M', quantity: 1 },
+  { id: 'sa008', sector: 'Modulus', itemId: 'c008', itemName: 'HTD-670-5M', quantity: 1 },
+  { id: 'sa009', sector: 'Modulus', itemId: 'p001', itemName: 'AEVU-20-4-PA', quantity: 1 },
+  { id: 'sa010', sector: 'Modulus', itemId: 'r001', itemName: 'POS 10A (5)', quantity: 1 },
+  { id: 'sa011', sector: 'Modulus', itemId: 'r002', itemName: 'POS 10LA (5)', quantity: 1 },
   // Alipack
-  { id: 'si006', sector: 'Alipack', bearingId: 'b001', bearingName: '698', quantity: 1 },
-  { id: 'si007', sector: 'Alipack', bearingId: 'b002', bearingName: '6000', quantity: 1 },
-  { id: 'si008', sector: 'Alipack', bearingId: 'b004', bearingName: '6002', quantity: 1 },
-  { id: 'si009', sector: 'Alipack', bearingId: 'b015', bearingName: '6201', quantity: 1 },
-  { id: 'si010', sector: 'Alipack', bearingId: 'b016', bearingName: '6202', quantity: 1 },
-  { id: 'si011', sector: 'Alipack', bearingId: 'b018', bearingName: '6203', quantity: 1 },
-  { id: 'si012', sector: 'Alipack', bearingId: 'b020', bearingName: '6204', quantity: 1 },
-  { id: 'si013', sector: 'Alipack', bearingId: 'b045', bearingName: 'UC 204', quantity: 1 },
-  { id: 'si014', sector: 'Alipack', bearingId: 'b046', bearingName: 'UC 205', quantity: 1 },
-  { id: 'si015', sector: 'Alipack', bearingId: 'b048', bearingName: 'UC 207', quantity: 1 },
+  { id: 'si006', sector: 'Alipack', itemId: 'b001', itemName: '698', quantity: 1 },
+  { id: 'si007', sector: 'Alipack', itemId: 'b002', itemName: '6000', quantity: 1 },
+  { id: 'si008', sector: 'Alipack', itemId: 'b004', itemName: '6002', quantity: 1 },
+  { id: 'si009', sector: 'Alipack', itemId: 'b015', itemName: '6201', quantity: 1 },
+  { id: 'si010', sector: 'Alipack', itemId: 'b016', itemName: '6202', quantity: 1 },
+  { id: 'si011', sector: 'Alipack', itemId: 'b018', itemName: '6203', quantity: 1 },
+  { id: 'si012', sector: 'Alipack', itemId: 'b020', itemName: '6204', quantity: 1 },
+  { id: 'si013', sector: 'Alipack', itemId: 'b045', itemName: 'UC 204', quantity: 1 },
+  { id: 'si014', sector: 'Alipack', itemId: 'b046', itemName: 'UC 205', quantity: 1 },
+  { id: 'si015', sector: 'Alipack', itemId: 'b048', itemName: 'UC 207', quantity: 1 },
   // Horno Linea 1
-  { id: 'si016', sector: 'Horno Linea 1', bearingId: 'b003', bearingName: '6001', quantity: 1 },
-  { id: 'si017', sector: 'Horno Linea 1', bearingId: 'b019', bearingName: '6203 ZZ', quantity: 1 },
-  { id: 'si018', sector: 'Horno Linea 1', bearingId: 'b049', bearingName: 'UC 208', quantity: 1 },
+  { id: 'si016', sector: 'Horno Linea 1', itemId: 'b003', itemName: '6001', quantity: 1 },
+  { id: 'si017', sector: 'Horno Linea 1', itemId: 'b019', itemName: '6203 ZZ', quantity: 1 },
+  { id: 'si018', sector: 'Horno Linea 1', itemId: 'b049', itemName: 'UC 208', quantity: 1 },
   // Horno Linea 2
-  { id: 'si019', sector: 'Horno Linea 2', bearingId: 'b003', bearingName: '6001', quantity: 1 },
-  { id: 'si020', sector: 'Horno Linea 2', bearingId: 'b019', bearingName: '6203 ZZ', quantity: 1 },
-  { id: 'si021', sector: 'Horno Linea 2', bearingId: 'b049', bearingName: 'UC 208', quantity: 1 },
-  { id: 'si022', sector: 'Horno Linea 2', bearingId: 'b095', bearingName: '1207kc4', quantity: 1 },
+  { id: 'si019', sector: 'Horno Linea 2', itemId: 'b003', itemName: '6001', quantity: 1 },
+  { id: 'si020', sector: 'Horno Linea 2', itemId: 'b019', itemName: '6203 ZZ', quantity: 1 },
+  { id: 'si021', sector: 'Horno Linea 2', itemId: 'b049', itemName: 'UC 208', quantity: 1 },
+  { id: 'si022', sector: 'Horno Linea 2', itemId: 'b095', itemName: '1207kc4', quantity: 1 },
   // Curva
-  { id: 'si023', sector: 'Curva', bearingId: 'b007', bearingName: '6004', quantity: 1 },
-  { id: 'si024', sector: 'Curva', bearingId: 'b001', bearingName: '698', quantity: 1 },
-  { id: 'si025', sector: 'Curva', bearingId: 'b045', bearingName: 'UC 204', quantity: 2 },
+  { id: 'si023', sector: 'Curva', itemId: 'b007', itemName: '6004', quantity: 1 },
+  { id: 'si024', sector: 'Curva', itemId: 'b001', itemName: '698', quantity: 1 },
+  { id: 'si025', sector: 'Curva', itemId: 'b045', itemName: 'UC 204', quantity: 2 },
 ];
-
-    

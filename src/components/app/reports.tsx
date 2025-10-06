@@ -16,22 +16,21 @@ import {
 } from "@/components/ui/table";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import type { Bearing, UsageLog } from "@/lib/types";
+import type { UsageLog } from "@/lib/types";
 import UsageChart from "./usage-chart";
 
 type ReportsProps = {
-  bearings: Bearing[];
   usageLog: UsageLog[];
 };
 
-export default function Reports({ bearings, usageLog }: ReportsProps) {
+export default function Reports({ usageLog }: ReportsProps) {
   return (
     <div className="grid auto-rows-max items-start gap-4 md:gap-8">
       <Card>
         <CardHeader>
           <CardTitle>Uso por Sector</CardTitle>
           <CardDescription>
-            Representación visual del consumo de rodamientos por sector.
+            Representación visual del consumo de artículos por sector.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -41,13 +40,13 @@ export default function Reports({ bearings, usageLog }: ReportsProps) {
       <Card>
         <CardHeader>
           <CardTitle>Historial de Uso</CardTitle>
-          <CardDescription>Un registro detallado de todo el uso de rodamientos.</CardDescription>
+          <CardDescription>Un registro detallado de todo el uso de artículos.</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Rodamiento</TableHead>
+                <TableHead>Artículo</TableHead>
                 <TableHead>Sector</TableHead>
                 <TableHead className="text-right">Cantidad</TableHead>
                 <TableHead>Fecha</TableHead>
@@ -58,7 +57,7 @@ export default function Reports({ bearings, usageLog }: ReportsProps) {
                 usageLog.map((log) => (
                   <TableRow key={log.id}>
                     <TableCell className="font-medium">
-                      {log.bearingName}
+                      {log.itemName}
                     </TableCell>
                     <TableCell>{log.sector}</TableCell>
                     <TableCell className="text-right">{log.quantity}</TableCell>
