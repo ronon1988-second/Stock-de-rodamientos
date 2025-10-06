@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BrainCircuit, Loader2, Info, ShoppingCart, FileDown, CheckCircle } from "lucide-react";
+import { BrainCircuit, Loader2, Info, ShoppingCart, FileDown, CheckCircle, ChevronRight } from "lucide-react";
 import { getAIReorderRecommendations } from "@/app/actions";
 import type { Bearing, SectorInventory } from "@/lib/types";
 import { ReorderRecommendationsOutput } from "@/ai/flows/reorder-recommendations";
@@ -24,6 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 
 type ToBuyViewProps = {
@@ -37,11 +38,39 @@ type ReorderInfo = {
     toBuy: number;
 }
 
+const getBearingSeries = (name: string): string => {
+  const normalizedName = name.toUpperCase().trim();
+  if (normalizedName.startsWith('6')) {
+    const series = normalizedName.substring(0, 2);
+    if (['60', '62', '63', '68', '69'].includes(series)) {
+      return `Serie ${series}xx`;
+    }
+  }
+  if (normalizedName.startsWith('UC')) return 'Serie UC (Insertos)';
+  if (normalizedName.startsWith('12') || normalizedName.startsWith('13') || normalizedName.startsWith('22') || normalizedName.startsWith('23')) {
+    const series = normalizedName.substring(0, 2);
+    if (['12', '13', '22', '23'].includes(series)) {
+        return `Serie ${series}xx (Autoalineables)`;
+    }
+  }
+  if (normalizedName.startsWith('30') || normalizedName.startsWith('32')) {
+      const series = normalizedName.substring(0, 2);
+      return `Serie ${series}xxx (Rodillos Cónicos)`;
+  }
+  if (normalizedName.startsWith('NK') || normalizedName.startsWith('RNA') || normalizedName.startsWith('HK')) return 'Rodamientos de Agujas';
+  if (normalizedName.startsWith('PHS') || normalizedName.startsWith('POS')) return 'Terminales de Rótula';
+  if (normalizedName.startsWith('H')) return 'Manguitos de Montaje';
+  
+  return 'Otros';
+};
+
+
 export default function ToBuyView({ bearings, sectorInventory }: ToBuyViewProps) {
   const [recommendations, setRecommendations] =
     useState<ReorderRecommendationsOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [openCollapsibles, setOpenCollapsibles] = useState<string[]>([]);
   const { toast } = useToast();
 
   const leadTime = 7;
@@ -71,9 +100,43 @@ export default function ToBuyView({ bearings, sectorInventory }: ToBuyViewProps)
             });
         }
     });
+    
+    // Set all groups to be open by default when there are items
+    if(result.length > 0) {
+        const groups = result.reduce((acc, item) => {
+            const series = getBearingSeries(item.bearing.name);
+            if (!acc.includes(series)) {
+                acc.push(series);
+            }
+            return acc;
+        }, [] as string[]);
+        setOpenCollapsibles(groups);
+    } else {
+        setOpenCollapsibles([]);
+    }
 
     return result.sort((a,b) => a.bearing.name.localeCompare(b.bearing.name));
   }, [bearings, sectorInventory]);
+
+  const groupedBearings = useMemo(() => {
+    const groups = bearingsToReorder.reduce((acc, item) => {
+      const series = getBearingSeries(item.bearing.name);
+      if (!acc[series]) {
+        acc[series] = [];
+      }
+      acc[series].push(item);
+      return acc;
+    }, {} as Record<string, ReorderInfo[]>);
+    
+    return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+  }, [bearingsToReorder]);
+
+  const toggleCollapsible = (series: string) => {
+    setOpenCollapsibles(prev => 
+      prev.includes(series) ? prev.filter(s => s !== series) : [...prev, series]
+    );
+  };
+
 
   const handleGetAIRecommendations = async () => {
     setIsLoading(true);
@@ -190,27 +253,47 @@ export default function ToBuyView({ bearings, sectorInventory }: ToBuyViewProps)
               </TableRow>
             </TableHeader>
             <TableBody>
-              {bearingsToReorder.length > 0 ? (
-                bearingsToReorder.map((item) => {
-                  const { bearing, totalRequired, toBuy } = item;
-                  const aiRecommendation = getAIRecommendationFor(bearing.name);
-                  return (
-                  <TableRow key={bearing.id}>
-                    <TableCell className="font-medium">{bearing.name}</TableCell>
-                    <TableCell className="text-right text-destructive font-semibold">{bearing.stock}</TableCell>
-                    <TableCell className="text-right">{totalRequired}</TableCell>
-                    <TableCell className="text-right">{bearing.threshold}</TableCell>
-                    <TableCell className="text-right font-bold text-primary">{toBuy}</TableCell>
-                    <TableCell className="text-right font-bold">
-                        {aiRecommendation !== null ? (
-                            <div className="flex items-center justify-end gap-2">
-                                <BrainCircuit size={16} />
-                                <span>{aiRecommendation}</span>
-                            </div>
-                        ) : recommendations ? '-' : ''}
-                    </TableCell>
-                  </TableRow>
-                )})
+              {groupedBearings.length > 0 ? (
+                groupedBearings.map(([series, itemsInGroup]) => (
+                  <Collapsible asChild key={series} open={openCollapsibles.includes(series)} onOpenChange={() => toggleCollapsible(series)}>
+                    <>
+                      <CollapsibleTrigger asChild>
+                         <TableRow className="bg-muted/50 hover:bg-muted cursor-pointer">
+                            <TableCell colSpan={6} className="font-bold">
+                              <div className="flex items-center gap-2">
+                                <ChevronRight className={`h-4 w-4 transition-transform ${openCollapsibles.includes(series) ? 'rotate-90' : ''}`} />
+                                {series} ({itemsInGroup.length})
+                              </div>
+                            </TableCell>
+                         </TableRow>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent asChild>
+                        <>
+                          {itemsInGroup.map((item) => {
+                            const { bearing, totalRequired, toBuy } = item;
+                            const aiRecommendation = getAIRecommendationFor(bearing.name);
+                            return (
+                            <TableRow key={bearing.id} className="bg-amber-500/5">
+                              <TableCell className="font-medium pl-12">{bearing.name}</TableCell>
+                              <TableCell className="text-right text-destructive font-semibold">{bearing.stock}</TableCell>
+                              <TableCell className="text-right">{totalRequired}</TableCell>
+                              <TableCell className="text-right">{bearing.threshold}</TableCell>
+                              <TableCell className="text-right font-bold text-primary">{toBuy}</TableCell>
+                              <TableCell className="text-right font-bold">
+                                  {aiRecommendation !== null ? (
+                                      <div className="flex items-center justify-end gap-2">
+                                          <BrainCircuit size={16} className="text-blue-500" />
+                                          <span>{aiRecommendation}</span>
+                                      </div>
+                                  ) : recommendations ? '-' : ''}
+                              </TableCell>
+                            </TableRow>
+                          )})}
+                        </>
+                      </CollapsibleContent>
+                    </>
+                  </Collapsible>
+                ))
               ) : (
                 <TableRow>
                   <TableCell colSpan={6} className="h-48 text-center">
