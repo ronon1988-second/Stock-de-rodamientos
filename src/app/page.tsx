@@ -20,7 +20,7 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { InventoryItem, UsageLog, Sector, SECTORS, SectorAssignment } from "@/lib/types";
 import { initialInventory, initialSectorAssignments } from "@/lib/data";
 import Dashboard from "@/components/app/dashboard";
