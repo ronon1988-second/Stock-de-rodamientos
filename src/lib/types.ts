@@ -1,4 +1,4 @@
-export const SECTORS = ['Modulus', 'Alipack', 'Horno Linea 1', 'Horno Linea 2', 'Curva'] as const;
+export const SECTORS = ['Modulus', 'Alipack', 'Horno Linea 1', 'Horno Linea 2', 'Curva', 'Laminado L1', 'Laminado L2'] as const;
 export type Sector = typeof SECTORS[number];
 
 // Renamed from Bearing to be more generic
