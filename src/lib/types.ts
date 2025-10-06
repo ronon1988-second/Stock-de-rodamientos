@@ -1,10 +1,10 @@
-export const SECTORS = ['Moduus', 'Alipack', 'Horno Linea 1', 'Horno Linea 2', 'Curva', 'Stock General'] as const;
+export const SECTORS = ['Moduus', 'Alipack', 'Horno Linea 1', 'Horno Linea 2', 'Curva'] as const;
 export type Sector = typeof SECTORS[number];
 
 export type Bearing = {
   id: string;
   name: string;
-  sector: Sector; // Sector where it is primarily assigned, or 'Stock General'
+  sector: 'Stock General'; // All bearings belong to a general stock now.
   stock: number;
   threshold: number;
 };

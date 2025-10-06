@@ -2,25 +2,21 @@
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { AlertCircle, Package, ShoppingCart, Truck } from "lucide-react";
 import StockTable from "./stock-table";
-import ReorderCard from "./reorder-card";
-import type { Bearing, UsageLog } from "@/lib/types";
+import type { Bearing, Sector } from "@/lib/types";
 
 type DashboardProps = {
   bearings: Bearing[];
-  usageLog: UsageLog[];
-  onLogUsage: (bearingId: string, quantity: number, sector: Bearing['sector']) => void;
+  onLogUsage: (bearingId: string, quantity: number, sector: Sector) => void;
   onUpdateBearing: (bearing: Bearing) => void;
 };
 
 export default function Dashboard({
   bearings,
-  usageLog,
   onLogUsage,
   onUpdateBearing,
 }: DashboardProps) {

@@ -2,11 +2,9 @@
 
 import React, { useState } from "react";
 import {
-  Bell,
   Home,
   LineChart,
   Menu,
-  ChevronDown,
   ChevronRight,
   ShoppingCart,
   Package,
@@ -57,7 +55,7 @@ export default function App() {
     });
   }
 
-  const handleLogUsage = (bearingId: string, quantity: number, sector: Bearing['sector']) => {
+  const handleLogUsage = (bearingId: string, quantity: number, sector: Sector) => {
     let updatedBearing: Bearing | undefined;
     setBearings((prevBearings) =>
       prevBearings.map((bearing) => {
@@ -79,7 +77,8 @@ export default function App() {
     );
     
     // This part runs only if the stock was sufficient
-    if (updatedBearing && updatedBearing.stock >= 0 && updatedBearing.stock !== bearings.find(b => b.id === bearingId)?.stock) {
+    const originalStock = bearings.find(b => b.id === bearingId)?.stock;
+    if (updatedBearing && originalStock && updatedBearing.stock < originalStock) {
       const newLog: UsageLog = {
         id: `usage-${Date.now()}`,
         bearingId: bearingId,
@@ -109,7 +108,7 @@ export default function App() {
   };
 
   const lowStockCount = bearings.filter(
-    (b) => b.stock <= b.threshold && b.stock > 0
+    (b) => b.stock <= b.threshold
   ).length;
 
   const NavLink = ({
@@ -160,7 +159,6 @@ export default function App() {
     if (view === 'dashboard') {
       return <Dashboard
         bearings={bearings}
-        usageLog={usageLog}
         onLogUsage={handleLogUsage}
         onUpdateBearing={handleUpdateBearing}
       />
@@ -169,7 +167,7 @@ export default function App() {
       return <Reports bearings={bearings} usageLog={usageLog} />
     }
     if (view === 'to-buy') {
-        return <ToBuyView bearings={bearings} onUpdateBearing={handleUpdateBearing} />
+        return <ToBuyView bearings={bearings} />
     }
     if (view.startsWith('sector-')) {
         const sector = view.replace('sector-', '') as Sector;
@@ -186,15 +184,15 @@ export default function App() {
         label="Panel de control"
       />
       <Collapsible open={isSectorsOpen} onOpenChange={setIsSectorsOpen}>
-          <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary [&[data-state=open]>svg]:rotate-90">
+          <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary [&[data-state=open]>div>svg.chevron]:rotate-90">
               <div className="flex items-center gap-3">
                   <Package className={isMobile ? "h-5 w-5" : "h-4 w-4"}/>
                   <span>Sectores</span>
+                  <ChevronRight className="chevron h-4 w-4 transition-transform" />
               </div>
-              <ChevronRight className="h-4 w-4 transition-transform" />
           </CollapsibleTrigger>
-          <CollapsibleContent className="space-y-1">
-              {SECTORS.filter(s => s !== 'Stock General').map(sector => (
+          <CollapsibleContent className="space-y-1 pt-1">
+              {SECTORS.map(sector => (
                   <NavLink
                       key={sector}
                       targetView={`sector-${sector}`}

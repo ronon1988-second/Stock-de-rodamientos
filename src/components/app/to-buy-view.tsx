@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { BrainCircuit, Loader2, Info, ShoppingCart, FileDown, CheckCircle } from "lucide-react";
 import { getAIReorderRecommendations } from "@/app/actions";
-import type { Bearing, UsageLog } from "@/lib/types";
+import type { Bearing } from "@/lib/types";
 import { ReorderRecommendationsOutput } from "@/ai/flows/reorder-recommendations";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -28,10 +28,9 @@ import { useToast } from "@/hooks/use-toast";
 
 type ToBuyViewProps = {
   bearings: Bearing[];
-  onUpdateBearing: (bearing: Bearing) => void;
 };
 
-export default function ToBuyView({ bearings, onUpdateBearing }: ToBuyViewProps) {
+export default function ToBuyView({ bearings }: ToBuyViewProps) {
   const [recommendations, setRecommendations] =
     useState<ReorderRecommendationsOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -41,7 +40,7 @@ export default function ToBuyView({ bearings, onUpdateBearing }: ToBuyViewProps)
   const reorderThreshold = 10;
   const leadTime = 7;
 
-  const bearingsToReorder = bearings.filter(b => b.stock < b.threshold);
+  const bearingsToReorder = bearings.filter(b => b.stock <= b.threshold);
 
   const handleGetAIRecommendations = async () => {
     setIsLoading(true);
@@ -164,7 +163,7 @@ export default function ToBuyView({ bearings, onUpdateBearing }: ToBuyViewProps)
                     <TableCell className="font-medium">{bearing.name}</TableCell>
                     <TableCell className="text-right text-destructive font-semibold">{bearing.stock}</TableCell>
                     <TableCell className="text-right">{bearing.threshold}</TableCell>
-                    <TableCell className="text-right font-bold">{needed}</TableCell>
+                    <TableCell className="text-right font-bold">{needed > 0 ? needed : 0}</TableCell>
                     <TableCell className="text-right font-bold text-primary">
                         {aiRecommendation !== null ? (
                             <div className="flex items-center justify-end gap-2">
