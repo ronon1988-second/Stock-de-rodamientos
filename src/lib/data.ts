@@ -1,6 +1,8 @@
 import { InventoryItem, SectorAssignment } from './types';
 
-// The 'sector' property has been removed, as all stock is part of a central inventory.
+// This data is now only used for one-time seeding if the database is empty.
+// The main application will read from Firestore directly.
+
 export const initialInventory: InventoryItem[] = [
   { id: 'b001', name: '698', stock: 0, threshold: 2 },
   { id: 'b002', name: '6000', stock: 2, threshold: 2 },

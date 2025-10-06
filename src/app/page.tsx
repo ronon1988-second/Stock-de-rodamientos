@@ -12,6 +12,12 @@ import {
   User,
   LogOut,
 } from "lucide-react";
+import {
+  collection,
+  doc,
+  writeBatch,
+  getDocs,
+} from "firebase/firestore";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,33 +38,88 @@ import { Logo } from "@/components/app/logo";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import SectorView from "@/components/app/sector-view";
 import ToBuyView from "@/components/app/to-buy-view";
-import { useUser, useAuth } from "@/firebase/provider";
+import { useUser, useAuth, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 
 type View = "dashboard" | "reports" | "to-buy" | `sector-${Sector}`;
 
 function AppContent() {
   const [view, setView] = useState<View>("dashboard");
-  const [inventory, setInventory] = useState<InventoryItem[]>(initialInventory);
-  const [usageLog, setUsageLog] = useState<UsageLog[]>([]);
-  const [sectorAssignments, setSectorAssignments] = useState<SectorAssignment[]>(initialSectorAssignments);
   const { toast } = useToast();
   const [isSectorsOpen, setIsSectorsOpen] = useState(true);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const { user } = useUser();
   const auth = useAuth();
+  const firestore = useFirestore();
+  const [isSeeding, setIsSeeding] = useState(false);
+  
+  // --- Firestore Data Hooks ---
+  const inventoryRef = useMemoFirebase(() => collection(firestore, "inventory"), [firestore]);
+  const { data: inventory, isLoading: isInventoryLoading } = useCollection<Omit<InventoryItem, 'id'>>(inventoryRef);
 
+  const sectorAssignmentsRef = useMemoFirebase(() => collection(firestore, "sectorAssignments"), [firestore]);
+  const { data: sectorAssignments, isLoading: isAssignmentsLoading } = useCollection<Omit<SectorAssignment, 'id'>>(sectorAssignmentsRef);
+
+  const usageLogRef = useMemoFirebase(() => collection(firestore, "usageLog"), [firestore]);
+  const { data: usageLog, isLoading: isUsageLogLoading } = useCollection<Omit<UsageLog, 'id'>>(usageLogRef);
+
+  // Effect to seed initial data if collections are empty
+  useEffect(() => {
+    const seedData = async () => {
+      if (inventory === null || sectorAssignments === null) return;
+      if (inventory.length === 0 && sectorAssignments.length === 0) {
+        setIsSeeding(true);
+        toast({
+          title: "Cargando datos iniciales...",
+          description: "Por favor espere. Esto puede tardar un momento.",
+        });
+        const batch = writeBatch(firestore);
+
+        const invRef = collection(firestore, "inventory");
+        initialInventory.forEach(item => {
+            const { id, ...data } = item;
+            const docRef = doc(invRef, id);
+            batch.set(docRef, data);
+        });
+
+        const assignRef = collection(firestore, "sectorAssignments");
+        initialSectorAssignments.forEach(item => {
+            const { id, ...data } = item;
+            const docRef = doc(assignRef, id);
+            batch.set(docRef, data);
+        });
+        
+        try {
+          await batch.commit();
+          toast({
+            title: "Datos cargados",
+            description: "El inventario inicial se ha cargado correctamente.",
+          });
+        } catch (error) {
+          console.error("Error seeding data: ", error);
+          toast({
+            variant: "destructive",
+            title: "Error al cargar datos",
+            description: "No se pudo cargar el inventario inicial.",
+          });
+        } finally {
+            setIsSeeding(false);
+        }
+      }
+    };
+    seedData();
+  }, [inventory, sectorAssignments, firestore, toast]);
+
+  const sortedInventory = useMemo(() => inventory ? [...inventory].sort((a, b) => a.name.localeCompare(b.name)) : [], [inventory]);
+  const sortedAssignments = useMemo(() => sectorAssignments ? [...sectorAssignments] : [], [sectorAssignments]);
+  const sortedUsageLog = useMemo(() => usageLog ? [...usageLog].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) : [], [usageLog]);
 
   const handleAddItem = (newItem: Omit<InventoryItem, 'id'>) => {
-    setInventory(prev => {
-        const newCompleteItem: InventoryItem = {
-            ...newItem,
-            id: `item-${Date.now()}-${Math.random()}`
-        };
-        return [...prev, newCompleteItem];
-    });
+    const invRef = collection(firestore, "inventory");
+    addDocumentNonBlocking(invRef, newItem);
     toast({
         title: "Artículo Agregado",
         description: `Se ha agregado ${newItem.name} al inventario.`
@@ -66,7 +127,9 @@ function AppContent() {
   }
 
   const handleUpdateItem = (updatedItem: InventoryItem) => {
-    setInventory(prev => prev.map(b => b.id === updatedItem.id ? updatedItem : b));
+    const itemRef = doc(firestore, "inventory", updatedItem.id);
+    const { id, ...data } = updatedItem;
+    updateDocumentNonBlocking(itemRef, data);
      toast({
         title: "Artículo Actualizado",
         description: `Se ha actualizado el stock de ${updatedItem.name}.`
@@ -74,33 +137,20 @@ function AppContent() {
   }
 
   const handleAssignItemToSector = (itemId: string, sector: Sector, quantity: number) => {
+    if (!inventory) return;
     const item = inventory.find(b => b.id === itemId);
     if (!item) return;
 
-    setSectorAssignments(prevAssignments => {
-      const existingAssignment = prevAssignments.find(
-        i => i.sector === sector && i.itemId === itemId
-      );
+    const assignRef = collection(firestore, "sectorAssignments");
+    
+    const newAssignment: Omit<SectorAssignment, 'id'> = {
+      sector,
+      itemId,
+      itemName: item.name,
+      quantity: quantity
+    };
 
-      if (existingAssignment) {
-        // If it exists, update the quantity
-        return prevAssignments.map(i =>
-          i.id === existingAssignment.id
-            ? { ...i, quantity: i.quantity + quantity }
-            : i
-        );
-      } else {
-        // If it doesn't exist, add a new assignment
-        const newAssignment: SectorAssignment = {
-          id: `si-${Date.now()}`,
-          sector,
-          itemId,
-          itemName: item.name,
-          quantity: quantity
-        };
-        return [...prevAssignments, newAssignment];
-      }
-    });
+    addDocumentNonBlocking(assignRef, newAssignment);
 
     toast({
       title: "Artículo Asignado",
@@ -109,10 +159,12 @@ function AppContent() {
   };
 
   const handleRemoveItemFromSector = (assignmentId: string) => {
-    const assignment = sectorAssignments.find(item => item.id === assignmentId);
+    const assignment = sectorAssignments?.find(item => item.id === assignmentId);
     if (!assignment) return;
 
-    setSectorAssignments(prev => prev.filter(item => item.id !== assignmentId));
+    const assignRef = doc(firestore, "sectorAssignments", assignmentId);
+    deleteDocumentNonBlocking(assignRef);
+
     toast({
       title: "Asignación Eliminada",
       description: `Se ha quitado el artículo ${assignment.itemName} del sector ${assignment.sector}.`,
@@ -120,57 +172,54 @@ function AppContent() {
   };
 
   const handleLogUsage = (itemId: string, quantity: number, sector: Sector) => {
-    let updatedItem: InventoryItem | undefined;
-    setInventory((prevInventory) =>
-      prevInventory.map((item) => {
-        if (item.id === itemId) {
-          if (item.stock < quantity) {
-             toast({
-              variant: "destructive",
-              title: "Error de Stock",
-              description: `No hay suficiente stock para ${item.name}.`,
-            });
-            updatedItem = item; // Keep it as is
-            return item;
-          }
-          updatedItem = { ...item, stock: item.stock - quantity };
-          return updatedItem;
-        }
-        return item;
-      })
-    );
-    
-    const originalStock = inventory.find(b => b.id === itemId)?.stock;
-    if (updatedItem && originalStock && updatedItem.stock < originalStock) {
-      const newLog: UsageLog = {
-        id: `usage-${Date.now()}`,
-        itemId: itemId,
-        itemName: updatedItem.name,
-        quantity,
-        date: new Date().toISOString(),
-        sector: sector,
-      };
-      setUsageLog((prevLogs) => [newLog, ...prevLogs]);
+    if (!inventory) return;
+    const item = inventory.find(i => i.id === itemId);
+    if (!item) return;
 
+    if (item.stock < quantity) {
       toast({
-        title: "Uso Registrado",
-        description: `Se han usado ${quantity} unidades de ${updatedItem.name} en ${sector}.`
+        variant: "destructive",
+        title: "Error de Stock",
+        description: `No hay suficiente stock para ${item.name}.`,
       });
+      return;
+    }
+    
+    // Update inventory stock
+    const updatedStock = item.stock - quantity;
+    const itemRef = doc(firestore, "inventory", itemId);
+    updateDocumentNonBlocking(itemRef, { stock: updatedStock });
+    
+    // Create usage log
+    const newLog: Omit<UsageLog, 'id'> = {
+      itemId: itemId,
+      itemName: item.name,
+      quantity,
+      date: new Date().toISOString(),
+      sector: sector,
+    };
+    const usageLogRef = collection(firestore, "usageLog");
+    addDocumentNonBlocking(usageLogRef, newLog);
 
-      if (
-        updatedItem.stock <= updatedItem.threshold &&
-        (updatedItem.stock + quantity) > updatedItem.threshold
-      ) {
-        toast({
-          variant: "destructive",
-          title: "Alerta de Stock Bajo",
-          description: `El artículo ${updatedItem.name} ha entrado en nivel de stock bajo.`,
-        });
-      }
+    toast({
+      title: "Uso Registrado",
+      description: `Se han usado ${quantity} unidades de ${item.name} en ${sector}.`
+    });
+
+    if (
+      updatedStock <= item.threshold &&
+      (item.stock) > item.threshold
+    ) {
+      toast({
+        variant: "destructive",
+        title: "Alerta de Stock Bajo",
+        description: `El artículo ${item.name} ha entrado en nivel de stock bajo.`,
+      });
     }
   };
 
   const lowStockCount = useMemo(() => {
+    if (!inventory || !sectorAssignments) return 0;
     const requiredBySector: { [itemId: string]: number } = {};
     sectorAssignments.forEach(item => {
         if (!requiredBySector[item.itemId]) {
@@ -242,26 +291,31 @@ function AppContent() {
   }
 
   const renderContent = () => {
+    const isLoading = isInventoryLoading || isAssignmentsLoading || isUsageLogLoading || isSeeding;
+     if (isLoading) {
+        return <Skeleton className="h-full w-full" />
+    }
+
     if (view === 'dashboard') {
       return <Dashboard
-        inventory={inventory}
+        inventory={sortedInventory}
         onLogUsage={handleLogUsage}
         onUpdateItem={handleUpdateItem}
         onAddItem={handleAddItem}
       />
     }
     if (view === 'reports') {
-      return <Reports usageLog={usageLog} />
+      return <Reports usageLog={sortedUsageLog} />
     }
     if (view === 'to-buy') {
-        return <ToBuyView inventory={inventory} sectorAssignments={sectorAssignments}/>
+        return <ToBuyView inventory={sortedInventory} sectorAssignments={sortedAssignments}/>
     }
     if (view.startsWith('sector-')) {
         const sector = view.replace('sector-', '') as Sector;
         return <SectorView 
             sector={sector} 
-            allInventory={inventory} 
-            sectorAssignments={sectorAssignments.filter(item => item.sector === sector)}
+            allInventory={sortedInventory} 
+            sectorAssignments={sortedAssignments.filter(item => item.sector === sector)}
             onAssignItem={handleAssignItemToSector}
             onRemoveItem={handleRemoveItemFromSector}
         />
