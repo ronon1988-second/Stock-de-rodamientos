@@ -23,7 +23,7 @@ import type { InventoryItem, Sector } from "@/lib/types";
 import { MoreHorizontal, Search, ChevronRight, PlusCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { Collapsible, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import AddItemDialog from "./add-item-dialog";
 
 type StockTableProps = {
@@ -57,8 +57,8 @@ const getItemSeries = (name: string): string => {
   }
   if (normalizedName.startsWith('NK') || normalizedName.startsWith('RNA') || normalizedName.startsWith('HK')) return 'Rodamientos de Agujas';
   if (normalizedName.startsWith('PHS') || normalizedName.startsWith('POS')) return 'Terminales de Rótula';
-  if (normalizedName.startsWith('H')) return 'Manguitos de Montaje';
   if (normalizedName.startsWith('HTD')) return 'Correas';
+  if (normalizedName.startsWith('H')) return 'Manguitos de Montaje';
   if (normalizedName.startsWith('AEVU')) return 'Pistones';
   
   return 'Otros';
@@ -162,22 +162,38 @@ export default function StockTable({ inventory, onLogUsage, onUpdateItem, onAddI
                 {groupedItems.length > 0 ? (
                     groupedItems.map(([series, itemsInGroup]) => (
                       <React.Fragment key={series}>
-                        <Collapsible asChild open={openCollapsibles.includes(series)} onOpenChange={() => toggleCollapsible(series)} key={series}>
-                            <TableRow className="bg-muted/50 hover:bg-muted/80">
-                                <TableCell colSpan={4} className="p-0">
-                                    <CollapsibleTrigger className="w-full h-full flex items-center gap-2 p-4 text-left font-bold">
-                                        <ChevronRight className={`h-4 w-4 transition-transform ${openCollapsibles.includes(series) ? 'rotate-90' : ''}`} />
-                                        {series} ({itemsInGroup.length})
-                                    </CollapsibleTrigger>
+                        <TableRow className="bg-muted/50 hover:bg-muted">
+                          <TableCell colSpan={4} className="p-0">
+                            <div
+                              className="flex w-full cursor-pointer items-center gap-2 p-4 text-left font-bold"
+                              onClick={() => toggleCollapsible(series)}
+                            >
+                              <ChevronRight
+                                className={`h-4 w-4 transition-transform ${
+                                  openCollapsibles.includes(series) ? "rotate-90" : ""
+                                }`}
+                              />
+                              {series} ({itemsInGroup.length})
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                        {openCollapsibles.includes(series) &&
+                          itemsInGroup.map((item) => {
+                            const status = getStatus(item);
+                            return (
+                              <TableRow
+                                key={item.id}
+                                className={
+                                  status === "Stock Bajo"
+                                    ? "bg-amber-500/10"
+                                    : status === "Sin Stock"
+                                    ? "bg-destructive/10"
+                                    : ""
+                                }
+                              >
+                                <TableCell className="font-medium pl-12">
+                                  {item.name}
                                 </TableCell>
-                            </TableRow>
-                        </Collapsible>
-
-                        {openCollapsibles.includes(series) && itemsInGroup.map((item) => {
-                          const status = getStatus(item);
-                          return (
-                              <TableRow key={item.id} className={status === 'Stock Bajo' ? 'bg-amber-500/10' : status === 'Sin Stock' ? 'bg-destructive/10' : ''}>
-                                <TableCell className="font-medium pl-12">{item.name}</TableCell>
                                 <TableCell className="text-right">{item.stock}</TableCell>
                                 <TableCell className="text-center">
                                   <Badge variant={getStatusVariant(status)}>{status}</Badge>
@@ -185,25 +201,33 @@ export default function StockTable({ inventory, onLogUsage, onUpdateItem, onAddI
                                 <TableCell>
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                      <Button aria-haspopup="true" size="icon" variant="ghost">
+                                      <Button
+                                        aria-haspopup="true"
+                                        size="icon"
+                                        variant="ghost"
+                                      >
                                         <MoreHorizontal className="h-4 w-4" />
                                         <span className="sr-only">Alternar menú</span>
                                       </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
                                       <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                      <DropdownMenuItem onSelect={() => setLogUsageItem(item)}>
+                                      <DropdownMenuItem
+                                        onSelect={() => setLogUsageItem(item)}
+                                      >
                                         Registrar Uso
                                       </DropdownMenuItem>
-                                      <DropdownMenuItem onSelect={() => setEditingItem(item)}>
+                                      <DropdownMenuItem
+                                        onSelect={() => setEditingItem(item)}
+                                      >
                                         Actualizar Stock
                                       </DropdownMenuItem>
                                     </DropdownMenuContent>
                                   </DropdownMenu>
                                 </TableCell>
                               </TableRow>
-                          );
-                        })}
+                            );
+                          })}
                       </React.Fragment>
                     ))
                 ) : (
