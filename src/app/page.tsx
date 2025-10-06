@@ -28,7 +28,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Bearing, UsageLog, Sector, SECTORS, SectorInventory } from "@/lib/types";
 import { initialBearings } from "@/lib/data";
 import Dashboard from "@/components/app/dashboard";
@@ -315,9 +315,12 @@ export default function App() {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="flex flex-col">
+                <SheetHeader>
+                  <SheetTitle className="sr-only">Menú de Navegación</SheetTitle>
+                </SheetHeader>
               <div className="flex items-center gap-2 text-lg font-semibold mb-4">
                 <Logo className="h-8 w-8 text-primary" />
-                <span className="sr-only">Balance de Rodamientos</span>
+                <span>Balance de Rodamientos</span>
               </div>
               <MainNav isMobile={true} />
             </SheetContent>
@@ -350,3 +353,5 @@ export default function App() {
     </div>
   );
 }
+
+    
