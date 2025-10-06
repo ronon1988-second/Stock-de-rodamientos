@@ -1,4 +1,4 @@
-import { Bearing } from './types';
+import { Bearing, SectorInventory } from './types';
 
 // The 'sector' property has been removed from the initial data,
 // as all stock is now considered part of a central inventory.
@@ -19,7 +19,7 @@ export const initialBearings: Bearing[] = [
   { id: 'b014', name: '6200', stock: 0, threshold: 10 },
   { id: 'b015', name: '6201', stock: 4, threshold: 10 },
   { id: 'b016', name: '6202', stock: 10, threshold: 10 },
-  { id: 'b017', name: '6202C3 ZZ', stock: 0, threshold: 10 },
+  { id: 'b017', name: '6202 c3', stock: 0, threshold: 10 },
   { id: 'b018', name: '6203', stock: 3, threshold: 10 },
   { id: 'b019', name: '6203 ZZ', stock: 7, threshold: 10 },
   { id: 'b020', name: '6204', stock: 1, threshold: 10 },
@@ -86,7 +86,7 @@ export const initialBearings: Bearing[] = [
   { id: 'b081', name: '2207', stock: 2, threshold: 10 },
   { id: 'b082', name: '2209', stock: 1, threshold: 10 },
   { id: 'b083', name: '2212', stock: 1, threshold: 10 },
-  { id: 'b084', name: '20124', stock: 0, threshold: 10 },
+  { id: 'b084', name: '22124', stock: 0, threshold: 10 },
   { id: 'b085', name: '22211', stock: 1, threshold: 10 },
   { id: 'b086', name: '22208', stock: 2, threshold: 10 },
   { id: 'b087', name: '30203', stock: 6, threshold: 10 },
@@ -97,4 +97,21 @@ export const initialBearings: Bearing[] = [
   { id: 'b092', name: '30210', stock: 5, threshold: 10 },
   { id: 'b093', name: '32010', stock: 5, threshold: 10 },
   { id: 'b094', name: 'LM 25 UU', stock: 5, threshold: 10 },
+];
+
+export const initialSectorInventory: SectorInventory[] = [
+  { id: 'si-001', sector: 'Modulus', bearingId: 'b004', bearingName: '6002', quantity: 6 },
+  { id: 'si-002', sector: 'Modulus', bearingId: 'b007', bearingName: '6004', quantity: 10 },
+  { id: 'si-003', sector: 'Modulus', bearingId: 'b008', bearingName: '6005', quantity: 22 },
+  { id: 'si-004', sector: 'Modulus', bearingId: 'b009', bearingName: '6005 ZZ', quantity: 6 },
+  { id: 'si-005', sector: 'Modulus', bearingId: 'b014', bearingName: '6200', quantity: 6 },
+  { id: 'si-006', sector: 'Modulus', bearingId: 'b017', bearingName: '6202 c3', quantity: 12 },
+  { id: 'si-007', sector: 'Modulus', bearingId: 'b020', bearingName: '6204', quantity: 2 },
+  { id: 'si-008', sector: 'Modulus', bearingId: 'b025', bearingName: '6208 ZZ C3', quantity: 4 },
+  { id: 'si-009', sector: 'Modulus', bearingId: 'b032', bearingName: '6302', quantity: 2 },
+  { id: 'si-010', sector: 'Modulus', bearingId: 'b034', bearingName: '6304', quantity: 1 },
+  { id: 'si-011', sector: 'Modulus', bearingId: 'b045', bearingName: 'UC 204', quantity: 4 },
+  { id: 'si-012', sector: 'Modulus', bearingId: 'b046', bearingName: 'UC 205', quantity: 4 },
+  { id: 'si-013', sector: 'Modulus', bearingId: 'b061', bearingName: 'HK 3038z', quantity: 2 },
+  { id: 'si-014', sector: 'Modulus', bearingId: 'b040', bearingName: '6903', quantity: 2 },
 ];

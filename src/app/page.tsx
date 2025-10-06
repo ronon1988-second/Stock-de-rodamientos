@@ -20,9 +20,9 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Bearing, UsageLog, Sector, SECTORS, SectorInventory } from "@/lib/types";
-import { initialBearings } from "@/lib/data";
+import { initialBearings, initialSectorInventory } from "@/lib/data";
 import Dashboard from "@/components/app/dashboard";
 import Reports from "@/components/app/reports";
 import { useToast } from "@/hooks/use-toast";
@@ -37,7 +37,7 @@ export default function App() {
   const [view, setView] = useState<View>("dashboard");
   const [bearings, setBearings] = useState<Bearing[]>(initialBearings);
   const [usageLog, setUsageLog] = useState<UsageLog[]>([]);
-  const [sectorInventory, setSectorInventory] = useState<SectorInventory[]>([]);
+  const [sectorInventory, setSectorInventory] = useState<SectorInventory[]>(initialSectorInventory);
   const { toast } = useToast();
   const [isSectorsOpen, setIsSectorsOpen] = useState(true);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
