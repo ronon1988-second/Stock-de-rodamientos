@@ -10,6 +10,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -34,13 +35,14 @@ type AssignBearingDialogProps = {
   sector: Sector;
   allBearings: Bearing[];
   onClose: () => void;
-  onAssign: (bearingId: string, sector: Sector) => void;
+  onAssign: (bearingId: string, sector: Sector, quantity: number) => void;
 };
 
 const AssignBearingSchema = z.object({
   bearingId: z.string({
     required_error: "Por favor seleccione un rodamiento.",
   }),
+  quantity: z.coerce.number().int().positive("La cantidad debe ser mayor que cero."),
 });
 
 export default function AssignBearingDialog({
@@ -52,10 +54,13 @@ export default function AssignBearingDialog({
 
   const form = useForm<z.infer<typeof AssignBearingSchema>>({
     resolver: zodResolver(AssignBearingSchema),
+    defaultValues: {
+      quantity: 1,
+    }
   });
 
   function onSubmit(values: z.infer<typeof AssignBearingSchema>) {
-    onAssign(values.bearingId, sector);
+    onAssign(values.bearingId, sector, values.quantity);
     onClose();
   }
 
@@ -65,7 +70,7 @@ export default function AssignBearingDialog({
         <DialogHeader>
           <DialogTitle>Asignar Rodamiento a {sector}</DialogTitle>
           <DialogDescription>
-            Seleccione un rodamiento del inventario general para añadirlo a la lista de este sector.
+            Seleccione un rodamiento y la cantidad a asignar a este sector.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -90,6 +95,19 @@ export default function AssignBearingDialog({
                       ))}
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="quantity"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Cantidad a Asignar</FormLabel>
+                  <FormControl>
+                    <Input type="number" {...field} />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

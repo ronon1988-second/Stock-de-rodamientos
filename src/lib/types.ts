@@ -25,6 +25,5 @@ export type SectorInventory = {
   sector: Sector;
   bearingId: string;
   bearingName: string;
-  // Quantity here could mean "quantity installed in this machine"
-  // For now, we'll just map the bearing. The logic can be extended.
+  quantity: number; // Quantity installed in this machine/sector
 };

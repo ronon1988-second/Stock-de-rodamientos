@@ -12,7 +12,7 @@ type SectorViewProps = {
     sector: Sector;
     allBearings: Bearing[];
     sectorInventory: SectorInventory[];
-    onAssignBearing: (bearingId: string, sector: Sector) => void;
+    onAssignBearing: (bearingId: string, sector: Sector, quantity: number) => void;
     onRemoveBearing: (assignmentId: string) => void;
 };
 
@@ -36,7 +36,7 @@ export default function SectorView({ sector, allBearings, sectorInventory, onAss
                         <div>
                             <CardTitle>Rodamientos en {sector}</CardTitle>
                             <CardDescription>
-                                Esta es la lista de rodamientos asignados a este sector.
+                                Esta es la lista de rodamientos asignados a este sector y la cantidad requerida.
                             </CardDescription>
                         </div>
                         <Button onClick={() => setIsAssignDialogOpen(true)}>
@@ -49,6 +49,7 @@ export default function SectorView({ sector, allBearings, sectorInventory, onAss
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Rodamiento</TableHead>
+                                    <TableHead className="text-right">Cantidad Asignada</TableHead>
                                     <TableHead className="text-right">Stock General Actual</TableHead>
                                     <TableHead className="w-[80px]">Acciones</TableHead>
                                 </TableRow>
@@ -58,6 +59,7 @@ export default function SectorView({ sector, allBearings, sectorInventory, onAss
                                     assignedBearingsDetails.map(item => (
                                         <TableRow key={item.id}>
                                             <TableCell className="font-medium">{item.bearingName}</TableCell>
+                                            <TableCell className="text-right font-semibold">{item.quantity}</TableCell>
                                             <TableCell className="text-right">{item.stock}</TableCell>
                                             <TableCell>
                                                 <Button 
@@ -73,7 +75,7 @@ export default function SectorView({ sector, allBearings, sectorInventory, onAss
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={3} className="h-24 text-center">
+                                        <TableCell colSpan={4} className="h-24 text-center">
                                             Aún no se han asignado rodamientos a este sector.
                                         </TableCell>
                                     </TableRow>

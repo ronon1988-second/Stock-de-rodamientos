@@ -57,31 +57,38 @@ export default function App() {
     });
   }
 
-  const handleAssignBearingToSector = (bearingId: string, sector: Sector) => {
+  const handleAssignBearingToSector = (bearingId: string, sector: Sector, quantity: number) => {
     const bearing = bearings.find(b => b.id === bearingId);
     if (!bearing) return;
 
-    const alreadyExists = sectorInventory.some(item => item.sector === sector && item.bearingId === bearingId);
+    setSectorInventory(prevInventory => {
+      const existingAssignment = prevInventory.find(
+        item => item.sector === sector && item.bearingId === bearingId
+      );
 
-    if (alreadyExists) {
-      toast({
-        variant: "destructive",
-        title: "Asignación Duplicada",
-        description: `El rodamiento ${bearing.name} ya está asignado al sector ${sector}.`,
-      });
-      return;
-    }
+      if (existingAssignment) {
+        // If it exists, update the quantity
+        return prevInventory.map(item =>
+          item.id === existingAssignment.id
+            ? { ...item, quantity: item.quantity + quantity }
+            : item
+        );
+      } else {
+        // If it doesn't exist, add a new assignment
+        const newAssignment: SectorInventory = {
+          id: `si-${Date.now()}`,
+          sector,
+          bearingId,
+          bearingName: bearing.name,
+          quantity: quantity
+        };
+        return [...prevInventory, newAssignment];
+      }
+    });
 
-    const newAssignment: SectorInventory = {
-      id: `si-${Date.now()}`,
-      sector,
-      bearingId,
-      bearingName: bearing.name,
-    };
-    setSectorInventory(prev => [...prev, newAssignment]);
     toast({
       title: "Rodamiento Asignado",
-      description: `Se ha asignado ${bearing.name} al sector ${sector}.`,
+      description: `Se han asignado ${quantity} unidades de ${bearing.name} al sector ${sector}.`,
     });
   };
 
