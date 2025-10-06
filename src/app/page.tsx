@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Home,
   LineChart,
@@ -10,6 +10,7 @@ import {
   ShoppingCart,
   Package,
   User,
+  LogOut,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -31,10 +32,14 @@ import { Logo } from "@/components/app/logo";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import SectorView from "@/components/app/sector-view";
 import ToBuyView from "@/components/app/to-buy-view";
+import { useUser, useAuth } from "@/firebase/provider";
+import { useRouter } from "next/navigation";
+import { Skeleton } from "@/components/ui/skeleton";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 type View = "dashboard" | "reports" | "to-buy" | `sector-${Sector}`;
 
-export default function App() {
+function AppContent() {
   const [view, setView] = useState<View>("dashboard");
   const [inventory, setInventory] = useState<InventoryItem[]>(initialInventory);
   const [usageLog, setUsageLog] = useState<UsageLog[]>([]);
@@ -42,6 +47,8 @@ export default function App() {
   const { toast } = useToast();
   const [isSectorsOpen, setIsSectorsOpen] = useState(true);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const { user } = useUser();
+  const auth = useAuth();
 
 
   const handleAddItem = (newItem: Omit<InventoryItem, 'id'>) => {
@@ -179,6 +186,14 @@ export default function App() {
         return b.stock < totalDemand;
     }).length;
   }, [inventory, sectorAssignments]);
+
+  const handleLogout = async () => {
+    await auth.signOut();
+    toast({
+        title: "Sesión cerrada",
+        description: "Has cerrado sesión exitosamente.",
+    })
+  };
 
   const NavLink = ({
     targetView,
@@ -363,10 +378,22 @@ export default function App() {
           <div className="w-full flex-1">
              <h1 className="font-semibold text-xl capitalize">{getViewTitle()}</h1>
           </div>
-          <Button variant="secondary" size="icon" className="rounded-full">
-            <User className="h-5 w-5" />
-            <span className="sr-only">Perfil de usuario</span>
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="secondary" size="icon" className="rounded-full">
+                <User className="h-5 w-5" />
+                <span className="sr-only">Perfil de usuario</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>{user?.email}</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={handleLogout}>
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Cerrar sesión</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </header>
         <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-muted/40">
           {renderContent()}
@@ -376,3 +403,23 @@ export default function App() {
   );
 }
 
+export default function Page() {
+  const { user, isUserLoading } = useUser();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.push('/login');
+    }
+  }, [user, isUserLoading, router]);
+
+  if (isUserLoading || !user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Skeleton className="h-[95vh] w-[95vw] rounded-lg" />
+      </div>
+    );
+  }
+
+  return <AppContent />;
+}
