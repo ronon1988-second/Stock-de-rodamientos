@@ -68,7 +68,8 @@ export const initialBearings: Bearing[] = [
   { id: 'b063', name: 'H307', stock: 0, threshold: 10 },
   { id: 'b064', name: '3308', stock: 0, threshold: 10 },
   { id: 'b065', name: 'HK 16/20', stock: 3, threshold: 10 },
-  { id: 'b066', name: 'RNA 6902', stock: 1, threshold: 10 },
+  { id: 'b066', name: 'RNA 6902', stock: 1, threshold:
+10 },
   { id: 'b067', name: 'TAF 283720', stock: 2, threshold: 10 },
   { id: 'b068', name: 'PHS B4', stock: 16, threshold: 10 },
   { id: 'b069', name: 'PHS B4L', stock: 2, threshold: 10 },
@@ -100,6 +101,7 @@ export const initialBearings: Bearing[] = [
 ];
 
 export const initialSectorInventory: SectorInventory[] = [
+  // Modulus
   { id: 'si-001', sector: 'Modulus', bearingId: 'b004', bearingName: '6002', quantity: 6 },
   { id: 'si-002', sector: 'Modulus', bearingId: 'b007', bearingName: '6004', quantity: 10 },
   { id: 'si-003', sector: 'Modulus', bearingId: 'b008', bearingName: '6005', quantity: 22 },
@@ -114,4 +116,19 @@ export const initialSectorInventory: SectorInventory[] = [
   { id: 'si-012', sector: 'Modulus', bearingId: 'b046', bearingName: 'UC 205', quantity: 4 },
   { id: 'si-013', sector: 'Modulus', bearingId: 'b061', bearingName: 'HK 3038z', quantity: 2 },
   { id: 'si-014', sector: 'Modulus', bearingId: 'b040', bearingName: '6903', quantity: 2 },
+  // Alipack
+  { id: 'si-101', sector: 'Alipack', bearingId: 'b003', bearingName: '6001', quantity: 4 },
+  { id: 'si-102', sector: 'Alipack', bearingId: 'b006', bearingName: '6003', quantity: 2 },
+  { id: 'si-103', sector: 'Alipack', bearingId: 'b007', bearingName: '6004', quantity: 11 },
+  { id: 'si-104', sector: 'Alipack', bearingId: 'b008', bearingName: '6005', quantity: 4 },
+  { id: 'si-105', sector: 'Alipack', bearingId: 'b010', bearingName: '6006', quantity: 2 },
+  { id: 'si-106', sector: 'Alipack', bearingId: 'b017', bearingName: '6202 c3', quantity: 20 },
+  { id: 'si-107', sector: 'Alipack', bearingId: 'b019', bearingName: '6203 ZZ', quantity: 8 },
+  { id: 'si-108', sector: 'Alipack', bearingId: 'b022', bearingName: '6206', quantity: 4 },
+  { id: 'si-109', sector: 'Alipack', bearingId: 'b060', bearingName: '6902', quantity: 2 },
+  { id: 'si-110', sector: 'Alipack', bearingId: 'b045', bearingName: 'UC 204', quantity: 2 },
+  { id: 'si-111', sector: 'Alipack', bearingId: 'b055', bearingName: 'RNA4905', quantity: 2 },
+  { id: 'si-112', sector: 'Alipack', bearingId: 'b056', bearingName: 'NK 17/16', quantity: 3 },
+  { id: 'si-113', sector: 'Alipack', bearingId: 'b057', bearingName: 'NK 28/20R', quantity: 2 },
+  { id: 'si-114', sector: 'Alipack', bearingId: 'b059', bearingName: 'NK21/16 R17/21/20', quantity: 1 },
 ];
