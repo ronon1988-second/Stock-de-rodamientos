@@ -25,7 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 
 type ToBuyViewProps = {
@@ -108,13 +108,13 @@ export default function ToBuyView({ inventory, sectorAssignments }: ToBuyViewPro
   }, [inventory, sectorAssignments]);
   
   useEffect(() => {
-      if (itemsToReorder.length > 0) {
+      if (itemsToReorder.length > 0 && openCollapsibles.length === 0) {
           const allGroups = [...new Set(itemsToReorder.map(item => getItemSeries(item.item.name)))];
           setOpenCollapsibles(allGroups);
-      } else {
+      } else if (itemsToReorder.length === 0) {
           setOpenCollapsibles([]);
       }
-  }, []);
+  }, [itemsToReorder]);
 
 
 
@@ -256,42 +256,36 @@ export default function ToBuyView({ inventory, sectorAssignments }: ToBuyViewPro
             <TableBody>
               {groupedItems.length > 0 ? (
                 groupedItems.map(([series, itemsInGroup]) => (
-                  <Collapsible asChild key={series} open={openCollapsibles.includes(series)} onOpenChange={() => toggleCollapsible(series)}>
-                    <React.Fragment>
-                      <TableRow className="bg-muted/50 hover:bg-muted cursor-pointer">
-                          <TableCell colSpan={6} className="p-0">
-                            <CollapsibleTrigger className="w-full p-4 text-left">
-                              <div className="flex items-center gap-2 font-bold">
-                                <ChevronRight className={`h-4 w-4 transition-transform ${openCollapsibles.includes(series) ? 'rotate-90' : ''}`} />
-                                {series} ({itemsInGroup.length})
-                              </div>
-                            </CollapsibleTrigger>
+                  <React.Fragment key={series}>
+                    <TableRow className="bg-muted/50 hover:bg-muted cursor-pointer" onClick={() => toggleCollapsible(series)}>
+                        <TableCell colSpan={6} className="p-0">
+                           <div className="flex items-center gap-2 p-4 text-left font-bold">
+                              <ChevronRight className={`h-4 w-4 transition-transform ${openCollapsibles.includes(series) ? 'rotate-90' : ''}`} />
+                              {series} ({itemsInGroup.length})
+                            </div>
+                        </TableCell>
+                    </TableRow>
+                    {openCollapsibles.includes(series) && itemsInGroup.map((item) => {
+                      const { item: inventoryItem, totalRequired, toBuy } = item;
+                      const aiRecommendation = getAIRecommendationFor(inventoryItem.name);
+                      return (
+                        <TableRow key={inventoryItem.id} className="bg-amber-500/5">
+                          <TableCell className="font-medium pl-12">{inventoryItem.name}</TableCell>
+                          <TableCell className="text-right text-destructive font-semibold">{inventoryItem.stock}</TableCell>
+                          <TableCell className="text-right">{totalRequired}</TableCell>
+                          <TableCell className="text-right">{inventoryItem.threshold}</TableCell>
+                          <TableCell className="text-right font-bold text-primary">{toBuy}</TableCell>
+                          <TableCell className="text-right font-bold">
+                              {aiRecommendation !== null ? (
+                                  <div className="flex items-center justify-end gap-2">
+                                      <BrainCircuit size={16} className="text-blue-500" />
+                                      <span>{aiRecommendation}</span>
+                                  </div>
+                              ) : recommendations ? '-' : ''}
                           </TableCell>
-                      </TableRow>
-                      {itemsInGroup.map((item) => {
-                        const { item: inventoryItem, totalRequired, toBuy } = item;
-                        const aiRecommendation = getAIRecommendationFor(inventoryItem.name);
-                        return (
-                        <CollapsibleContent asChild key={inventoryItem.id}>
-                          <TableRow className="bg-amber-500/5">
-                            <TableCell className="font-medium pl-12">{inventoryItem.name}</TableCell>
-                            <TableCell className="text-right text-destructive font-semibold">{inventoryItem.stock}</TableCell>
-                            <TableCell className="text-right">{totalRequired}</TableCell>
-                            <TableCell className="text-right">{inventoryItem.threshold}</TableCell>
-                            <TableCell className="text-right font-bold text-primary">{toBuy}</TableCell>
-                            <TableCell className="text-right font-bold">
-                                {aiRecommendation !== null ? (
-                                    <div className="flex items-center justify-end gap-2">
-                                        <BrainCircuit size={16} className="text-blue-500" />
-                                        <span>{aiRecommendation}</span>
-                                    </div>
-                                ) : recommendations ? '-' : ''}
-                            </TableCell>
-                          </TableRow>
-                        </CollapsibleContent>
-                      )})}
-                    </React.Fragment>
-                  </Collapsible>
+                        </TableRow>
+                    )})}
+                  </React.Fragment>
                 ))
               ) : (
                 <TableRow>
@@ -322,3 +316,5 @@ export default function ToBuyView({ inventory, sectorAssignments }: ToBuyViewPro
     </div>
   );
 }
+
+    
