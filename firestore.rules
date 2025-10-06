@@ -1,169 +1,80 @@
+/**
+ * @fileoverview Firestore Security Rules for Prototyping.
+ *
+ * Core Philosophy:
+ * This ruleset is designed for the rapid prototyping phase of development. It prioritizes ease of access and
+ * modification for developers while maintaining a baseline level of security. It assumes a shared inventory model where any authenticated user can view and modify the same dataset.
+ *
+ * Data Structure:
+ * - /inventory/{inventoryId}: Stores inventory items. Accessible by any authenticated user.
+ * - /sectorAssignments/{assignmentId}: Stores sector assignments. Accessible by any authenticated user.
+ * - /usageLog/{usageLogId}: Stores usage logs. Accessible by any authenticated user.
+ *
+ * Key Security Decisions:
+ * - All authenticated users can read and write all collections.
+ * - The rules explicitly deny unauthenticated access.
+ * - No data validation is enforced beyond requiring user authentication for all operations.
+ *
+ * Denormalization for Authorization: N/A (All authenticated users have access)
+ * Structural Segregation: N/A (All data is shared)
+ */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the request is made by the owner of the resource.
-     * @param {string} userId The user ID to compare against the request's auth UID.
-     * @return {bool} True if the user is the owner, false otherwise.
-     */
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    /**
-     * @description Checks if the user is signed in.
-     * @return {bool} True if the user is signed in, false otherwise.
+     * @description Defines whether a user is signed in.
      */
     function isSignedIn() {
       return request.auth != null;
     }
 
     /**
-     * @description Checks if the user is the existing owner of the resource.
-     *              Combines the ownership check with existence check (`resource != null`).
-     * @param {string} userId The user ID to compare against the resource's owner ID.
-     * @return {bool} True if the user is the existing owner, false otherwise.
+     * @description Rules for the 'inventory' collection. Allows any authenticated user to read and write inventory items.
+     * @path /databases/{database}/documents/inventory/{inventoryId}
+     * @allow (get, list) Any authenticated user can read.
+     * @allow (create, update, delete) Any authenticated user can write.
+     * @deny If the user is not authenticated.
+     * @principle Allows full access to inventory for all authenticated users during prototyping.
      */
-    function isExistingOwner(userId) {
-      return (isOwner(userId) && exists(resource.data));
-    }
-
-
-    /**
-     * @description Rules for the root users collection. Listing all users is denied.
-     * @path /users
-     * @allow (list) Signed-in user attempts to list all users.
-     * @deny (list) Listing all users is always denied.
-     * @principle Prevents unauthorized listing of users.
-     */
-    match /users {
-      allow list: if false;
+    match /inventory/{inventoryId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource.data != null;
+      allow delete: if isSignedIn() && resource.data != null;
     }
 
     /**
-     * @description Rules for a specific user document. Allows the user to create their own document, and nobody else.
-     * @path /users/{userId}
-     * @allow (create) User 'A' creates /users/A.
-     * @deny (create) User 'A' creates /users/B.
-     * @allow (get) User 'A' gets /users/A.
-     * @deny (get) User 'B' gets /users/A.
-     * @allow (update) User 'A' updates /users/A.
-     * @deny (update) User 'B' updates /users/A.
-     * @allow (delete) User 'A' deletes /users/A.
-     * @deny (delete) User 'B' deletes /users/A.
-     * @principle Enforces document ownership and prevents unauthorized modifications.
+     * @description Rules for the 'sectorAssignments' collection. Allows any authenticated user to read and write sector assignments.
+     * @path /databases/{database}/documents/sectorAssignments/{assignmentId}
+     * @allow (get, list) Any authenticated user can read.
+     * @allow (create, update, delete) Any authenticated user can write.
+     * @deny If the user is not authenticated.
+     * @principle Allows full access to sector assignments for all authenticated users during prototyping.
      */
-    match /users/{userId} {
-      allow create: if isSignedIn() && isOwner(userId);
-      allow get: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isOwner(userId);
-      allow delete: if isSignedIn() && isOwner(userId);
+    match /sectorAssignments/{assignmentId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource.data != null;
+      allow delete: if isSignedIn() && resource.data != null;
     }
 
     /**
-     * @description Manages access to bearing documents for a specific user.
-     * @path /users/{userId}/bearings/{bearingId}
-     * @allow (create) User 'A' creates /users/A/bearings/bearing1.
-     * @deny (create) User 'B' creates /users/A/bearings/bearing1.
-     * @allow (get) User 'A' gets /users/A/bearings/bearing1.
-     * @deny (get) User 'B' gets /users/A/bearings/bearing1.
-     * @allow (update) User 'A' updates /users/A/bearings/bearing1.
-     * @deny (update) User 'B' updates /users/A/bearings/bearing1.
-     * @allow (delete) User 'A' deletes /users/A/bearings/bearing1.
-     * @deny (delete) User 'B' deletes /users/A/bearings/bearing1.
-     * @principle Enforces document ownership for writes.
+     * @description Rules for the 'usageLog' collection. Allows any authenticated user to read and write usage logs.
+     * @path /databases/{database}/documents/usageLog/{usageLogId}
+     * @allow (get, list) Any authenticated user can read.
+     * @allow (create, update, delete) Any authenticated user can write.
+     * @deny If the user is not authenticated.
+     * @principle Allows full access to usage logs for all authenticated users during prototyping.
      */
-    match /users/{userId}/bearings/{bearingId} {
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if isSignedIn() && request.auth.uid == userId;
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isOwner(userId);
-      allow delete: if isSignedIn() && isOwner(userId);
-    }
-
-    /**
-     * @description Manages access to location documents for a specific user.
-     * @path /users/{userId}/locations/{locationId}
-     * @allow (create) User 'A' creates /users/A/locations/location1.
-     * @deny (create) User 'B' creates /users/A/locations/location1.
-     * @allow (get) User 'A' gets /users/A/locations/location1.
-     * @deny (get) User 'B' gets /users/A/locations/location1.
-     * @allow (update) User 'A' updates /users/A/locations/location1.
-     * @deny (update) User 'B' updates /users/A/locations/location1.
-     * @allow (delete) User 'A' deletes /users/A/locations/location1.
-     * @deny (delete) User 'B' deletes /users/A/locations/location1.
-     * @principle Enforces document ownership for writes.
-     */
-    match /users/{userId}/locations/{locationId} {
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if isSignedIn() && request.auth.uid == userId;
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isOwner(userId);
-      allow delete: if isSignedIn() && isOwner(userId);
-    }
-
-    /**
-     * @description Manages access to stock level documents for a specific user.
-     * @path /users/{userId}/stockLevels/{stockLevelId}
-     * @allow (create) User 'A' creates /users/A/stockLevels/stockLevel1.
-     * @deny (create) User 'B' creates /users/A/stockLevels/stockLevel1.
-     * @allow (get) User 'A' gets /users/A/stockLevels/stockLevel1.
-     * @deny (get) User 'B' gets /users/A/stockLevels/stockLevel1.
-     * @allow (update) User 'A' updates /users/A/stockLevels/stockLevel1.
-     * @deny (update) User 'B' updates /users/A/stockLevels/stockLevel1.
-     * @allow (delete) User 'A' deletes /users/A/stockLevels/stockLevel1.
-     * @deny (delete) User 'B' deletes /users/A/stockLevels/stockLevel1.
-     * @principle Enforces document ownership for writes.
-     */
-    match /users/{userId}/stockLevels/{stockLevelId} {
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if isSignedIn() && request.auth.uid == userId;
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isOwner(userId);
-      allow delete: if isSignedIn() && isOwner(userId);
-    }
-
-    /**
-     * @description Manages access to usage log documents for a specific user.
-     * @path /users/{userId}/usageLogs/{usageLogId}
-     * @allow (create) User 'A' creates /users/A/usageLogs/usageLog1.
-     * @deny (create) User 'B' creates /users/A/usageLogs/usageLog1.
-     * @allow (get) User 'A' gets /users/A/usageLogs/usageLog1.
-     * @deny (get) User 'B' gets /users/A/usageLogs/usageLog1.
-     * @allow (update) User 'A' updates /users/A/usageLogs/usageLog1.
-     * @deny (update) User 'B' updates /users/A/usageLogs/usageLog1.
-     * @allow (delete) User 'A' deletes /users/A/usageLogs/usageLog1.
-     * @deny (delete) User 'B' deletes /users/A/usageLogs/usageLog1.
-     * @principle Enforces document ownership for writes.
-     */
-    match /users/{userId}/usageLogs/{usageLogId} {
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if isSignedIn() && request.auth.uid == userId;
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isOwner(userId);
-      allow delete: if isSignedIn() && isOwner(userId);
-    }
-
-    /**
-     * @description Manages access to reorder recommendation documents for a specific user.
-     * @path /users/{userId}/reorderRecommendations/{reorderRecommendationId}
-     * @allow (create) User 'A' creates /users/A/reorderRecommendations/reorderRecommendation1.
-     * @deny (create) User 'B' creates /users/A/reorderRecommendations/reorderRecommendation1.
-     * @allow (get) User 'A' gets /users/A/reorderRecommendations/reorderRecommendation1.
-     * @deny (get) User 'B' gets /users/A/reorderRecommendations/reorderRecommendation1.
-     * @allow (update) User 'A' updates /users/A/reorderRecommendations/reorderRecommendation1.
-     * @deny (update) User 'B' updates /users/A/reorderRecommendations/reorderRecommendation1.
-     * @allow (delete) User 'A' deletes /users/A/reorderRecommendations/reorderRecommendation1.
-     * @deny (delete) User 'B' deletes /users/A/reorderRecommendations/reorderRecommendation1.
-     * @principle Enforces document ownership for writes.
-     */
-    match /users/{userId}/reorderRecommendations/{reorderRecommendationId} {
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if isSignedIn() && request.auth.uid == userId;
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isOwner(userId);
-      allow delete: if isSignedIn() && isOwner(userId);
+    match /usageLog/{usageLogId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource.data != null;
+      allow delete: if isSignedIn() && resource.data != null;
     }
   }
 }
