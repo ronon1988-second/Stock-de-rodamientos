@@ -48,6 +48,8 @@ export default function App() {
   const [sectorInventory, setSectorInventory] = useState<SectorInventory[]>([]);
   const { toast } = useToast();
   const [isSectorsOpen, setIsSectorsOpen] = useState(true);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+
 
   const handleUpdateBearing = (updatedBearing: Bearing) => {
     setBearings(prev => prev.map(b => b.id === updatedBearing.id ? updatedBearing : b));
@@ -164,18 +166,20 @@ export default function App() {
     label,
     badgeCount,
     isSubItem = false,
+    onClick,
   }: {
     targetView: View;
     icon: React.ReactNode;
     label: string;
     badgeCount?: number;
     isSubItem?: boolean;
+    onClick: (view: View) => void;
   }) => (
     <a
       href="#"
       onClick={(e) => {
         e.preventDefault();
-        setView(targetView);
+        onClick(targetView);
       }}
       className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${
         view === targetView ? "bg-muted text-primary" : ""
@@ -229,12 +233,18 @@ export default function App() {
     return null;
   }
 
+  const handleNavClick = (targetView: View) => {
+    setView(targetView);
+    setIsSheetOpen(false); // Close sheet on navigation
+  };
+
   const MainNav = ({ isMobile = false }) => (
      <nav className={`grid items-start ${isMobile ? 'gap-2 text-lg' : 'px-2 text-sm'} font-medium ${isMobile ? '' : 'lg:px-4'}`}>
       <NavLink
         targetView="dashboard"
         icon={<Home className={isMobile ? "h-5 w-5" : "h-4 w-4"} />}
         label="Panel de control"
+        onClick={handleNavClick}
       />
       <Collapsible open={isSectorsOpen} onOpenChange={setIsSectorsOpen}>
           <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary [&[data-state=open]>div>svg.chevron]:rotate-90">
@@ -252,6 +262,7 @@ export default function App() {
                       icon={<div className="h-4 w-4" />} // Placeholder for alignment
                       label={sector}
                       isSubItem={true}
+                      onClick={handleNavClick}
                   />
               ))}
           </CollapsibleContent>
@@ -262,11 +273,13 @@ export default function App() {
         icon={<ShoppingCart className={isMobile ? "h-5 w-5" : "h-4 w-4"} />}
         label="Rodamientos a Comprar"
         badgeCount={lowStockCount}
+        onClick={handleNavClick}
       />
       <NavLink
         targetView="reports"
         icon={<LineChart className={isMobile ? "h-5 w-5" : "h-4 w-4"} />}
         label="Reportes"
+        onClick={handleNavClick}
       />
     </nav>
   )
@@ -303,7 +316,7 @@ export default function App() {
       </div>
       <div className="flex flex-col">
         <header className="flex h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6">
-          <Sheet>
+          <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
             <SheetTrigger asChild>
               <Button
                 variant="outline"
@@ -316,7 +329,8 @@ export default function App() {
             </SheetTrigger>
             <SheetContent side="left" className="flex flex-col">
                 <SheetHeader>
-                  <SheetTitle className="sr-only">Menú de Navegación</SheetTitle>
+                  <SheetTitle>Balance de Rodamientos</SheetTitle>
+                  <span className="sr-only">Menú de Navegación</span>
                 </SheetHeader>
               <div className="flex items-center gap-2 text-lg font-semibold mb-4">
                 <Logo className="h-8 w-8 text-primary" />
@@ -353,5 +367,3 @@ export default function App() {
     </div>
   );
 }
-
-    
