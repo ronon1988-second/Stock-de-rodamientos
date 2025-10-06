@@ -19,9 +19,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import UpdateStockDialog from "./update-stock-dialog";
 import type { Bearing, Sector } from "@/lib/types";
-import { MoreHorizontal, Search } from "lucide-react";
+import { MoreHorizontal, Search, ChevronRight } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 type StockTableProps = {
   bearings: Bearing[];
@@ -31,16 +32,72 @@ type StockTableProps = {
   description?: string;
 };
 
+// Function to determine bearing series
+const getBearingSeries = (name: string): string => {
+  const normalizedName = name.toUpperCase().trim();
+  if (normalizedName.startsWith('6')) {
+    const series = normalizedName.substring(0, 2);
+    if (['60', '62', '63', '68', '69'].includes(series)) {
+      return `Serie ${series}xx`;
+    }
+  }
+  if (normalizedName.startsWith('UC')) return 'Serie UC (Insertos)';
+  if (normalizedName.startsWith('12') || normalizedName.startsWith('13') || normalizedName.startsWith('22') || normalizedName.startsWith('23')) {
+    const series = normalizedName.substring(0, 2);
+    if (['12', '13', '22', '23'].includes(series)) {
+        return `Serie ${series}xx (Autoalineables)`;
+    }
+  }
+  if (normalizedName.startsWith('30') || normalizedName.startsWith('32')) {
+      const series = normalizedName.substring(0, 2);
+      return `Serie ${series}xxx (Rodillos Cónicos)`;
+  }
+  if (normalizedName.startsWith('NK') || normalizedName.startsWith('RNA') || normalizedName.startsWith('HK')) return 'Rodamientos de Agujas';
+  if (normalizedName.startsWith('PHS') || normalizedName.startsWith('POS')) return 'Terminales de Rótula';
+  if (normalizedName.startsWith('H')) return 'Manguitos de Montaje';
+  
+  return 'Otros';
+};
+
+
 export default function StockTable({ bearings, onLogUsage, onUpdateBearing, title, description }: StockTableProps) {
   const [logUsageBearing, setLogUsageBearing] = useState<Bearing | null>(null);
   const [editingBearing, setEditingBearing] = useState<Bearing | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [openCollapsibles, setOpenCollapsibles] = useState<string[]>([]);
 
-  const filteredBearings = useMemo(() => {
-    return bearings.filter(bearing => 
+  const groupedBearings = useMemo(() => {
+    const filtered = bearings.filter(bearing => 
       bearing.name.toLowerCase().includes(searchTerm.toLowerCase())
-    ).sort((a, b) => a.name.localeCompare(b.name));
+    );
+
+    const groups = filtered.reduce((acc, bearing) => {
+      const series = getBearingSeries(bearing.name);
+      if (!acc[series]) {
+        acc[series] = [];
+      }
+      acc[series].push(bearing);
+      return acc;
+    }, {} as Record<string, Bearing[]>);
+
+    // Sort groups
+    Object.values(groups).forEach(group => group.sort((a, b) => a.name.localeCompare(b.name)));
+    
+    // Set all as open if there is a search term
+    if(searchTerm){
+        setOpenCollapsibles(Object.keys(groups));
+    } else {
+        setOpenCollapsibles([]);
+    }
+
+    return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
   }, [bearings, searchTerm]);
+
+  const toggleCollapsible = (series: string) => {
+    setOpenCollapsibles(prev => 
+      prev.includes(series) ? prev.filter(s => s !== series) : [...prev, series]
+    );
+  };
 
   const getStatus = (bearing: Bearing) => {
     if (bearing.stock === 0) return "Sin Stock";
@@ -87,38 +144,58 @@ export default function StockTable({ bearings, onLogUsage, onUpdateBearing, titl
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredBearings.length > 0 ? (
-                  filteredBearings.map((bearing) => {
-                    const status = getStatus(bearing);
-                    return (
-                      <TableRow key={bearing.id} className={status === 'Stock Bajo' ? 'bg-amber-500/10' : status === 'Sin Stock' ? 'bg-destructive/10' : ''}>
-                        <TableCell className="font-medium">{bearing.name}</TableCell>
-                        <TableCell className="text-right">{bearing.stock}</TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant={getStatusVariant(status)}>{status}</Badge>
-                        </TableCell>
-                        <TableCell>
-                           <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button aria-haspopup="true" size="icon" variant="ghost">
-                                <MoreHorizontal className="h-4 w-4" />
-                                <span className="sr-only">Alternar menú</span>
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                              <DropdownMenuItem onSelect={() => setLogUsageBearing(bearing)}>
-                                Registrar Uso
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onSelect={() => setEditingBearing(bearing)}>
-                                Actualizar Stock
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
+                {groupedBearings.length > 0 ? (
+                  groupedBearings.map(([series, bearingsInGroup]) => (
+                    <Collapsible asChild key={series} open={openCollapsibles.includes(series)} onOpenChange={() => toggleCollapsible(series)}>
+                      <>
+                        <CollapsibleTrigger asChild>
+                           <TableRow className="bg-muted/50 hover:bg-muted cursor-pointer">
+                              <TableCell colSpan={4} className="font-bold">
+                                <div className="flex items-center gap-2">
+                                  <ChevronRight className={`h-4 w-4 transition-transform ${openCollapsibles.includes(series) ? 'rotate-90' : ''}`} />
+                                  {series} ({bearingsInGroup.length})
+                                </div>
+                              </TableCell>
+                           </TableRow>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent asChild>
+                          <>
+                            {bearingsInGroup.map((bearing) => {
+                              const status = getStatus(bearing);
+                              return (
+                                <TableRow key={bearing.id} className={status === 'Stock Bajo' ? 'bg-amber-500/10' : status === 'Sin Stock' ? 'bg-destructive/10' : ''}>
+                                  <TableCell className="font-medium pl-12">{bearing.name}</TableCell>
+                                  <TableCell className="text-right">{bearing.stock}</TableCell>
+                                  <TableCell className="text-center">
+                                    <Badge variant={getStatusVariant(status)}>{status}</Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button aria-haspopup="true" size="icon" variant="ghost">
+                                          <MoreHorizontal className="h-4 w-4" />
+                                          <span className="sr-only">Alternar menú</span>
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                                        <DropdownMenuItem onSelect={() => setLogUsageBearing(bearing)}>
+                                          Registrar Uso
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onSelect={() => setEditingBearing(bearing)}>
+                                          Actualizar Stock
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </>
+                        </CollapsibleContent>
+                      </>
+                    </Collapsible>
+                  ))
                 ) : (
                   <TableRow>
                     <TableCell colSpan={4} className="h-24 text-center">
