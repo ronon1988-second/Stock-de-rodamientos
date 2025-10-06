@@ -54,7 +54,6 @@ export default function ToBuyView({ bearings }: ToBuyViewProps) {
         bearings.map((b) => ({
           bearing: b.name,
           stock: b.stock,
-          sector: b.sector,
         }))
       ),
       reorderThreshold: reorderThreshold,
