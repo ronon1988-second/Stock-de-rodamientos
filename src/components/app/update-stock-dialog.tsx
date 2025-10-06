@@ -84,7 +84,9 @@ export default function UpdateStockDialog({
         <DialogHeader>
           <DialogTitle>{isLogUsage ? 'Registrar Uso' : 'Actualizar Stock'} de {bearing.name}</DialogTitle>
           <DialogDescription>
-             {isLogUsage ? 'Seleccione el sector e ingrese la cantidad utilizada.' : 'Ingrese el nuevo total de stock para este rodamiento.'}
+             {isLogUsage 
+                ? 'Seleccione el sector e ingrese la cantidad utilizada.' 
+                : 'Ingrese el nuevo total de stock para este rodamiento.'}
              <br />
              Stock actual: <strong>{bearing.stock} unidades</strong>
           </DialogDescription>
