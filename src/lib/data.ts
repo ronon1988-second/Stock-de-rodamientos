@@ -145,4 +145,8 @@ export const initialSectorInventory: SectorInventory[] = [
   // Horno Linea 2
   { id: 'si-301', sector: 'Horno Linea 2', bearingId: 'b098', bearingName: '1207kc4', quantity: 4 },
   { id: 'si-302', sector: 'Horno Linea 2', bearingId: 'b063', bearingName: 'H307', quantity: 4 },
+  // Curva
+  { id: 'si-401', sector: 'Curva', bearingId: 'b007', bearingName: '6004', quantity: 40 },
+  { id: 'si-402', sector: 'Curva', bearingId: 'b001', bearingName: '698', quantity: 153 },
+  { id: 'si-403', sector: 'Curva', bearingId: 'b045', bearingName: 'UC 204', quantity: 4 },
 ];
