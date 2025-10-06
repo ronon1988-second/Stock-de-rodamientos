@@ -4,7 +4,7 @@ export type Sector = typeof SECTORS[number];
 export type Bearing = {
   id: string;
   name: string;
-  sector: 'Stock General'; // All bearings belong to a general stock now.
+  // The 'sector' property is removed from Bearing, as stock is now centralized.
   stock: number;
   threshold: number;
 };
@@ -19,9 +19,12 @@ export type UsageLog = {
   sector: Sector; // The sector where it was used
 };
 
-// Represents the specific bearings and quantities assigned to a machine/sector
+// Represents the specific bearings assigned to a machine/sector (Bill of Materials)
 export type SectorInventory = {
+  id: string; // Unique ID for the assignment
   sector: Sector;
   bearingId: string;
-  quantity: number;
-}
+  bearingName: string;
+  // Quantity here could mean "quantity installed in this machine"
+  // For now, we'll just map the bearing. The logic can be extended.
+};

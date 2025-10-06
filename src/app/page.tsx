@@ -8,6 +8,7 @@ import {
   ChevronRight,
   ShoppingCart,
   Package,
+  X,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -28,7 +29,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Bearing, UsageLog, Sector, SECTORS } from "@/lib/types";
+import { Bearing, UsageLog, Sector, SECTORS, SectorInventory } from "@/lib/types";
 import { initialBearings } from "@/lib/data";
 import Dashboard from "@/components/app/dashboard";
 import Reports from "@/components/app/reports";
@@ -44,6 +45,7 @@ export default function App() {
   const [view, setView] = useState<View>("dashboard");
   const [bearings, setBearings] = useState<Bearing[]>(initialBearings);
   const [usageLog, setUsageLog] = useState<UsageLog[]>([]);
+  const [sectorInventory, setSectorInventory] = useState<SectorInventory[]>([]);
   const { toast } = useToast();
   const [isSectorsOpen, setIsSectorsOpen] = useState(true);
 
@@ -54,6 +56,45 @@ export default function App() {
         description: `Se ha actualizado el stock de ${updatedBearing.name}.`
     });
   }
+
+  const handleAssignBearingToSector = (bearingId: string, sector: Sector) => {
+    const bearing = bearings.find(b => b.id === bearingId);
+    if (!bearing) return;
+
+    const alreadyExists = sectorInventory.some(item => item.sector === sector && item.bearingId === bearingId);
+
+    if (alreadyExists) {
+      toast({
+        variant: "destructive",
+        title: "Asignación Duplicada",
+        description: `El rodamiento ${bearing.name} ya está asignado al sector ${sector}.`,
+      });
+      return;
+    }
+
+    const newAssignment: SectorInventory = {
+      id: `si-${Date.now()}`,
+      sector,
+      bearingId,
+      bearingName: bearing.name,
+    };
+    setSectorInventory(prev => [...prev, newAssignment]);
+    toast({
+      title: "Rodamiento Asignado",
+      description: `Se ha asignado ${bearing.name} al sector ${sector}.`,
+    });
+  };
+
+  const handleRemoveBearingFromSector = (assignmentId: string) => {
+    const assignment = sectorInventory.find(item => item.id === assignmentId);
+    if (!assignment) return;
+
+    setSectorInventory(prev => prev.filter(item => item.id !== assignmentId));
+    toast({
+      title: "Asignación Eliminada",
+      description: `Se ha quitado el rodamiento ${assignment.bearingName} del sector ${assignment.sector}.`,
+    });
+  };
 
   const handleLogUsage = (bearingId: string, quantity: number, sector: Sector) => {
     let updatedBearing: Bearing | undefined;
@@ -76,7 +117,6 @@ export default function App() {
       })
     );
     
-    // This part runs only if the stock was sufficient
     const originalStock = bearings.find(b => b.id === bearingId)?.stock;
     if (updatedBearing && originalStock && updatedBearing.stock < originalStock) {
       const newLog: UsageLog = {
@@ -171,7 +211,13 @@ export default function App() {
     }
     if (view.startsWith('sector-')) {
         const sector = view.replace('sector-', '') as Sector;
-        return <SectorView sector={sector} allBearings={bearings} usageLog={usageLog} />
+        return <SectorView 
+            sector={sector} 
+            allBearings={bearings} 
+            sectorInventory={sectorInventory.filter(item => item.sector === sector)}
+            onAssignBearing={handleAssignBearingToSector}
+            onRemoveBearing={handleRemoveBearingFromSector}
+        />
     }
     return null;
   }
@@ -188,8 +234,8 @@ export default function App() {
               <div className="flex items-center gap-3">
                   <Package className={isMobile ? "h-5 w-5" : "h-4 w-4"}/>
                   <span>Sectores</span>
-                  <ChevronRight className="chevron h-4 w-4 transition-transform" />
               </div>
+              <ChevronRight className="chevron h-4 w-4 transition-transform" />
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-1 pt-1">
               {SECTORS.map(sector => (
