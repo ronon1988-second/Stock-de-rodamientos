@@ -18,7 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import UpdateStockDialog from "./update-stock-dialog";
-import type { Bearing, Sector, SECTORS } from "@/lib/types";
+import type { Bearing, Sector } from "@/lib/types";
 import { MoreHorizontal, Search } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -26,11 +26,12 @@ import { Input } from "@/components/ui/input";
 type StockTableProps = {
   bearings: Bearing[];
   onLogUsage: (bearingId: string, quantity: number, sector: Sector) => void;
-  onAddBearing: (newBearing: Omit<Bearing, 'id'>) => void;
   onUpdateBearing: (bearing: Bearing) => void;
+  title?: string;
+  description?: string;
 };
 
-export default function StockTable({ bearings, onLogUsage, onUpdateBearing }: StockTableProps) {
+export default function StockTable({ bearings, onLogUsage, onUpdateBearing, title, description }: StockTableProps) {
   const [logUsageBearing, setLogUsageBearing] = useState<Bearing | null>(null);
   const [editingBearing, setEditingBearing] = useState<Bearing | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -57,9 +58,9 @@ export default function StockTable({ bearings, onLogUsage, onUpdateBearing }: St
     <>
       <Card>
         <CardHeader>
-          <CardTitle>Inventario de Rodamientos</CardTitle>
+          <CardTitle>{title || 'Inventario de Rodamientos'}</CardTitle>
           <CardDescription>
-            Busca, visualiza y gestiona todo tu inventario de rodamientos.
+            {description || 'Busca, visualiza y gestiona todo tu inventario de rodamientos.'}
           </CardDescription>
           <div className="relative mt-2">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -75,7 +76,7 @@ export default function StockTable({ bearings, onLogUsage, onUpdateBearing }: St
         <CardContent>
           <div className="max-h-[60vh] overflow-auto">
             <Table>
-              <TableHeader className="sticky top-0 bg-card">
+              <TableHeader className="sticky top-0 bg-card z-10">
                 <TableRow>
                   <TableHead>Nombre</TableHead>
                   <TableHead className="text-right">Stock</TableHead>

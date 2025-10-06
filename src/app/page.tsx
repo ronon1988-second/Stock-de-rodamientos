@@ -1,11 +1,15 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   Bell,
   Home,
   LineChart,
   Menu,
+  ChevronDown,
+  ChevronRight,
+  ShoppingCart,
+  Package,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -26,34 +30,24 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Bearing, UsageLog } from "@/lib/types";
+import { Bearing, UsageLog, Sector, SECTORS } from "@/lib/types";
 import { initialBearings } from "@/lib/data";
 import Dashboard from "@/components/app/dashboard";
 import Reports from "@/components/app/reports";
 import { useToast } from "@/hooks/use-toast";
 import { Logo } from "@/components/app/logo";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import SectorView from "@/components/app/sector-view";
+import ToBuyView from "@/components/app/to-buy-view";
 
-type View = "dashboard" | "reports";
+type View = "dashboard" | "reports" | "to-buy" | `sector-${Sector}`;
 
 export default function App() {
   const [view, setView] = useState<View>("dashboard");
   const [bearings, setBearings] = useState<Bearing[]>(initialBearings);
   const [usageLog, setUsageLog] = useState<UsageLog[]>([]);
   const { toast } = useToast();
-
-  const handleAddBearing = (newBearing: Omit<Bearing, "id">) => {
-    // This function is kept for compatibility but might be phased out
-    // as the new workflow is to update existing bearings from the master list.
-    const bearingWithId: Bearing = {
-      ...newBearing,
-      id: `b${(bearings.length + 1).toString().padStart(3, '0')}`,
-    };
-    setBearings(prev => [...prev, bearingWithId]);
-    toast({
-        title: "Rodamiento Añadido",
-        description: `Se ha añadido ${newBearing.name} al inventario.`
-    });
-  };
+  const [isSectorsOpen, setIsSectorsOpen] = useState(true);
 
   const handleUpdateBearing = (updatedBearing: Bearing) => {
     setBearings(prev => prev.map(b => b.id === updatedBearing.id ? updatedBearing : b));
@@ -85,7 +79,7 @@ export default function App() {
     );
     
     // This part runs only if the stock was sufficient
-    if (updatedBearing && updatedBearing.stock >= 0) {
+    if (updatedBearing && updatedBearing.stock >= 0 && updatedBearing.stock !== bearings.find(b => b.id === bearingId)?.stock) {
       const newLog: UsageLog = {
         id: `usage-${Date.now()}`,
         bearingId: bearingId,
@@ -123,11 +117,13 @@ export default function App() {
     icon,
     label,
     badgeCount,
+    isSubItem = false,
   }: {
     targetView: View;
     icon: React.ReactNode;
     label: string;
     badgeCount?: number;
+    isSubItem?: boolean;
   }) => (
     <a
       href="#"
@@ -137,7 +133,7 @@ export default function App() {
       }}
       className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${
         view === targetView ? "bg-muted text-primary" : ""
-      }`}
+      } ${isSubItem ? 'pl-7' : ''}`}
     >
       {icon}
       {label}
@@ -148,6 +144,81 @@ export default function App() {
       )}
     </a>
   );
+  
+  const getViewTitle = () => {
+    if (view === 'dashboard') return 'Panel de control';
+    if (view === 'reports') return 'Reportes';
+    if (view === 'to-buy') return 'Rodamientos a Comprar';
+    if (view.startsWith('sector-')) {
+        const sector = view.replace('sector-', '');
+        return `Sector: ${sector}`;
+    }
+    return 'Panel de control';
+  }
+
+  const renderContent = () => {
+    if (view === 'dashboard') {
+      return <Dashboard
+        bearings={bearings}
+        usageLog={usageLog}
+        onLogUsage={handleLogUsage}
+        onUpdateBearing={handleUpdateBearing}
+      />
+    }
+    if (view === 'reports') {
+      return <Reports bearings={bearings} usageLog={usageLog} />
+    }
+    if (view === 'to-buy') {
+        return <ToBuyView bearings={bearings} onUpdateBearing={handleUpdateBearing} />
+    }
+    if (view.startsWith('sector-')) {
+        const sector = view.replace('sector-', '') as Sector;
+        return <SectorView sector={sector} allBearings={bearings} usageLog={usageLog} />
+    }
+    return null;
+  }
+
+  const MainNav = ({ isMobile = false }) => (
+     <nav className={`grid items-start ${isMobile ? 'gap-2 text-lg' : 'px-2 text-sm'} font-medium ${isMobile ? '' : 'lg:px-4'}`}>
+      <NavLink
+        targetView="dashboard"
+        icon={<Home className={isMobile ? "h-5 w-5" : "h-4 w-4"} />}
+        label="Panel de control"
+      />
+      <Collapsible open={isSectorsOpen} onOpenChange={setIsSectorsOpen}>
+          <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary [&[data-state=open]>svg]:rotate-90">
+              <div className="flex items-center gap-3">
+                  <Package className={isMobile ? "h-5 w-5" : "h-4 w-4"}/>
+                  <span>Sectores</span>
+              </div>
+              <ChevronRight className="h-4 w-4 transition-transform" />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-1">
+              {SECTORS.filter(s => s !== 'Stock General').map(sector => (
+                  <NavLink
+                      key={sector}
+                      targetView={`sector-${sector}`}
+                      icon={<div className="h-4 w-4" />} // Placeholder for alignment
+                      label={sector}
+                      isSubItem={true}
+                  />
+              ))}
+          </CollapsibleContent>
+      </Collapsible>
+
+      <NavLink
+        targetView="to-buy"
+        icon={<ShoppingCart className={isMobile ? "h-5 w-5" : "h-4 w-4"} />}
+        label="Rodamientos a Comprar"
+        badgeCount={lowStockCount}
+      />
+      <NavLink
+        targetView="reports"
+        icon={<LineChart className={isMobile ? "h-5 w-5" : "h-4 w-4"} />}
+        label="Reportes"
+      />
+    </nav>
+  )
 
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
@@ -158,29 +229,12 @@ export default function App() {
               <Logo className="h-8 w-8 text-primary" />
               <span className="">Balance de Rodamientos</span>
             </a>
-            {lowStockCount > 0 && (
-              <Button variant="outline" size="icon" className="ml-auto h-8 w-8">
-                <Bell className="h-4 w-4" />
-                <span className="sr-only">Alternar notificaciones</span>
-              </Button>
-            )}
           </div>
-          <div className="flex-1">
-            <nav className="grid items-start px-2 text-sm font-medium lg:px-4">
-              <NavLink
-                targetView="dashboard"
-                icon={<Home className="h-4 w-4" />}
-                label="Panel de control"
-              />
-              <NavLink
-                targetView="reports"
-                icon={<LineChart className="h-4 w-4" />}
-                label="Reportes"
-              />
-            </nav>
+          <div className="flex-1 overflow-auto py-2">
+            <MainNav />
           </div>
            <div className="mt-auto p-4">
-            <Card x-chunk="dashboard-02-chunk-0">
+            <Card>
               <CardHeader className="p-2 pt-0 md:p-4">
                 <CardTitle>¿Necesitas Ayuda?</CardTitle>
                 <CardDescription>
@@ -210,30 +264,16 @@ export default function App() {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="flex flex-col">
-              <nav className="grid gap-2 text-lg font-medium">
-                <a
-                  href="#"
-                  className="flex items-center gap-2 text-lg font-semibold mb-4"
-                >
-                  <Logo className="h-8 w-8 text-primary" />
-                  <span className="sr-only">Balance de Rodamientos</span>
-                </a>
-                <NavLink
-                  targetView="dashboard"
-                  icon={<Home className="h-5 w-5" />}
-                  label="Panel de control"
-                />
-                <NavLink
-                  targetView="reports"
-                  icon={<LineChart className="h-5 w-5" />}
-                  label="Reportes"
-                />
-              </nav>
+              <div className="flex items-center gap-2 text-lg font-semibold mb-4">
+                <Logo className="h-8 w-8 text-primary" />
+                <span className="sr-only">Balance de Rodamientos</span>
+              </div>
+              <MainNav isMobile={true} />
             </SheetContent>
           </Sheet>
 
           <div className="w-full flex-1">
-             <h1 className="font-semibold text-xl capitalize">{view === 'dashboard' ? 'Panel de control' : 'Reportes'}</h1>
+             <h1 className="font-semibold text-xl capitalize">{getViewTitle()}</h1>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -252,19 +292,8 @@ export default function App() {
             </DropdownMenuContent>
           </DropdownMenu>
         </header>
-        <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
-          {view === "dashboard" && (
-            <Dashboard
-              bearings={bearings}
-              usageLog={usageLog}
-              onLogUsage={handleLogUsage}
-              onAddBearing={handleAddBearing}
-              onUpdateBearing={handleUpdateBearing}
-            />
-          )}
-          {view === "reports" && (
-            <Reports bearings={bearings} usageLog={usageLog} />
-          )}
+        <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-muted/40">
+          {renderContent()}
         </main>
       </div>
     </div>
