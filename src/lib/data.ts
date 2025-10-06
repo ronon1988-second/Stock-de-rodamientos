@@ -100,6 +100,7 @@ export const initialBearings: Bearing[] = [
   { id: 'b095', name: '2209 kc3', stock: 0, threshold: 10 },
   { id: 'b096', name: '6205 zz', stock: 0, threshold: 10 },
   { id: 'b097', name: '6306 zz c3', stock: 0, threshold: 10 },
+  { id: 'b098', name: '1207kc4', stock: 0, threshold: 10 },
 ];
 
 export const initialSectorInventory: SectorInventory[] = [
@@ -141,6 +142,7 @@ export const initialSectorInventory: SectorInventory[] = [
   { id: 'si-205', sector: 'Horno Linea 1', bearingId: 'b064', bearingName: '3308', quantity: 2 },
   { id: 'si-206', sector: 'Horno Linea 1', bearingId: 'b010', bearingName: '6006', quantity: 2 },
   { id: 'si-207', sector: 'Horno Linea 1', bearingId: 'b097', bearingName: '6306 zz c3', quantity: 4 },
+  // Horno Linea 2
+  { id: 'si-301', sector: 'Horno Linea 2', bearingId: 'b098', bearingName: '1207kc4', quantity: 4 },
+  { id: 'si-302', sector: 'Horno Linea 2', bearingId: 'b063', bearingName: 'H307', quantity: 4 },
 ];
-
-    
