@@ -68,8 +68,7 @@ export const initialBearings: Bearing[] = [
   { id: 'b063', name: 'H307', stock: 0, threshold: 10 },
   { id: 'b064', name: '3308', stock: 0, threshold: 10 },
   { id: 'b065', name: 'HK 16/20', stock: 3, threshold: 10 },
-  { id: 'b066', name: 'RNA 6902', stock: 1, threshold:
-10 },
+  { id: 'b066', name: 'RNA 6902', stock: 1, threshold: 10 },
   { id: 'b067', name: 'TAF 283720', stock: 2, threshold: 10 },
   { id: 'b068', name: 'PHS B4', stock: 16, threshold: 10 },
   { id: 'b069', name: 'PHS B4L', stock: 2, threshold: 10 },
@@ -98,6 +97,9 @@ export const initialBearings: Bearing[] = [
   { id: 'b092', name: '30210', stock: 5, threshold: 10 },
   { id: 'b093', name: '32010', stock: 5, threshold: 10 },
   { id: 'b094', name: 'LM 25 UU', stock: 5, threshold: 10 },
+  { id: 'b095', name: '2209 kc3', stock: 0, threshold: 10 },
+  { id: 'b096', name: '6205 zz', stock: 0, threshold: 10 },
+  { id: 'b097', name: '6306 zz c3', stock: 0, threshold: 10 },
 ];
 
 export const initialSectorInventory: SectorInventory[] = [
@@ -131,4 +133,14 @@ export const initialSectorInventory: SectorInventory[] = [
   { id: 'si-112', sector: 'Alipack', bearingId: 'b056', bearingName: 'NK 17/16', quantity: 3 },
   { id: 'si-113', sector: 'Alipack', bearingId: 'b057', bearingName: 'NK 28/20R', quantity: 2 },
   { id: 'si-114', sector: 'Alipack', bearingId: 'b059', bearingName: 'NK21/16 R17/21/20', quantity: 1 },
+  // Horno Linea 1
+  { id: 'si-201', sector: 'Horno Linea 1', bearingId: 'b095', bearingName: '2209 kc3', quantity: 6 },
+  { id: 'si-202', sector: 'Horno Linea 1', bearingId: 'b062', bearingName: 'H309', quantity: 6 },
+  { id: 'si-203', sector: 'Horno Linea 1', bearingId: 'b017', bearingName: '6202 c3', quantity: 6 },
+  { id: 'si-204', sector: 'Horno Linea 1', bearingId: 'b096', bearingName: '6205 zz', quantity: 6 },
+  { id: 'si-205', sector: 'Horno Linea 1', bearingId: 'b064', bearingName: '3308', quantity: 2 },
+  { id: 'si-206', sector: 'Horno Linea 1', bearingId: 'b010', bearingName: '6006', quantity: 2 },
+  { id: 'si-207', sector: 'Horno Linea 1', bearingId: 'b097', bearingName: '6306 zz c3', quantity: 4 },
 ];
+
+    
