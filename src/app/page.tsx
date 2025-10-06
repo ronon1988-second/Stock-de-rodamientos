@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Home,
   LineChart,
@@ -148,9 +148,22 @@ export default function App() {
     }
   };
 
-  const lowStockCount = bearings.filter(
-    (b) => b.stock <= b.threshold
-  ).length;
+  const lowStockCount = useMemo(() => {
+    const requiredBySector: { [bearingId: string]: number } = {};
+    sectorInventory.forEach(item => {
+        if (!requiredBySector[item.bearingId]) {
+            requiredBySector[item.bearingId] = 0;
+        }
+        requiredBySector[item.bearingId] += item.quantity;
+    });
+
+    return bearings.filter(b => {
+        const totalRequired = requiredBySector[b.id] || 0;
+        const safetyStock = b.threshold;
+        const totalDemand = totalRequired + safetyStock;
+        return b.stock < totalDemand;
+    }).length;
+  }, [bearings, sectorInventory]);
 
   const NavLink = ({
     targetView,
@@ -210,7 +223,7 @@ export default function App() {
       return <Reports bearings={bearings} usageLog={usageLog} />
     }
     if (view === 'to-buy') {
-        return <ToBuyView bearings={bearings} />
+        return <ToBuyView bearings={bearings} sectorInventory={sectorInventory}/>
     }
     if (view.startsWith('sector-')) {
         const sector = view.replace('sector-', '') as Sector;
@@ -321,7 +334,7 @@ export default function App() {
             </SheetTrigger>
             <SheetContent side="left" className="flex flex-col">
                 <SheetHeader>
-                  <SheetTitle>Menú</SheetTitle>
+                  <SheetTitle className="sr-only">Menú</SheetTitle>
                 </SheetHeader>
               <div className="flex items-center gap-2 text-lg font-semibold mb-4">
                 <Logo className="h-8 w-8 text-primary" />
