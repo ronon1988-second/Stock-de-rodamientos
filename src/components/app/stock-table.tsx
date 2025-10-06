@@ -92,9 +92,10 @@ export default function StockTable({ inventory, onLogUsage, onUpdateItem, onAddI
     // Set all as open if there is a search term
     if(searchTerm){
         setOpenCollapsibles(Object.keys(groups));
-    } else {
+    } else if (openCollapsibles.length === 0 && !searchTerm) { // Default to closed if no search
         setOpenCollapsibles([]);
     }
+
 
     return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
   }, [inventory, searchTerm]);
@@ -157,69 +158,66 @@ export default function StockTable({ inventory, onLogUsage, onUpdateItem, onAddI
                   </TableHead>
                 </TableRow>
               </TableHeader>
+                <TableBody>
                 {groupedItems.length > 0 ? (
-                  <TableBody>
-                    {groupedItems.map(([series, itemsInGroup]) => (
-                      <Collapsible asChild key={series} open={openCollapsibles.includes(series)} onOpenChange={() => toggleCollapsible(series)}>
-                        <>
-                          <CollapsibleTrigger asChild>
-                            <TableRow className="bg-muted/50 hover:bg-muted cursor-pointer">
-                                <TableCell colSpan={4} className="font-bold">
-                                  <div className="flex items-center gap-2">
+                    groupedItems.map(([series, itemsInGroup]) => (
+                      <Collapsible key={series} asChild open={openCollapsibles.includes(series)} onOpenChange={() => toggleCollapsible(series)}>
+                        <React.Fragment>
+                          <TableRow className="bg-muted/50 hover:bg-muted">
+                              <TableCell colSpan={4} className="p-0">
+                                <CollapsibleTrigger className="w-full p-4 text-left">
+                                  <div className="flex items-center gap-2 font-bold">
                                     <ChevronRight className={`h-4 w-4 transition-transform ${openCollapsibles.includes(series) ? 'rotate-90' : ''}`} />
                                     {series} ({itemsInGroup.length})
                                   </div>
-                                </TableCell>
-                            </TableRow>
-                          </CollapsibleTrigger>
-                          <CollapsibleContent asChild>
-                            <>
-                              {itemsInGroup.map((item) => {
-                                const status = getStatus(item);
-                                return (
-                                  <TableRow key={item.id} className={status === 'Stock Bajo' ? 'bg-amber-500/10' : status === 'Sin Stock' ? 'bg-destructive/10' : ''}>
-                                    <TableCell className="font-medium pl-12">{item.name}</TableCell>
-                                    <TableCell className="text-right">{item.stock}</TableCell>
-                                    <TableCell className="text-center">
-                                      <Badge variant={getStatusVariant(status)}>{status}</Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                      <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                          <Button aria-haspopup="true" size="icon" variant="ghost">
-                                            <MoreHorizontal className="h-4 w-4" />
-                                            <span className="sr-only">Alternar menú</span>
-                                          </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                          <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                          <DropdownMenuItem onSelect={() => setLogUsageItem(item)}>
-                                            Registrar Uso
-                                          </DropdownMenuItem>
-                                          <DropdownMenuItem onSelect={() => setEditingItem(item)}>
-                                            Actualizar Stock
-                                          </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                      </DropdownMenu>
-                                    </TableCell>
-                                  </TableRow>
-                                );
-                              })}
-                            </>
-                          </CollapsibleContent>
-                        </>
+                                </CollapsibleTrigger>
+                              </TableCell>
+                          </TableRow>
+                          
+                          {itemsInGroup.map((item) => {
+                            const status = getStatus(item);
+                            return (
+                              <CollapsibleContent asChild key={item.id}>
+                                <TableRow className={status === 'Stock Bajo' ? 'bg-amber-500/10' : status === 'Sin Stock' ? 'bg-destructive/10' : ''}>
+                                  <TableCell className="font-medium pl-12">{item.name}</TableCell>
+                                  <TableCell className="text-right">{item.stock}</TableCell>
+                                  <TableCell className="text-center">
+                                    <Badge variant={getStatusVariant(status)}>{status}</Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button aria-haspopup="true" size="icon" variant="ghost">
+                                          <MoreHorizontal className="h-4 w-4" />
+                                          <span className="sr-only">Alternar menú</span>
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                                        <DropdownMenuItem onSelect={() => setLogUsageItem(item)}>
+                                          Registrar Uso
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onSelect={() => setEditingItem(item)}>
+                                          Actualizar Stock
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </TableCell>
+                                </TableRow>
+                              </CollapsibleContent>
+                            );
+                          })}
+                        </React.Fragment>
                       </Collapsible>
-                    ))}
-                  </TableBody>
+                    ))
                 ) : (
-                  <TableBody>
                     <TableRow>
                       <TableCell colSpan={4} className="h-24 text-center">
                         {searchTerm ? "No se encontraron artículos." : "No hay artículos en el inventario."}
                       </TableCell>
                     </TableRow>
-                  </TableBody>
                 )}
+              </TableBody>
             </Table>
           </div>
         </CardContent>

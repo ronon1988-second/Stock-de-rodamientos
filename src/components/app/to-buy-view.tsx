@@ -107,19 +107,15 @@ export default function ToBuyView({ inventory, sectorAssignments }: ToBuyViewPro
     return result.sort((a,b) => a.item.name.localeCompare(b.item.name));
   }, [inventory, sectorAssignments]);
   
-  // Effect to open all groups only when the list is first populated or search term changes
   useEffect(() => {
-    if (itemsToReorder.length > 0 && openCollapsibles.length === 0) {
-        const groups = itemsToReorder.reduce((acc, item) => {
-            const series = getItemSeries(item.item.name);
-            if (!acc.includes(series)) {
-                acc.push(series);
-            }
-            return acc;
-        }, [] as string[]);
-        setOpenCollapsibles(groups);
-    }
-  }, [itemsToReorder, openCollapsibles]);
+      if (itemsToReorder.length > 0) {
+          const allGroups = [...new Set(itemsToReorder.map(item => getItemSeries(item.item.name)))];
+          setOpenCollapsibles(allGroups);
+      } else {
+          setOpenCollapsibles([]);
+      }
+  }, []);
+
 
 
   const groupedItems = useMemo(() => {
@@ -257,61 +253,58 @@ export default function ToBuyView({ inventory, sectorAssignments }: ToBuyViewPro
               </TableRow>
             </TableHeader>
             
+            <TableBody>
               {groupedItems.length > 0 ? (
                 groupedItems.map(([series, itemsInGroup]) => (
                   <Collapsible asChild key={series} open={openCollapsibles.includes(series)} onOpenChange={() => toggleCollapsible(series)}>
-                    <tbody className="w-full">
-                      <CollapsibleTrigger asChild>
-                         <TableRow className="bg-muted/50 hover:bg-muted cursor-pointer">
-                            <TableCell colSpan={6} className="font-bold">
-                              <div className="flex items-center gap-2">
+                    <React.Fragment>
+                      <TableRow className="bg-muted/50 hover:bg-muted cursor-pointer">
+                          <TableCell colSpan={6} className="p-0">
+                            <CollapsibleTrigger className="w-full p-4 text-left">
+                              <div className="flex items-center gap-2 font-bold">
                                 <ChevronRight className={`h-4 w-4 transition-transform ${openCollapsibles.includes(series) ? 'rotate-90' : ''}`} />
                                 {series} ({itemsInGroup.length})
                               </div>
+                            </CollapsibleTrigger>
+                          </TableCell>
+                      </TableRow>
+                      {itemsInGroup.map((item) => {
+                        const { item: inventoryItem, totalRequired, toBuy } = item;
+                        const aiRecommendation = getAIRecommendationFor(inventoryItem.name);
+                        return (
+                        <CollapsibleContent asChild key={inventoryItem.id}>
+                          <TableRow className="bg-amber-500/5">
+                            <TableCell className="font-medium pl-12">{inventoryItem.name}</TableCell>
+                            <TableCell className="text-right text-destructive font-semibold">{inventoryItem.stock}</TableCell>
+                            <TableCell className="text-right">{totalRequired}</TableCell>
+                            <TableCell className="text-right">{inventoryItem.threshold}</TableCell>
+                            <TableCell className="text-right font-bold text-primary">{toBuy}</TableCell>
+                            <TableCell className="text-right font-bold">
+                                {aiRecommendation !== null ? (
+                                    <div className="flex items-center justify-end gap-2">
+                                        <BrainCircuit size={16} className="text-blue-500" />
+                                        <span>{aiRecommendation}</span>
+                                    </div>
+                                ) : recommendations ? '-' : ''}
                             </TableCell>
-                         </TableRow>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent asChild>
-                        <>
-                          {itemsInGroup.map((item) => {
-                            const { item: inventoryItem, totalRequired, toBuy } = item;
-                            const aiRecommendation = getAIRecommendationFor(inventoryItem.name);
-                            return (
-                            <TableRow key={inventoryItem.id} className="bg-amber-500/5">
-                              <TableCell className="font-medium pl-12">{inventoryItem.name}</TableCell>
-                              <TableCell className="text-right text-destructive font-semibold">{inventoryItem.stock}</TableCell>
-                              <TableCell className="text-right">{totalRequired}</TableCell>
-                              <TableCell className="text-right">{inventoryItem.threshold}</TableCell>
-                              <TableCell className="text-right font-bold text-primary">{toBuy}</TableCell>
-                              <TableCell className="text-right font-bold">
-                                  {aiRecommendation !== null ? (
-                                      <div className="flex items-center justify-end gap-2">
-                                          <BrainCircuit size={16} className="text-blue-500" />
-                                          <span>{aiRecommendation}</span>
-                                      </div>
-                                  ) : recommendations ? '-' : ''}
-                              </TableCell>
-                            </TableRow>
-                          )})}
-                        </>
-                      </CollapsibleContent>
-                    </tbody>
+                          </TableRow>
+                        </CollapsibleContent>
+                      )})}
+                    </React.Fragment>
                   </Collapsible>
                 ))
               ) : (
-                <TableBody>
-                    <TableRow>
-                    <TableCell colSpan={6} className="h-48 text-center">
-                        <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
-                            <CheckCircle className="h-10 w-10 text-green-500"/>
-                            <p className="text-lg font-semibold">¡Todo en orden!</p>
-                            <p className="text-sm">No hay artículos que necesiten reposición en este momento.</p>
-                        </div>
-                    </TableCell>
-                    </TableRow>
-                </TableBody>
+                <TableRow>
+                  <TableCell colSpan={6} className="h-48 text-center">
+                      <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                          <CheckCircle className="h-10 w-10 text-green-500"/>
+                          <p className="text-lg font-semibold">¡Todo en orden!</p>
+                          <p className="text-sm">No hay artículos que necesiten reposición en este momento.</p>
+                      </div>
+                  </TableCell>
+                </TableRow>
               )}
-            
+            </TableBody>
           </Table>
         </CardContent>
         {recommendations && (
