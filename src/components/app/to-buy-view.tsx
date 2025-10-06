@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -100,10 +100,14 @@ export default function ToBuyView({ bearings, sectorInventory }: ToBuyViewProps)
             });
         }
     });
-    
-    // Set all groups to be open by default when there are items
-    if(result.length > 0) {
-        const groups = result.reduce((acc, item) => {
+
+    return result.sort((a,b) => a.bearing.name.localeCompare(b.bearing.name));
+  }, [bearings, sectorInventory]);
+  
+  // Effect to open all groups only when the list is first populated
+  useEffect(() => {
+    if (bearingsToReorder.length > 0) {
+        const groups = bearingsToReorder.reduce((acc, item) => {
             const series = getBearingSeries(item.bearing.name);
             if (!acc.includes(series)) {
                 acc.push(series);
@@ -114,9 +118,8 @@ export default function ToBuyView({ bearings, sectorInventory }: ToBuyViewProps)
     } else {
         setOpenCollapsibles([]);
     }
+  }, [bearingsToReorder]);
 
-    return result.sort((a,b) => a.bearing.name.localeCompare(b.bearing.name));
-  }, [bearings, sectorInventory]);
 
   const groupedBearings = useMemo(() => {
     const groups = bearingsToReorder.reduce((acc, item) => {
