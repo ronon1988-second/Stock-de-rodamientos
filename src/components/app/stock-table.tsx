@@ -1,3 +1,4 @@
+
 "use client";
 import React, { useState, useMemo } from "react";
 import {
@@ -19,15 +20,17 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import UpdateStockDialog from "./update-stock-dialog";
 import type { InventoryItem, Sector } from "@/lib/types";
-import { MoreHorizontal, Search, ChevronRight } from "lucide-react";
+import { MoreHorizontal, Search, ChevronRight, PlusCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import AddItemDialog from "./add-item-dialog";
 
 type StockTableProps = {
   inventory: InventoryItem[];
   onLogUsage: (itemId: string, quantity: number, sector: Sector) => void;
   onUpdateItem: (item: InventoryItem) => void;
+  onAddItem: (item: Omit<InventoryItem, 'id'>) => void;
   title?: string;
   description?: string;
 };
@@ -62,9 +65,10 @@ const getItemSeries = (name: string): string => {
 };
 
 
-export default function StockTable({ inventory, onLogUsage, onUpdateItem, title, description }: StockTableProps) {
+export default function StockTable({ inventory, onLogUsage, onUpdateItem, onAddItem, title, description }: StockTableProps) {
   const [logUsageItem, setLogUsageItem] = useState<InventoryItem | null>(null);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [addingItem, setAddingItem] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [openCollapsibles, setOpenCollapsibles] = useState<string[]>([]);
 
@@ -117,11 +121,19 @@ export default function StockTable({ inventory, onLogUsage, onUpdateItem, title,
     <>
       <Card>
         <CardHeader>
-          <CardTitle>{title || 'Inventario General'}</CardTitle>
-          <CardDescription>
-            {description || 'Busca, visualiza y gestiona todo tu inventario.'}
-          </CardDescription>
-          <div className="relative mt-2">
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle>{title || 'Inventario General'}</CardTitle>
+              <CardDescription>
+                {description || 'Busca, visualiza y gestiona todo tu inventario.'}
+              </CardDescription>
+            </div>
+            <Button onClick={() => setAddingItem(true)}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Agregar Artículo
+            </Button>
+          </div>
+          <div className="relative mt-4">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
@@ -210,6 +222,14 @@ export default function StockTable({ inventory, onLogUsage, onUpdateItem, title,
           </div>
         </CardContent>
       </Card>
+
+      {addingItem && (
+        <AddItemDialog
+          onClose={() => setAddingItem(false)}
+          onConfirm={onAddItem}
+          existingNames={inventory.map(i => i.name)}
+        />
+      )}
       
       {logUsageItem && (
         <UpdateStockDialog

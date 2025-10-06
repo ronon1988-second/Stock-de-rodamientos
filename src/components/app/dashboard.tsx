@@ -1,3 +1,4 @@
+
 "use client";
 import {
   Card,
@@ -13,12 +14,14 @@ type DashboardProps = {
   inventory: InventoryItem[];
   onLogUsage: (itemId: string, quantity: number, sector: Sector) => void;
   onUpdateItem: (item: InventoryItem) => void;
+  onAddItem: (item: Omit<InventoryItem, 'id'>) => void;
 };
 
 export default function Dashboard({
   inventory,
   onLogUsage,
   onUpdateItem,
+  onAddItem
 }: DashboardProps) {
   const totalStock = inventory.reduce((sum, b) => sum + b.stock, 0);
   const lowStockCount = inventory.filter((b) => b.stock < b.threshold).length;
@@ -77,6 +80,7 @@ export default function Dashboard({
             inventory={inventory} 
             onLogUsage={onLogUsage}
             onUpdateItem={onUpdateItem}
+            onAddItem={onAddItem}
           />
       </div>
     </div>

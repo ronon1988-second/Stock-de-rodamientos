@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo } from "react";
@@ -42,6 +43,20 @@ export default function App() {
   const [isSectorsOpen, setIsSectorsOpen] = useState(true);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
+
+  const handleAddItem = (newItem: Omit<InventoryItem, 'id'>) => {
+    setInventory(prev => {
+        const newCompleteItem: InventoryItem = {
+            ...newItem,
+            id: `item-${Date.now()}-${Math.random()}`
+        };
+        return [...prev, newCompleteItem];
+    });
+    toast({
+        title: "Artículo Agregado",
+        description: `Se ha agregado ${newItem.name} al inventario.`
+    });
+  }
 
   const handleUpdateItem = (updatedItem: InventoryItem) => {
     setInventory(prev => prev.map(b => b.id === updatedItem.id ? updatedItem : b));
@@ -217,6 +232,7 @@ export default function App() {
         inventory={inventory}
         onLogUsage={handleLogUsage}
         onUpdateItem={handleUpdateItem}
+        onAddItem={handleAddItem}
       />
     }
     if (view === 'reports') {
@@ -359,3 +375,4 @@ export default function App() {
     </div>
   );
 }
+
