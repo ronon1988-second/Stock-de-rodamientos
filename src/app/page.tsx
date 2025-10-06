@@ -8,7 +8,7 @@ import {
   ChevronRight,
   ShoppingCart,
   Package,
-  X,
+  User,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -20,14 +20,6 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Bearing, UsageLog, Sector, SECTORS, SectorInventory } from "@/lib/types";
 import { initialBearings } from "@/lib/data";
@@ -329,8 +321,7 @@ export default function App() {
             </SheetTrigger>
             <SheetContent side="left" className="flex flex-col">
                 <SheetHeader>
-                  <SheetTitle>Balance de Rodamientos</SheetTitle>
-                  <span className="sr-only">Menú de Navegación</span>
+                  <SheetTitle>Menú</SheetTitle>
                 </SheetHeader>
               <div className="flex items-center gap-2 text-lg font-semibold mb-4">
                 <Logo className="h-8 w-8 text-primary" />
@@ -343,22 +334,10 @@ export default function App() {
           <div className="w-full flex-1">
              <h1 className="font-semibold text-xl capitalize">{getViewTitle()}</h1>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="secondary" size="icon" className="rounded-full">
-                 <img src="https://images.unsplash.com/photo-1628157588553-5ee30a682e5e?q=80&w=200&h=200&auto=format&fit=crop" alt="Avatar" className="rounded-full" />
-                <span className="sr-only">Alternar menú de usuario</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Mi Cuenta</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>Configuración</DropdownMenuItem>
-              <DropdownMenuItem>Soporte</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>Cerrar Sesión</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button variant="secondary" size="icon" className="rounded-full">
+            <User className="h-5 w-5" />
+            <span className="sr-only">Perfil de usuario</span>
+          </Button>
         </header>
         <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-muted/40">
           {renderContent()}
