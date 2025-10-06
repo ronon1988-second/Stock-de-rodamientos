@@ -1,0 +1,277 @@
+{
+  "entities": {
+    "Bearing": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Bearing",
+      "type": "object",
+      "description": "Represents a specific type of bearing.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the bearing."
+        },
+        "partNumber": {
+          "type": "string",
+          "description": "The manufacturer's part number for the bearing."
+        },
+        "description": {
+          "type": "string",
+          "description": "A description of the bearing."
+        },
+        "size": {
+          "type": "string",
+          "description": "The size specifications of the bearing."
+        },
+        "criticalStockLevel": {
+          "type": "number",
+          "description": "The minimum quantity of this bearing that should be in stock before a reorder is recommended."
+        }
+      },
+      "required": [
+        "id",
+        "partNumber",
+        "description",
+        "size",
+        "criticalStockLevel"
+      ]
+    },
+    "Location": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Location",
+      "type": "object",
+      "description": "Represents a physical location where bearings are stored or used (e.g., a specific machine or production line).",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the location."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the location (e.g., 'Packaging Machine 1', 'Production Line A')."
+        },
+        "description": {
+          "type": "string",
+          "description": "A description of the location."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description"
+      ]
+    },
+    "StockLevel": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "StockLevel",
+      "type": "object",
+      "description": "Represents the quantity of a specific bearing type at a specific location.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the stock level record."
+        },
+        "bearingId": {
+          "type": "string",
+          "description": "Reference to Bearing. (Relationship: Bearing 1:N StockLevel)"
+        },
+        "locationId": {
+          "type": "string",
+          "description": "Reference to Location. (Relationship: Location 1:N StockLevel)"
+        },
+        "quantity": {
+          "type": "number",
+          "description": "The quantity of the bearing at the location."
+        }
+      },
+      "required": [
+        "id",
+        "bearingId",
+        "locationId",
+        "quantity"
+      ]
+    },
+    "UsageLog": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UsageLog",
+      "type": "object",
+      "description": "Represents a record of bearing usage at a specific location.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the usage log record."
+        },
+        "bearingId": {
+          "type": "string",
+          "description": "Reference to Bearing. (Relationship: Bearing 1:N UsageLog)"
+        },
+        "locationId": {
+          "type": "string",
+          "description": "Reference to Location. (Relationship: Location 1:N UsageLog)"
+        },
+        "quantity": {
+          "type": "number",
+          "description": "The quantity of the bearing used."
+        },
+        "date": {
+          "type": "string",
+          "description": "The date and time when the bearing was used.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "bearingId",
+        "locationId",
+        "quantity",
+        "date"
+      ]
+    },
+    "ReorderRecommendation": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ReorderRecommendation",
+      "type": "object",
+      "description": "Represents a recommendation to reorder a specific bearing type.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the reorder recommendation."
+        },
+        "bearingId": {
+          "type": "string",
+          "description": "Reference to Bearing. (Relationship: Bearing 1:N ReorderRecommendation)"
+        },
+        "recommendedQuantity": {
+          "type": "number",
+          "description": "The quantity of the bearing that is recommended to be reordered."
+        },
+        "reorderDate": {
+          "type": "string",
+          "description": "The date when the reorder was placed.",
+          "format": "date-time"
+        },
+        "totalValue": {
+          "type": "number",
+          "description": "The total value of the reordered bearings."
+        }
+      },
+      "required": [
+        "id",
+        "bearingId",
+        "recommendedQuantity",
+        "reorderDate",
+        "totalValue"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "users/{userId}/bearings/{bearingId}",
+        "definition": {
+          "entityName": "Bearing",
+          "schema": {
+            "$ref": "#/backend/entities/Bearing"
+          },
+          "description": "Stores bearing information. Bearings are private to each user. Includes path-based ownership.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The ID of the user who owns the bearing."
+            },
+            {
+              "name": "bearingId",
+              "description": "The unique ID of the bearing."
+            }
+          ]
+        }
+      },
+      {
+        "path": "users/{userId}/locations/{locationId}",
+        "definition": {
+          "entityName": "Location",
+          "schema": {
+            "$ref": "#/backend/entities/Location"
+          },
+          "description": "Stores location information (e.g., machine or production line). Locations are private to each user. Includes path-based ownership.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The ID of the user who owns the location."
+            },
+            {
+              "name": "locationId",
+              "description": "The unique ID of the location."
+            }
+          ]
+        }
+      },
+      {
+        "path": "users/{userId}/stockLevels/{stockLevelId}",
+        "definition": {
+          "entityName": "StockLevel",
+          "schema": {
+            "$ref": "#/backend/entities/StockLevel"
+          },
+          "description": "Stores the quantity of a bearing at a specific location. StockLevels are private to each user. Includes path-based ownership.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The ID of the user who owns the stock level information."
+            },
+            {
+              "name": "stockLevelId",
+              "description": "The unique ID of the stock level record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "users/{userId}/usageLogs/{usageLogId}",
+        "definition": {
+          "entityName": "UsageLog",
+          "schema": {
+            "$ref": "#/backend/entities/UsageLog"
+          },
+          "description": "Stores historical usage data for bearings. UsageLogs are private to each user. Includes path-based ownership.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The ID of the user who owns the usage log information."
+            },
+            {
+              "name": "usageLogId",
+              "description": "The unique ID of the usage log record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "users/{userId}/reorderRecommendations/{reorderRecommendationId}",
+        "definition": {
+          "entityName": "ReorderRecommendation",
+          "schema": {
+            "$ref": "#/backend/entities/ReorderRecommendation"
+          },
+          "description": "Stores reorder recommendations generated by the system. ReorderRecommendations are private to each user. Includes path-based ownership.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The ID of the user who owns the reorder recommendation."
+            },
+            {
+              "name": "reorderRecommendationId",
+              "description": "The unique ID of the reorder recommendation."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "Given the application requirements for Bearing Balance, which includes importing existing data, tracking stock levels, logging usage, providing low stock alerts, generating reorder recommendations, and reporting, the following Firestore data structure is recommended. This structure prioritizes authorization independence and supports secure list operations. The use of path-based ownership is preferred where appropriate.\n\nAuthorization Independence is achieved through the application of denormalization (Strategy A). This will avoid any rules requiring get() calls. QAPs (Rules are not Filters) is achieved by Structural Segregation and Path-based ownership.\n\nThe core entities are Bearings, Locations, StockLevels, UsageLogs, and ReorderRecommendations. The data structure focuses on storing stock levels and historical usage data efficiently to enable reorder recommendations and reporting. The structure uses the login system, so private data will be organized under the 'users' collection."
+  }
+}
