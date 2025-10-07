@@ -2,165 +2,185 @@
  * @fileoverview Firestore Security Rules for the application.
  *
  * Core Philosophy:
- * This ruleset enforces a role-based access control model where users can only
- * read their own role, admins can read user profiles, and admins/editors can
- * manage articles. It prioritizes secure authorization based on user roles
- * and identities.
+ * This ruleset enforces a role-based access control model with an "admin" role.
+ * Most data is publicly readable, but write access is restricted to users with the "admin" role.
+ * User profiles and roles are managed under the /users/{userId} and /roles/{userId} paths respectively,
+ * with ownership enforced on user profile creation.
  *
  * Data Structure:
- * - /roles/{userId}: Stores user roles, readable only by the user themselves.
- * - /users/{userId}: Stores user profiles, readable only by admins.
- * - /articles/{articleId}: Stores article content, readable by all authenticated users,
- *   writable by admins and editors.
- * - /inventory/{itemId}: Stores inventory information.
- * - /sectors/{sectorId}: Stores sector information.
- * - /sectors/{sectorId}/machines/{machineId}: Stores machine information for each sector.
- * - /machineAssignments/{assignmentId}: Stores assignments of inventory items to machines.
- * - /usageLog/{logId}: Stores usage logs for inventory items.
+ * - /inventory/{itemId}: Publicly readable inventory items.
+ * - /sectors/{sectorId}: Publicly readable sector information.
+ * - /sectors/{sectorId}/machines/{machineId}: Publicly readable machine information within sectors.
+ * - /machineAssignments/{assignmentId}: Publicly readable assignments of items to machines.
+ * - /usageLog/{logId}: Publicly readable logs of item usage.
+ * - /users/{userId}: User profiles, only writable by the user themselves on creation.
+ * - /roles/{userId}: User roles, only writable by admins.
  *
  * Key Security Decisions:
- * - User listing is disallowed to prevent unauthorized access to user data.
- * - Articles are publicly readable but only writable by authorized roles.
- * - The rules explicitly deny write access to roles and user profiles to
- *   prevent unauthorized role elevation or profile modification.
- * - Flexible schema on data writes for rapid prototyping.
+ * - Public read access for most collections to enable quick prototyping.
+ * - Write access restricted to admins for most collections to prevent unauthorized modifications.
+ * - User profile creation allowed only for the user themselves, with the uid validated on creation.
+ * - No listing of users is allowed to protect user privacy.
  *
  * Denormalization for Authorization:
- *  - User roles are stored in a separate /roles/{userId} document. While this design requires a `get()` call in more complex scenarios, it aligns with the principle of separating authorization data. For the rules provided, this is the only means necessary.
- *
- * Structural Segregation:
- *  - User roles and profiles are stored in separate collections to simplify
- *    access control and prevent accidental exposure of sensitive information.
+ *  - Roles are stored in a separate `/roles/{userId}` document to simplify role checks.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows a user to read their own role.
-     * @path /roles/{userId}
-     * @allow (get, list) if the requesting user's UID matches the document ID.
-     *          Example: User with UID 'user123' requests 'get' on /roles/user123.
-     * @deny (get, list) if the requesting user's UID does not match the document ID.
-     *          Example: User with UID 'user456' requests 'get' on /roles/user123.
-     * @principle Enforces document ownership for reads.
-     */
-    match /roles/{userId} {
-      allow get, list: if isSignedIn() && isOwner(userId);
-      allow create, update, delete: if false;
-    }
-
-    /**
-     * @description Allows admins to read user profiles.
-     * @path /users/{userId}
-     * @allow (get, list) if the requesting user has the 'admin' role.
-     *          Example: User with 'admin' role requests 'get' on /users/user123.
-     * @deny (get, list) if the requesting user does not have the 'admin' role.
-     *          Example: User without 'admin' role requests 'get' on /users/user123.
-     * @principle Restricts access to user profiles to admins only.
-     */
-    match /users/{userId} {
-      allow get, list: if isSignedIn() && isAdmin();
-      allow create, update, delete: if false;
-    }
-
-    /**
-     * @description Allows authenticated users to read articles and admins/editors to write them.
-     * @path /articles/{articleId}
-     * @allow (get, list) if the requesting user is authenticated.
-     *          Example: Any authenticated user requests 'get' on /articles/article123.
-     * @allow (create, update, delete) if the requesting user has the 'admin' or 'editor' role.
-     *          Example: User with 'admin' role requests 'create' on /articles/article456.
-     * @deny (create, update, delete) if the requesting user does not have the 'admin' or 'editor' role.
-     *          Example: User without 'admin' or 'editor' role requests 'create' on /articles/article456.
-     * @principle Provides public read access to articles while restricting write access to authorized roles.
-     */
-    match /articles/{articleId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn() && (isAdmin() || isEditor());
-    }
-
-    /**
-     * @description Allows anyone to read inventory items.
+     * @description Allows anyone to read inventory items, but restricts creation, updates, and deletion to admins.
      * @path /inventory/{itemId}
-     * @allow (get, list) if true (public read).
-     *          Example: Any user requests 'get' on /inventory/item123.
-     * @deny (create, update, delete) all write operations.
-     * @principle Allows public read access to inventory items.
+     * @allow (get, list): if true
+     * @allow (create): if isAdmin()
+     * @allow (update): if isAdmin()
+     * @allow (delete): if isAdmin()
+     * @deny (create): if !isAdmin()
+     * @deny (update): if !isAdmin()
+     * @deny (delete): if !isAdmin()
+     * @principle Allows public read access with admin-only writes.
      */
     match /inventory/{itemId} {
       allow get, list: if true;
-      allow create, update, delete: if false;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Allows anyone to read sectors.
+     * @description Allows anyone to read sector information, but restricts creation, updates, and deletion to admins.
      * @path /sectors/{sectorId}
-     * @allow (get, list) if true (public read).
-     *          Example: Any user requests 'get' on /sectors/sector123.
-     * @deny (create, update, delete) all write operations.
-     * @principle Allows public read access to sectors.
+     * @allow (get, list): if true
+     * @allow (create): if isAdmin()
+     * @allow (update): if isAdmin()
+     * @allow (delete): if isAdmin()
+     * @deny (create): if !isAdmin()
+     * @deny (update): if !isAdmin()
+     * @deny (delete): if !isAdmin()
+     * @principle Allows public read access with admin-only writes.
      */
     match /sectors/{sectorId} {
       allow get, list: if true;
-      allow create, update, delete: if false;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Allows anyone to read machines within a sector.
+     * @description Allows anyone to read machine information within a sector, but restricts creation, updates, and deletion to admins.
      * @path /sectors/{sectorId}/machines/{machineId}
-     * @allow (get, list) if true (public read).
-     *          Example: Any user requests 'get' on /sectors/sector123/machines/machine456.
-     * @deny (create, update, delete) all write operations.
-     * @principle Allows public read access to machines within sectors.
+     * @allow (get, list): if true
+     * @allow (create): if isAdmin()
+     * @allow (update): if isAdmin()
+     * @allow (delete): if isAdmin()
+     * @deny (create): if !isAdmin()
+     * @deny (update): if !isAdmin()
+     * @deny (delete): if !isAdmin()
+     * @principle Allows public read access with admin-only writes.
      */
     match /sectors/{sectorId}/machines/{machineId} {
       allow get, list: if true;
-      allow create, update, delete: if false;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Allows anyone to read machine assignments.
+     * @description Allows anyone to read machine assignments, but restricts creation, updates, and deletion to admins.
      * @path /machineAssignments/{assignmentId}
-     * @allow (get, list) if true (public read).
-     *          Example: Any user requests 'get' on /machineAssignments/assignment123.
-     * @deny (create, update, delete) all write operations.
-     * @principle Allows public read access to machine assignments.
+     * @allow (get, list): if true
+     * @allow (create): if isAdmin()
+     * @allow (update): if isAdmin()
+     * @allow (delete): if isAdmin()
+     * @deny (create): if !isAdmin()
+     * @deny (update): if !isAdmin()
+     * @deny (delete): if !isAdmin()
+     * @principle Allows public read access with admin-only writes.
      */
     match /machineAssignments/{assignmentId} {
       allow get, list: if true;
-      allow create, update, delete: if false;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
-     /**
-      * @description Allows anyone to read usage logs.
-      * @path /usageLog/{logId}
-      * @allow (get, list) if true (public read).
-      *          Example: Any user requests 'get' on /usageLog/log123.
-      * @deny (create, update, delete) all write operations.
-      * @principle Allows public read access to usage logs.
-      */
+    /**
+     * @description Allows anyone to read usage logs, but restricts creation, updates, and deletion to admins.
+     * @path /usageLog/{logId}
+     * @allow (get, list): if true
+     * @allow (create): if isAdmin()
+     * @allow (update): if isAdmin()
+     * @allow (delete): if isAdmin()
+     * @deny (create): if !isAdmin()
+     * @deny (update): if !isAdmin()
+     * @deny (delete): if !isAdmin()
+     * @principle Allows public read access with admin-only writes.
+     */
     match /usageLog/{logId} {
       allow get, list: if true;
-      allow create, update, delete: if false;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
-  }
+    /**
+     * @description Allows a user to create their own profile. Only admins can update or delete profiles.
+     * @path /users/{userId}
+     * @allow (create): if isOwner(userId) && request.resource.data.uid == userId
+     * @allow (get): if isOwner(userId) || isAdmin()
+     * @allow (update): if isAdmin()
+     * @allow (delete): if isAdmin()
+     * @deny (create): if !isOwner(userId) || request.resource.data.uid != userId
+     * @deny (update): if !isAdmin()
+     * @deny (delete): if !isAdmin()
+     * @deny (list): if true
+     * @principle Enforces user-ownership for profile creation and admin-only writes. Prevents listing users.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if false;
+      allow create: if isOwner(userId) && request.resource.data.uid == userId;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
 
-  // Helper functions
-  function isSignedIn() {
-    return request.auth != null;
-  }
+    /**
+     * @description Allows only admins to manage user roles.
+     * @path /roles/{userId}
+     * @allow (create): if isAdmin()
+     * @allow (get): if isAdmin()
+     * @allow (update): if isAdmin()
+     * @allow (delete): if isAdmin()
+     * @deny (create): if !isAdmin()
+     * @deny (get): if !isAdmin()
+     * @deny (update): if !isAdmin()
+     * @deny (delete): if !isAdmin()
+     *  @deny (list): if true
+     * @principle Restricts role management to admins.
+     */
+    match /roles/{userId} {
+      allow get: if isAdmin();
+      allow list: if false;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
 
-  function isOwner(userId) {
-    return request.auth.uid == userId;
-  }
+    function isSignedIn() {
+      return request.auth != null;
+    }
 
-  function isAdmin() {
-    return request.auth.token.role == 'admin';
-  }
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
 
-    function isEditor() {
-    return request.auth.token.role == 'editor';
+    function isAdmin() {
+      return isSignedIn() && hasRole('admin');
+    }
+
+    function hasRole(role) {
+          return request.auth.token.role == role;
+    }
   }
 }

@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -19,13 +18,9 @@ import {
   doc,
   writeBatch,
   query,
-  onSnapshot,
-  getDoc,
-  serverTimestamp,
   getDocs,
   addDoc,
   setDoc,
-  where,
   deleteDoc,
   updateDoc,
 } from 'firebase/firestore';
@@ -148,24 +143,36 @@ function AppContent() {
   const auth = useAuth();
   const firestore = useFirestore();
   const [isSeeding, setIsSeeding] = useState(false);
+  const [userRoles, setUserRoles] = useState({ isAdmin: false, isEditor: false });
+
+
+  useEffect(() => {
+    const fetchUserClaims = async () => {
+      if (user) {
+        try {
+          const idTokenResult = await user.getIdTokenResult(true); // Force refresh
+          const claims = idTokenResult.claims;
+          setUserRoles({
+            isAdmin: !!claims.admin,
+            isEditor: !!claims.editor,
+          });
+        } catch (error) {
+          console.error("Error fetching user claims:", error);
+          // Handle error, maybe sign out user
+        }
+      }
+    };
+
+    fetchUserClaims();
+  }, [user]);
+
+
+  const { isAdmin, isEditor } = userRoles;
 
   // DATA FETCHING
-  const roleRef = useMemoFirebase(
-    () => (user && firestore ? doc(firestore, 'roles', user.uid) : null),
-    [firestore, user]
-  );
-  const { data: userRoleDoc, isLoading: isRoleLoading } = useDoc<UserRole>(roleRef);
-  
-  const userProfileRef = useMemoFirebase(
-    () => (user && firestore ? doc(firestore, 'users', user.uid) : null),
-    [firestore, user]
-  );
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
-  
-  const allUsersRef = useMemoFirebase(() => (firestore ? collection(firestore, 'users') : null), [firestore]);
+  const allUsersRef = useMemoFirebase(() => (firestore && isAdmin ? collection(firestore, 'users') : null), [firestore, isAdmin]);
   const { data: allUsers, isLoading: isAllUsersLoading } = useCollection<UserProfile>(allUsersRef);
-
-
+  
   const inventoryRef = useMemoFirebase(() => firestore ? collection(firestore, 'inventory') : null, [firestore]);
   const { data: inventory, isLoading: isInventoryLoading } = useCollection<InventoryItem>(inventoryRef);
 
@@ -177,11 +184,6 @@ function AppContent() {
   
   const usageLogRef = useMemoFirebase(() => firestore ? collection(firestore, 'usageLog') : null, [firestore]);
   const { data: usageLog, isLoading: isUsageLogLoading } = useCollection<UsageLog>(usageLogRef);
-  
-  // PERMISSIONS
-  const isMasterUser = user?.email === 'maurofbordon@gmail.com';
-  const isAdmin = isMasterUser || userRoleDoc?.role === 'admin';
-  const isEditor = isAdmin || userRoleDoc?.role === 'editor';
     
   useEffect(() => {
     const seedData = async () => {
@@ -460,9 +462,7 @@ function AppContent() {
       isUsageLogLoading ||
       isSectorsLoading ||
       isSeeding ||
-      isProfileLoading ||
-      isRoleLoading ||
-      isAllUsersLoading;
+      (isAdmin && isAllUsersLoading);
 
     if (isDataLoading) {
       return <Skeleton className="h-full w-full" />;
@@ -583,7 +583,7 @@ function AppContent() {
       <Accordion type="single" collapsible className="w-full">
         {(sortedSectors || []).map(sector => (
           <AccordionItem key={sector.id} value={sector.id} className="border-b-0">
-            <AccordionTrigger className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-muted-foreground hover:text-primary hover:no-underline">
+            <AccordionTrigger>
               <div className="flex items-center gap-3">
                 <Package className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />
                 <span className="font-semibold">{sector.name}</span>
@@ -615,7 +615,7 @@ function AppContent() {
   );
 
   // Central loading check
-  if (isUserLoading || isProfileLoading || isRoleLoading) {
+  if (isUserLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Skeleton className="h-[95vh] w-[95vw] rounded-lg" />
@@ -694,8 +694,8 @@ function AppContent() {
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>
                 {user?.email}{' '}
-                {isMasterUser && '(Master)'}
-                {userRoleDoc?.role && ` - ${userRoleDoc.role}`}
+                {isAdmin && '(Admin)'}
+                {isEditor && !isAdmin && '(Editor)'}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={handleLogout}>
@@ -733,5 +733,3 @@ export default function Page() {
 
   return <AppContent />;
 }
-
-    
