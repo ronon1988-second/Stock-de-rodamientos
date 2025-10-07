@@ -26,7 +26,6 @@ export async function setupUserAndRole(uid: string, email: string): Promise<{ su
     try {
         const { firestore } = getSdks();
         
-        // 1. Create user profile document
         const userRef = doc(firestore, 'users', uid);
         const userData: Omit<UserProfile, 'id'|'uid'> = {
             email: email,
@@ -34,18 +33,19 @@ export async function setupUserAndRole(uid: string, email: string): Promise<{ su
         };
         await setDoc(userRef, userData);
 
-        // 2. Create default role document
         const roleRef = doc(firestore, 'roles', uid);
-        // Special case for master user
+        
         if (email === 'maurofbordon@gmail.com') {
             await setDoc(roleRef, { role: 'admin' });
-            // Also set custom claim for immediate admin access
             const adminApp = getAdminApp();
             const auth = getAuth(adminApp);
-            await auth.setCustomUserClaims(uid, { admin: true });
+            await auth.setCustomUserClaims(uid, { admin: true, editor: true });
 
         } else {
             await setDoc(roleRef, { role: 'editor' });
+             const adminApp = getAdminApp();
+            const auth = getAuth(adminApp);
+            await auth.setCustomUserClaims(uid, { editor: true });
         }
 
         return { success: true };
@@ -66,12 +66,10 @@ export async function updateUserRole(uid: string, role: 'admin' | 'editor'): Pro
         const adminApp = getAdminApp();
         const auth = getAuth(adminApp);
 
-        // Update the role in the /roles collection
         const roleRef = doc(firestore, 'roles', uid);
         await setDoc(roleRef, { role: role });
 
-        // Set custom claims for the user
-        const claims = role === 'admin' ? { admin: true, editor: true } : { editor: true };
+        const claims = role === 'admin' ? { admin: true, editor: true } : { editor: true, admin: false };
         await auth.setCustomUserClaims(uid, claims);
 
         return { success: true };
@@ -83,3 +81,4 @@ export async function updateUserRole(uid: string, role: 'admin' | 'editor'): Pro
 }
 
     
+

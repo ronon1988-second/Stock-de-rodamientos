@@ -47,6 +47,7 @@ import {
   Machine,
   MachineAssignment,
   UserProfile,
+  UserRole,
 } from '@/lib/types';
 import { initialInventory, initialSectors, initialMachines } from '@/lib/data';
 import Dashboard from '@/components/app/dashboard';
@@ -61,6 +62,7 @@ import {
   useFirestore,
   useCollection,
   useMemoFirebase,
+  useDoc,
 } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -142,8 +144,12 @@ function AppContent() {
   const auth = useAuth();
   const firestore = useFirestore();
   const [isSeeding, setIsSeeding] = useState(false);
-  const [userRoles, setUserRoles] = useState({ isAdmin: false, isEditor: false });
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isEditor, setIsEditor] = useState(false);
 
+  // Get user role from /roles/{uid} collection
+  const roleRef = useMemoFirebase(() => (firestore && user) ? doc(firestore, 'roles', user.uid) : null, [firestore, user]);
+  const { data: userRoleDoc, isLoading: isRoleLoading } = useDoc<UserRole>(roleRef);
 
   useEffect(() => {
     const fetchUserClaims = async () => {
@@ -151,22 +157,22 @@ function AppContent() {
         try {
           const idTokenResult = await user.getIdTokenResult(true); // Force refresh
           const claims = idTokenResult.claims;
-          setUserRoles({
-            isAdmin: !!claims.admin,
-            isEditor: !!claims.editor || !!claims.admin, // Admins are also editors
-          });
+          setIsAdmin(!!claims.admin);
+          setIsEditor(!!claims.editor || !!claims.admin);
         } catch (error) {
           console.error("Error fetching user claims:", error);
-          // Handle error, maybe sign out user
+          setIsAdmin(false);
+          setIsEditor(false);
         }
+      } else {
+        setIsAdmin(false);
+        setIsEditor(false);
       }
     };
 
     fetchUserClaims();
   }, [user]);
 
-
-  const { isAdmin, isEditor } = userRoles;
 
   // DATA FETCHING
   const allUsersRef = useMemoFirebase(() => (firestore && isAdmin ? collection(firestore, 'users') : null), [firestore, isAdmin]);
@@ -188,10 +194,7 @@ function AppContent() {
     
   useEffect(() => {
     const seedData = async () => {
-        if (!firestore || !user || isInventoryLoading || isSectorsLoading || isSeeding) return;
-
-        // Only seed if the user is an admin to avoid multiple seedings from different users
-        if (!isAdmin) return;
+        if (!firestore || !user || isInventoryLoading || isSectorsLoading || isSeeding || !isAdmin) return;
 
         const invQuery = query(collection(firestore, 'inventory'));
         const sectorsQuery = query(collection(firestore, 'sectors'));
@@ -210,13 +213,11 @@ function AppContent() {
             try {
                 const batch = writeBatch(firestore);
 
-                // Seed inventory
                 initialInventory.forEach(item => {
                     const docRef = doc(collection(firestore, 'inventory'));
                     batch.set(docRef, item);
                 });
 
-                // Seed sectors and get their new IDs
                  for (const sectorData of initialSectors) {
                     const sectorRef = doc(collection(firestore, 'sectors'));
                     batch.set(sectorRef, sectorData);
@@ -466,6 +467,8 @@ function AppContent() {
 
   const renderContent = () => {
     const isDataLoading =
+      isUserLoading ||
+      isRoleLoading ||
       isInventoryLoading ||
       isAssignmentsLoading ||
       isUsageLogLoading ||
@@ -504,7 +507,7 @@ function AppContent() {
       );
     }
     if (view === 'organization') {
-      if (!isEditor) { // Changed from isAdmin to isEditor
+      if (!isEditor) { 
         setView('dashboard');
         toast({ title: "Acceso denegado", description: "Necesita permisos de editor o administrador.", variant: "destructive"})
         return null;
@@ -540,7 +543,6 @@ function AppContent() {
       );
     }
    
-    // Fallback view
     return (
         <Dashboard
             inventory={sortedInventory}
@@ -592,7 +594,7 @@ function AppContent() {
       <Accordion type="single" collapsible className="w-full">
         {(sortedSectors || []).map(sector => (
           <AccordionItem key={sector.id} value={sector.id} className="border-b-0">
-            <AccordionTrigger>
+            <AccordionTrigger className="text-left">
               <div className="flex items-center gap-3">
                 <Package className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />
                 <span className="font-semibold">{sector.name}</span>
@@ -623,8 +625,8 @@ function AppContent() {
     </nav>
   );
 
-  // Central loading check
-  if (isUserLoading || (user && !userRoles.isEditor && !userRoles.isAdmin && user.email !== 'maurofbordon@gmail.com' && !isSeeding && !isSectorsLoading && !isInventoryLoading)) {
+  const isLoading = isUserLoading || isRoleLoading;
+  if (isLoading) {
       return (
         <div className="flex items-center justify-center min-h-screen">
           <Skeleton className="h-[95vh] w-[95vw] rounded-lg" />
