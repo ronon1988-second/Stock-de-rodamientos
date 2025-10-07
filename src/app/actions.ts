@@ -2,7 +2,7 @@
 'use server';
 
 import { getReorderRecommendations, ReorderRecommendationsInput } from "@/ai/flows/reorder-recommendations";
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, getDocs, query, setDoc, where, collection } from 'firebase/firestore';
 import { getSdks } from "@/firebase";
 
 export async function getAIReorderRecommendations(input: ReorderRecommendationsInput) {

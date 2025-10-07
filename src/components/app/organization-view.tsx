@@ -7,8 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { PlusCircle, Trash2, Edit, Save, X } from 'lucide-react';
 import { Sector, Machine } from '@/lib/types';
-import { Firestore, collection, doc } from 'firebase/firestore';
-import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { Firestore, collection, doc, addDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
@@ -16,7 +15,6 @@ import { Skeleton } from '../ui/skeleton';
 
 type OrganizationViewProps = {
     sectors: Sector[];
-    firestore: Firestore;
 };
 
 function MachineListEditor({ sector }: { sector: Sector }) {
@@ -25,28 +23,26 @@ function MachineListEditor({ sector }: { sector: Sector }) {
     const [newMachineName, setNewMachineName] = useState('');
     const [editingMachine, setEditingMachine] = useState<{ id: string, name: string } | null>(null);
 
-    const machinesRef = useMemoFirebase(() => collection(firestore, `sectors/${sector.id}/machines`), [firestore, sector.id]);
+    const machinesRef = useMemoFirebase(() => firestore ? collection(firestore, `sectors/${sector.id}/machines`) : null, [firestore, sector.id]);
     const { data: machines, isLoading } = useCollection<Machine>(machinesRef);
 
-    const handleAddMachine = () => {
+    const handleAddMachine = async () => {
         const machineName = newMachineName.trim();
-        if (!machineName) return;
-        const machinesRef = collection(firestore, `sectors/${sector.id}/machines`);
-        addDocumentNonBlocking(machinesRef, { name: machineName, sectorId: sector.id });
+        if (!machineName || !firestore) return;
+        await addDoc(collection(firestore, `sectors/${sector.id}/machines`), { name: machineName, sectorId: sector.id });
         setNewMachineName('');
         toast({ title: "Máquina Agregada", description: `Se ha agregado la máquina "${machineName}".` });
     };
 
-    const handleDeleteMachine = (machine: Machine) => {
-        const machineRef = doc(firestore, `sectors/${sector.id}/machines`, machine.id);
-        deleteDocumentNonBlocking(machineRef);
+    const handleDeleteMachine = async (machine: Machine) => {
+        if (!firestore) return;
+        await deleteDoc(doc(firestore, `sectors/${sector.id}/machines`, machine.id));
         toast({ title: "Máquina Eliminada", variant: 'destructive', description: `Se ha eliminado la máquina "${machine.name}".` });
     };
 
-    const handleUpdateMachine = () => {
-        if (!editingMachine || editingMachine.name.trim() === '') return;
-        const machineRef = doc(firestore, `sectors/${sector.id}/machines`, editingMachine.id);
-        updateDocumentNonBlocking(machineRef, { name: editingMachine.name });
+    const handleUpdateMachine = async () => {
+        if (!editingMachine || editingMachine.name.trim() === '' || !firestore) return;
+        await updateDoc(doc(firestore, `sectors/${sector.id}/machines`, editingMachine.id), { name: editingMachine.name });
         toast({ title: "Máquina Actualizada", description: "El nombre de la máquina ha sido actualizado." });
         setEditingMachine(null);
     };
@@ -124,31 +120,30 @@ function MachineListEditor({ sector }: { sector: Sector }) {
     );
 }
 
-export default function OrganizationView({ sectors, firestore }: OrganizationViewProps) {
+export default function OrganizationView({ sectors }: OrganizationViewProps) {
     const [newSectorName, setNewSectorName] = useState('');
     const [editingSector, setEditingSector] = useState<{id: string, name: string} | null>(null);
     const { toast } = useToast();
+    const firestore = useFirestore();
 
-    const handleAddSector = () => {
-        if (newSectorName.trim() === '') return;
-        const sectorsRef = collection(firestore, 'sectors');
-        addDocumentNonBlocking(sectorsRef, { name: newSectorName });
+    const handleAddSector = async () => {
+        if (newSectorName.trim() === '' || !firestore) return;
+        await addDoc(collection(firestore, 'sectors'), { name: newSectorName });
         setNewSectorName('');
         toast({ title: "Sector Agregado", description: `Se ha creado el sector "${newSectorName}".` });
     };
 
-    const handleDeleteSector = (sector: Sector) => {
-        const sectorRef = doc(firestore, 'sectors', sector.id);
-        deleteDocumentNonBlocking(sectorRef);
+    const handleDeleteSector = async (sector: Sector) => {
+        if (!firestore) return;
+        await deleteDoc(doc(firestore, 'sectors', sector.id));
         // Note: Machines subcollection is not automatically deleted, but will be inaccessible.
         // A real-world app might need a cloud function to clean up subcollections.
         toast({ title: "Sector Eliminado", variant: 'destructive', description: `Se ha eliminado el sector "${sector.name}".` });
     };
 
-    const handleUpdateSector = () => {
-        if (!editingSector || editingSector.name.trim() === '') return;
-        const sectorRef = doc(firestore, 'sectors', editingSector.id);
-        updateDocumentNonBlocking(sectorRef, { name: editingSector.name });
+    const handleUpdateSector = async () => {
+        if (!editingSector || editingSector.name.trim() === '' || !firestore) return;
+        await updateDoc(doc(firestore, 'sectors', editingSector.id), { name: editingSector.name });
         toast({ title: "Sector Actualizado", description: "El nombre del sector ha sido actualizado."});
         setEditingSector(null);
     };
@@ -231,3 +226,5 @@ export default function OrganizationView({ sectors, firestore }: OrganizationVie
         </div>
     );
 }
+
+    

@@ -1,4 +1,5 @@
 
+
 // Represents a single sector in the plant, managed by the user.
 export type Sector = {
   id: string;
@@ -54,3 +55,5 @@ export type UserRole = {
     // The id of this doc is the user's UID
     role: 'admin' | 'editor';
 }
+
+    

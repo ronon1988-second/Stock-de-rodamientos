@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -23,7 +24,8 @@ import {
   serverTimestamp,
   getDocs,
   addDoc,
-  setDoc
+  setDoc,
+  where
 } from 'firebase/firestore';
 
 import { Badge } from '@/components/ui/badge';
@@ -77,8 +79,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  addDocumentNonBlocking,
-  deleteDocumentNonBlocking,
   setDocumentNonBlocking,
 } from '@/firebase/non-blocking-updates';
 import OrganizationView from '@/components/app/organization-view';
@@ -171,13 +171,12 @@ function AppContent() {
       const userDoc = await getDoc(userRef);
 
       if (!userDoc.exists()) {
-        const userData = {
+        const userData: Omit<UserProfile, 'id'> = {
             uid: user.uid,
-            email: user.email,
+            email: user.email!,
             displayName: user.email?.split('@')[0] || 'Usuario',
-            createdAt: serverTimestamp(),
         };
-        await setDoc(userRef, userData, { merge: true });
+        await setDoc(userRef, userData);
         toast({
           title: "Perfil de usuario creado",
           description: "¡Bienvenido! Su perfil ha sido guardado."
@@ -216,8 +215,13 @@ function AppContent() {
     const seedData = async () => {
         if (!firestore || !user || isInventoryLoading || isSectorsLoading || isSeeding) return;
 
-        const invSnapshot = await getDocs(collection(firestore, 'inventory'));
-        const sectorsSnapshot = await getDocs(collection(firestore, 'sectors'));
+        const invQuery = query(collection(firestore, 'inventory'));
+        const sectorsQuery = query(collection(firestore, 'sectors'));
+        
+        const [invSnapshot, sectorsSnapshot] = await Promise.all([
+          getDocs(invQuery),
+          getDocs(sectorsQuery)
+        ]);
         
         if (invSnapshot.empty && sectorsSnapshot.empty) {
             setIsSeeding(true);
@@ -229,15 +233,15 @@ function AppContent() {
                 const batch = writeBatch(firestore);
 
                 // Seed inventory
-                const invRef = collection(firestore, 'inventory');
                 initialInventory.forEach(item => {
-                    const docRef = doc(invRef); // Firestore generates ID
+                    const docRef = doc(collection(firestore, 'inventory'));
                     batch.set(docRef, item);
                 });
 
                 // Seed sectors and get their new IDs
                 const sectorPromises = initialSectors.map(async (sectorData) => {
-                    const sectorRef = await addDoc(collection(firestore, 'sectors'), sectorData);
+                    const sectorRef = doc(collection(firestore, 'sectors'));
+                    batch.set(sectorRef, sectorData);
                     return { name: sectorData.name, id: sectorRef.id };
                 });
                 const createdSectors = await Promise.all(sectorPromises);
@@ -308,13 +312,12 @@ function AppContent() {
     return Object.values(machinesBySector).flat();
   }, [machinesBySector]);
 
-  const handleAddItem = (newItem: Omit<InventoryItem, 'id'>) => {
-    if (!isEditor) {
+  const handleAddItem = async (newItem: Omit<InventoryItem, 'id'>) => {
+    if (!isEditor || !firestore) {
         toast({ title: "Acceso denegado", variant: "destructive" });
         return;
     }
-    const invRef = collection(firestore, 'inventory');
-    addDocumentNonBlocking(invRef, newItem);
+    await addDoc(collection(firestore, 'inventory'), newItem);
     toast({
       title: 'Artículo Agregado',
       description: `Se ha agregado ${newItem.name} al inventario.`,
@@ -322,7 +325,7 @@ function AppContent() {
   };
 
   const handleUpdateItem = (updatedItem: InventoryItem) => {
-    if (!isEditor) {
+    if (!isEditor || !firestore) {
         toast({ title: "Acceso denegado", variant: "destructive" });
         return;
     }
@@ -335,20 +338,18 @@ function AppContent() {
     });
   };
 
-  const handleAssignItemToMachine = (
+  const handleAssignItemToMachine = async (
     itemId: string,
     machineId: string,
     sectorId: string,
     quantity: number
   ) => {
-    if (!isEditor || !inventory) {
+    if (!isEditor || !inventory || !firestore) {
         toast({ title: "Acceso denegado", variant: "destructive" });
         return;
     }
     const item = inventory.find(b => b.id === itemId);
     if (!item) return;
-
-    const assignRef = collection(firestore, 'machineAssignments');
 
     const newAssignment: Omit<MachineAssignment, 'id'> = {
       sectorId,
@@ -358,7 +359,7 @@ function AppContent() {
       quantity: quantity,
     };
 
-    addDocumentNonBlocking(assignRef, newAssignment);
+    await addDoc(collection(firestore, 'machineAssignments'), newAssignment);
 
     toast({
       title: 'Artículo Asignado',
@@ -366,16 +367,15 @@ function AppContent() {
     });
   };
 
-  const handleRemoveItemFromMachine = (assignmentId: string) => {
-    if (!isEditor) {
+  const handleRemoveItemFromMachine = async (assignmentId: string) => {
+    if (!isEditor || !firestore) {
         toast({ title: "Acceso denegado", variant: "destructive" });
         return;
     }
     const assignment = machineAssignments?.find(item => item.id === assignmentId);
     if (!assignment) return;
 
-    const assignRef = doc(firestore, 'machineAssignments', assignmentId);
-    deleteDocumentNonBlocking(assignRef);
+    await setDoc(doc(firestore, 'machineAssignments', assignmentId), {}, {merge: true});
 
     toast({
       title: 'Asignación Eliminada',
@@ -383,13 +383,13 @@ function AppContent() {
     });
   };
 
-  const handleLogUsage = (
+  const handleLogUsage = async (
     itemId: string,
     quantity: number,
     machineId: string,
     sectorId: string
   ) => {
-    if (!isEditor || !inventory) {
+    if (!isEditor || !inventory || !firestore) {
       toast({ title: "Acceso denegado", variant: "destructive" });
       return;
     }
@@ -407,7 +407,7 @@ function AppContent() {
 
     const updatedStock = item.stock - quantity;
     const itemRef = doc(firestore, 'inventory', itemId);
-    setDocumentNonBlocking(itemRef, { stock: updatedStock }, { merge: true });
+    await setDoc(itemRef, { stock: updatedStock }, { merge: true });
 
     const newLog: Omit<UsageLog, 'id'> = {
       itemId,
@@ -417,8 +417,7 @@ function AppContent() {
       sectorId,
       machineId,
     };
-    const usageLogRef = collection(firestore, 'usageLog');
-    addDocumentNonBlocking(usageLogRef, newLog);
+    await addDoc(collection(firestore, 'usageLog'), newLog);
 
     toast({
       title: 'Uso Registrado',
@@ -550,7 +549,6 @@ function AppContent() {
       return (
         <OrganizationView
           sectors={sortedSectors}
-          firestore={firestore}
         />
       );
     }
