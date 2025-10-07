@@ -1,137 +1,137 @@
+/**
+ * @file Firebase Security Rules for Firestore.
+ *
+ * @core_philosophy This ruleset implements a role-based access control system with public read access to inventory data.
+ *   Admin and editor roles have broad write access, while regular users can only read inventory data.
+ *
+ * @data_structure
+ * - /users/{userId}: Stores user profile data, accessible only to the user themselves.
+ * - /roles/{userId}: Stores user roles, accessible only to admins.
+ * - /sectors/{sectorId}: Stores sector data.
+ * - /machines/{machineId}: Stores machine data.
+ * - /inventory/{itemId}: Stores inventory item data.
+ * - /machine_assignments/{assignmentId}: Stores machine assignment data.
+ *
+ * @key_security_decisions
+ * - Public read access to the `/inventory` collection is enabled for prototyping, but write access is restricted to admins and editors.
+ * - User listing is disabled for privacy.
+ * - All write operations require authentication.
+ *
+ * @denormalization_for_authorization
+ * - No denormalization is used in this initial prototype. All authorization is based on user roles.
+ *
+ * @structural_segregation
+ * - User profiles and roles are stored in separate collections to manage access control effectively.
+ */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows users to read their own profile data. Admins can manage all user profiles.
+     * @description Allows users to read their own profile data.
      * @path /users/{userId}
-     * @allow (get) User with matching UID can read their own profile.
-     * @allow (create) User can create their own profile with matching UID and email.
-     * @allow (update) User with matching UID can update their own profile.
-     * @allow (delete) User with matching UID can delete their own profile.
-     * @deny (get) User tries to read another user's profile.
-     * @deny (create) User tries to create a profile with a mismatched UID.
-     * @deny (update) User tries to update another user's profile.
-     * @deny (delete) User tries to delete another user's profile.
-     * @principle Enforces document ownership for user profiles and restricts access to a user's own data.
+     * @allow (get, list) User with UID 'user123' can read their profile data.
+     * @deny (get, list) User with UID 'user456' cannot read 'user123' profile data.
+     * @principle Enforces document ownership for reads.
      */
     match /users/{userId} {
-      allow get: if isSignedIn() && isOwner(userId);
+      allow get: if isOwner(userId);
       allow list: if false;
-      allow create: if isSignedIn() && isOwner(userId) && request.auth.uid == userId;
-      allow update: if isSignedIn() && isOwner(userId);
-      allow delete: if isSignedIn() && isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
     }
 
     /**
-     * @description Allows admins to manage user roles.
+     * @description Allows admins to read and write user roles.
      * @path /roles/{userId}
-     * @allow (get) Admin can read user roles.
-     * @deny (get) Non-admin user tries to read roles.
-     * @deny (create) Non-admin user tries to create a role.
-     * @deny (update) Non-admin user tries to update roles.
-     * @deny (delete) Non-admin user tries to delete roles.
-     * @principle Restricts role management to admin users.
+     * @allow (get, list, create, update, delete) Admin user can manage user roles.
+     * @deny (get, list, create, update, delete) Non-admin user cannot manage user roles.
+     * @principle Restricts role management to admins.
      */
     match /roles/{userId} {
-      allow get: if isAdmin();
-      allow list: if false;
-      allow create: if isAdmin(); // Allow admins to create roles
-      allow update: if isAdmin();
-      allow delete: if isAdmin(); // Allow admins to delete roles
+      allow get, list, create, update, delete: if isAdmin();
     }
 
     /**
-     * @description Allows public read access to sector data, but restricts write access to admins.
+     * @description Allows anyone to read inventory data, but only admins/editors can create, update, or delete.
+     * @path /inventory/{itemId}
+     * @allow (get, list) Any user can read inventory data.
+     * @allow (create, update, delete) Admin user can manage inventory data.
+     * @deny (create, update, delete) Non-admin user cannot manage inventory data.
+     * @principle Provides public read access with owner-only writes (for admins/editors).
+     */
+    match /inventory/{itemId} {
+      allow get, list: if true;
+      allow create: if isAdmin() || isEditor();
+      allow update: if isExistingAdmin() || isExistingEditor();
+      allow delete: if isExistingAdmin() || isExistingEditor();
+    }
+
+    /**
+     * @description Allows anyone to read sector data, but only admins/editors can create, update, or delete.
      * @path /sectors/{sectorId}
-     * @allow (get) Any user can read sector data.
-     * @allow (list) Any user can list sector data.
-     * @allow (create) Admin can create sector data.
-     * @allow (update) Admin can update sector data.
-     * @allow (delete) Admin can delete sector data.
-     * @deny (create) Non-admin user tries to create sector data.
-     * @deny (update) Non-admin user tries to update sector data.
-     * @deny (delete) Non-admin user tries to delete sector data.
-     * @principle Allows public read access with owner-only writes.
+     * @allow (get, list) Any user can read sector data.
+     * @allow (create, update, delete) Admin user can manage sector data.
+     * @deny (create, update, delete) Non-admin user cannot manage sector data.
      */
     match /sectors/{sectorId} {
       allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow create: if isAdmin() || isEditor();
+      allow update: if isExistingAdmin() || isExistingEditor();
+      allow delete: if isExistingAdmin() || isExistingEditor();
     }
 
     /**
-     * @description Allows public read access to machine data, but restricts write access to admins.
+     * @description Allows anyone to read machine data, but only admins/editors can create, update, or delete.
      * @path /machines/{machineId}
-     * @allow (get) Any user can read machine data.
-     * @allow (list) Any user can list machine data.
-     * @allow (create) Admin can create machine data.
-     * @allow (update) Admin can update machine data.
-     * @allow (delete) Admin can delete machine data.
-     * @deny (create) Non-admin user tries to create machine data.
-     * @deny (update) Non-admin user tries to update machine data.
-     * @deny (delete) Non-admin user tries to delete machine data.
-     * @principle Allows public read access with owner-only writes.
+     * @allow (get, list) Any user can read machine data.
+     * @allow (create, update, delete) Admin user can manage machine data.
+     * @deny (create, update, delete) Non-admin user cannot manage machine data.
      */
     match /machines/{machineId} {
       allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow create: if isAdmin() || isEditor();
+      allow update: if isExistingAdmin() || isExistingEditor();
+      allow delete: if isExistingAdmin() || isExistingEditor();
     }
 
     /**
-     * @description Allows public read access to inventory item data, but restricts write access to admins.
-     * @path /inventoryItems/{itemId}
-     * @allow (get) Any user can read inventory item data.
-     * @allow (list) Any user can list inventory item data.
-     * @allow (create) Admin can create inventory item data.
-     * @allow (update) Admin can update inventory item data.
-     * @allow (delete) Admin can delete inventory item data.
-     * @deny (create) Non-admin user tries to create inventory item data.
-     * @deny (update) Non-admin user tries to update inventory item data.
-     * @deny (delete) Non-admin user tries to delete inventory item data.
-     * @principle Allows public read access with owner-only writes.
+     * @description Allows anyone to read machine assignment data, but only admins/editors can create, update, or delete.
+     * @path /machine_assignments/{assignmentId}
+     * @allow (get, list) Any user can read machine assignment data.
+     * @allow (create, update, delete) Admin user can manage machine assignment data.
+     * @deny (create, update, delete) Non-admin user cannot manage machine assignment data.
      */
-    match /inventoryItems/{itemId} {
+    match /machine_assignments/{assignmentId} {
       allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow create: if isAdmin() || isEditor();
+      allow update: if isExistingAdmin() || isExistingEditor();
+      allow delete: if isExistingAdmin() || isExistingEditor();
     }
 
-        /**
-     * @description Allows public read access to machine assignment data, but restricts write access to admins.
-     * @path /machineAssignments/{machineAssignmentId}
-     * @allow (get) Any user can read machine assignment data.
-     * @allow (list) Any user can list machine assignment data.
-     * @allow (create) Admin can create machine assignment data.
-     * @allow (update) Admin can update machine assignment data.
-     * @allow (delete) Admin can delete machine assignment data.
-     * @deny (create) Non-admin user tries to create machine assignment data.
-     * @deny (update) Non-admin user tries to update machine assignment data.
-     * @deny (delete) Non-admin user tries to delete machine assignment data.
-     * @principle Allows public read access with owner-only writes.
-     */
-    match /machineAssignments/{machineAssignmentId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+    function isSignedIn() {
+      return request.auth != null;
     }
-  }
 
-  // Helper functions
-  function isSignedIn() {
-    return request.auth != null;
-  }
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
 
-  function isOwner(userId) {
-    return request.auth.uid == userId;
-  }
+    function isAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role == 'admin';
+    }
 
-  function isAdmin() {
-    return isSignedIn() && get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role == 'admin';
+    function isEditor() {
+      return isSignedIn() && (get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role == 'admin' || get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role == 'editor');
+    }
+
+    function isExistingAdmin() {
+        return isAdmin() && resource != null;
+    }
+
+    function isExistingEditor() {
+        return isEditor() && resource != null;
+    }
   }
 }
