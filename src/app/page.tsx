@@ -27,7 +27,7 @@ import {
   setDoc,
   where,
   deleteDoc,
-  updateDoc
+  updateDoc,
 } from 'firebase/firestore';
 
 import { Badge } from '@/components/ui/badge';
@@ -174,7 +174,11 @@ function AppContent() {
   const usageLogRef = useMemoFirebase(() => firestore ? collection(firestore, 'usageLog') : null, [firestore]);
   const { data: usageLog, isLoading: isUsageLogLoading } = useCollection<UsageLog>(usageLogRef);
 
-  const allUsersRef = useMemoFirebase(() => (isAdmin && firestore) ? collection(firestore, 'users') : null, [firestore, userRoleDoc]);
+  // Fetch all users only if the current user is an admin.
+  const allUsersRef = useMemoFirebase(
+    () => (firestore && userRoleDoc?.role === 'admin' ? collection(firestore, 'users') : null),
+    [firestore, userRoleDoc]
+  );
   const { data: allUsers, isLoading: isAllUsersLoading } = useCollection<UserProfile>(allUsersRef);
   
   // PERMISSIONS
@@ -459,7 +463,8 @@ function AppContent() {
       isUsageLogLoading ||
       isSectorsLoading ||
       isSeeding ||
-      isAllUsersLoading;
+      isProfileLoading ||
+      isRoleLoading;
 
     if (isDataLoading) {
       return <Skeleton className="h-full w-full" />;
@@ -569,6 +574,7 @@ function AppContent() {
             icon={<Users className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
             label="Gestionar Usuarios"
             onClick={handleNavClick}
+            disabled={!isAdmin || isAllUsersLoading || !allUsers} // Disable if not admin or data is loading
           />
         </>
       )}
@@ -730,3 +736,5 @@ export default function Page() {
 
   return <AppContent />;
 }
+
+    

@@ -35,7 +35,12 @@ export async function setupUserAndRole(uid: string, email: string): Promise<{ su
 
         // 2. Create default role document
         const roleRef = doc(firestore, 'roles', uid);
-        await setDoc(roleRef, { role: 'editor' });
+        // Special case for master user
+        if (email === 'maurofbordon@gmail.com') {
+            await setDoc(roleRef, { role: 'admin' });
+        } else {
+            await setDoc(roleRef, { role: 'editor' });
+        }
 
         return { success: true };
     } catch (error: any) {
@@ -61,3 +66,5 @@ export async function updateUserRole(uid: string, role: 'admin' | 'editor'): Pro
         return { success: false, error: error.message || 'An unexpected error occurred while writing the role to the database.' };
     }
 }
+
+    
