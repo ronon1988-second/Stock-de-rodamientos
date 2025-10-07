@@ -163,7 +163,7 @@ function AppContent() {
         const isEditorClaim = !!claims.editor;
         
         setIsAdmin(isAdminClaim);
-        setIsEditor(isAdminClaim || isEditorClaim); // Admin is also an editor
+        setIsEditor(isAdminClaim || isEditorClaim); 
     } catch (error) {
         console.error("Error refreshing user claims:", error);
         toast({
@@ -562,7 +562,7 @@ function AppContent() {
       );
     }
     if (view === 'users') {
-        if (!isAdmin) {
+        if (!isEditor) { // Show to editors, but action is protected by admin
             setView('dashboard');
             return null;
         }
@@ -590,19 +590,8 @@ function AppContent() {
         />
       );
     }
-    // Fallback for non-admin/editor users trying to access restricted views
-    if ((view === 'organization' && !isAdmin) || (view === 'users' && !isAdmin)) {
-      setView('dashboard');
-      return (
-        <Dashboard
-          inventory={sortedInventory}
-          onUpdateItem={handleUpdateItem}
-          onAddItem={handleAddItem}
-          canEdit={isEditor}
-        />
-      );
-    }
-
+   
+    // Fallback view
     return (
         <Dashboard
             inventory={sortedInventory}
@@ -674,7 +663,7 @@ function AppContent() {
           label="Reportes"
           onClick={handleNavClick}
         />
-        {isAdmin && (
+        {isEditor && (
            <NavLink
             targetView="users"
             icon={<Users className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}

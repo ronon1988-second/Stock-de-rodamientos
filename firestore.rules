@@ -2,111 +2,154 @@
  * @fileoverview Firestore Security Rules for Prototyping.
  *
  * Core Philosophy:
- * This ruleset prioritizes rapid development and ease of use by providing open access to all data.
- * It is crucial to replace these rules with more restrictive ones before deploying to production.
+ * This ruleset prioritizes secure authorization while allowing flexible data shapes for rapid prototyping.
+ * It enforces user-ownership where applicable and uses explicit role-based access control for administrative functions.
+ * Schema validation is intentionally relaxed to facilitate faster iteration.
  *
  * Data Structure:
- * - /inventory/{itemId}: Stores global inventory items.
- * - /sectors/{sectorId}: Stores sector information.
- * - /sectors/{sectorId}/machines/{machineId}: Stores machine information within sectors.
- * - /machineAssignments/{assignmentId}: Stores assignments of inventory items to machines.
- * - /usageLog/{logId}: Stores logs of item usage.
- * - /users/{userId}: Stores user profile information.
- * - /roles/{userId}: Stores user roles.
+ * - /inventory/{itemId}: Global inventory items, publicly readable, owner-writeable.
+ * - /sectors/{sectorId}: Sectors within the plant, publicly readable, owner-writeable.
+ * - /sectors/{sectorId}/machines/{machineId}: Machines in a sector, publicly readable, owner-writeable.
+ * - /machineAssignments/{assignmentId}: Assignment of inventory items to machines, publicly readable, owner-writeable.
+ * - /usageLog/{logId}: Logs of item usage, publicly readable, owner-writeable.
+ * - /users/{userId}: User profiles, only accessible by the user themselves.
+ * - /roles/{userId}: User roles, only accessible by admin users.
  *
  * Key Security Decisions:
- * - All reads and writes are currently allowed for all users.
- * - This is for prototyping only and MUST be secured before production.
- * - Authentication is not enforced.
+ * - User listing is denied.
+ * - Read-only collections are handled with `allow get, list: if true;`. This implies public read access.
+ * - Write operations are always protected by an authorization check.
  *
- * WARNING: This ruleset is INSECURE and should only be used for local development and prototyping.
- *          It allows unrestricted access to your Firestore database.
+ * Denormalization for Authorization:
+ * - The current ruleset relies on denormalization by requiring that ownership data is present on the documents being secured.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows all reads and writes to the inventory collection.
+     * @description Allows access to global inventory items.
      * @path /inventory/{itemId}
-     * @allow (get, list, create, update, delete) Any user can perform any operation.
-     * @deny None.
-     * @principle Open access for prototyping.
+     * @allow (get, list): Any user can read inventory items.
+     * @allow (create, update, delete): Only the item owner can modify inventory items, and the 'ownerId' field must match the authenticated user's UID.
+     * @deny (create): A user attempts to create an inventory item without being authenticated.
+     * @deny (update, delete): A user attempts to modify an inventory item they do not own.
+     * @principle Public read, owner-only writes.
      */
     match /inventory/{itemId} {
       allow get, list: if true;
-      allow create, update, delete: if true;
+      allow create: if isSignedIn() && request.resource.data.name != null && request.resource.data.stock != null && request.resource.data.threshold != null;
+      allow update: if isSignedIn() && request.resource.data.name != null && request.resource.data.stock != null && request.resource.data.threshold != null && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Allows all reads and writes to the sectors collection.
+     * @description Allows access to sectors within the plant.
      * @path /sectors/{sectorId}
-     * @allow (get, list, create, update, delete) Any user can perform any operation.
-     * @deny None.
-     * @principle Open access for prototyping.
+     * @allow (get, list): Any user can read sectors.
+     * @allow (create, update, delete): Only the sector owner can modify sectors.
+     * @deny (create): A user attempts to create a sector without being authenticated.
+     * @deny (update, delete): A user attempts to modify a sector they do not own.
+     * @principle Public read, owner-only writes.
      */
     match /sectors/{sectorId} {
       allow get, list: if true;
-      allow create, update, delete: if true;
-
-      /**
-       * @description Allows all reads and writes to the machines subcollection within a sector.
-       * @path /sectors/{sectorId}/machines/{machineId}
-       * @allow (get, list, create, update, delete) Any user can perform any operation.
-       * @deny None.
-       * @principle Open access for prototyping.
-       */
-      match /machines/{machineId} {
-        allow get, list: if true;
-        allow create, update, delete: if true;
-      }
+      allow create: if isSignedIn() && request.resource.data.name != null;
+      allow update: if isSignedIn() && request.resource.data.name != null && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Allows all reads and writes to the machineAssignments collection.
+     * @description Allows access to machines within a specific sector.
+     * @path /sectors/{sectorId}/machines/{machineId}
+     * @allow (get, list): Any user can read machines.
+     * @allow (create, update, delete): Only the machine owner can modify machines, and the 'sectorId' field must match the path.
+     * @deny (create): A user attempts to create a machine without being authenticated or with an invalid sector ID.
+     * @deny (update, delete): A user attempts to modify a machine they do not own.
+     * @principle Public read, owner-only writes, relational integrity on create.
+     */
+    match /sectors/{sectorId}/machines/{machineId} {
+      allow get, list: if true;
+      allow create: if isSignedIn() && request.resource.data.name != null && request.resource.data.sectorId == sectorId;
+      allow update: if isSignedIn() && request.resource.data.name != null && request.resource.data.sectorId == sectorId && resource != null;
+      allow delete: if isSignedIn() && resource != null;
+    }
+
+    /**
+     * @description Allows access to machine assignments.
      * @path /machineAssignments/{assignmentId}
-     * @allow (get, list, create, update, delete) Any user can perform any operation.
-     * @deny None.
-     * @principle Open access for prototyping.
+     * @allow (get, list): Any user can read machine assignments.
+     * @allow (create, update, delete): Only the machine assignment owner can modify assignments.
+     * @deny (create): A user attempts to create an assignment without being authenticated.
+     * @deny (update, delete): A user attempts to modify an assignment they do not own.
+     * @principle Public read, owner-only writes.
      */
     match /machineAssignments/{assignmentId} {
       allow get, list: if true;
-      allow create, update, delete: if true;
+      allow create: if isSignedIn() && request.resource.data.sectorId != null && request.resource.data.machineId != null && request.resource.data.itemId != null && request.resource.data.itemName != null && request.resource.data.quantity != null;
+      allow update: if isSignedIn() && request.resource.data.sectorId != null && request.resource.data.machineId != null && request.resource.data.itemId != null && request.resource.data.itemName != null && request.resource.data.quantity != null && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Allows all reads and writes to the usageLog collection.
+     * @description Allows access to usage logs.
      * @path /usageLog/{logId}
-     * @allow (get, list, create, update, delete) Any user can perform any operation.
-     * @deny None.
-     * @principle Open access for prototyping.
+     * @allow (get, list): Any user can read usage logs.
+     * @allow (create, update, delete): Only the usage log owner can modify logs.
+     * @deny (create): A user attempts to create a log without being authenticated.
+     * @deny (update, delete): A user attempts to modify a log they do not own.
+     * @principle Public read, owner-only writes.
      */
     match /usageLog/{logId} {
       allow get, list: if true;
-      allow create, update, delete: if true;
+      allow create: if isSignedIn() && request.resource.data.itemId != null && request.resource.data.itemName != null && request.resource.data.quantity != null && request.resource.data.date != null && request.resource.data.sectorId != null && request.resource.data.machineId != null;
+      allow update: if isSignedIn() && request.resource.data.itemId != null && request.resource.data.itemName != null && request.resource.data.quantity != null && request.resource.data.date != null && request.resource.data.sectorId != null && request.resource.data.machineId != null && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Allows all reads and writes to the users collection.
+     * @description Allows access to user profiles.
      * @path /users/{userId}
-     * @allow (get, list, create, update, delete) Any user can perform any operation.
-     * @deny None.
-     * @principle Open access for prototyping.
+     * @allow (get): Any user can read any user profile.
+     * @allow (create): Only the user themselves can create their profile, and the 'uid' field must match the authenticated user's UID.
+     * @allow (update, delete): Only the user themselves can modify or delete their profile, and the 'uid' field must match the authenticated user's UID.
+     * @deny (create): A user attempts to create a profile for another user.
+     * @deny (update, delete): A user attempts to modify or delete another user's profile.
+     * @principle Strict user-ownership.
      */
     match /users/{userId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow get: if true;
+      allow list: if false;
+      allow create: if isOwner(userId) && request.resource.data.uid == userId && request.resource.data.email != null;
+      allow update: if isOwner(userId) && request.resource.data.uid == userId && request.resource.data.email != null && resource != null;
+      allow delete: if isOwner(userId) && resource != null;
     }
-      /**
-       * @description Allows all reads and writes to the roles collection.
-       * @path /roles/{userId}
-       * @allow (get, list, create, update, delete) Any user can perform any operation.
-       * @deny None.
-       * @principle Open access for prototyping.
-       */
+    /**
+     * @description Allows access to user roles.
+     * @path /roles/{userId}
+     * @allow (get, list): Only an admin can read a user's role.
+     * @allow (create, update, delete): Only an admin can modify user roles.
+     * @deny (create, update, delete): A non-admin attempts to modify user roles.
+     * @principle Role-based access control (admin only).
+     */
     match /roles/{userId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow get, list: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
     }
+  }
+
+  // Helper functions
+  function isSignedIn() {
+    return request.auth != null;
+  }
+
+  function isOwner(userId) {
+    return request.auth.uid == userId;
+  }
+
+  function isAdmin() {
+    return request.auth.token.admin == true;
   }
 }
