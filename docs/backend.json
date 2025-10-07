@@ -5,7 +5,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "User Profile",
       "type": "object",
-      "description": "Represents a user's profile information.",
+      "description": "Represents a user's public profile information.",
       "properties": {
         "uid": {
           "type": "string",
@@ -19,14 +19,23 @@
         "displayName": {
           "type": "string",
           "description": "The user's display name."
-        },
-        "role": {
-          "type": "string",
-          "description": "The user's role in the application.",
-          "enum": ["admin", "editor"]
         }
       },
-      "required": ["uid", "email", "role", "displayName"]
+      "required": ["uid", "email", "displayName"]
+    },
+    "UserRole": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "User Role",
+        "type": "object",
+        "description": "Represents a user's role in the application.",
+        "properties": {
+            "role": {
+                "type": "string",
+                "description": "The user's role.",
+                "enum": ["admin", "editor"]
+            }
+        },
+        "required": ["role"]
     },
     "Sector": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -154,7 +163,18 @@
           "schema": {
             "$ref": "#/backend/entities/UserProfile"
           },
-          "description": "Stores public user profile information, including their role.",
+          "description": "Stores public user profile information.",
+          "params": [{"name": "userId", "description": "Matches the user's Firebase Auth UID."}]
+        }
+      },
+       {
+        "path": "roles/{userId}",
+        "definition": {
+          "entityName": "UserRole",
+          "schema": {
+            "$ref": "#/backend/entities/UserRole"
+          },
+          "description": "Stores the role for a given user.",
           "params": [{"name": "userId", "description": "Matches the user's Firebase Auth UID."}]
         }
       },
@@ -220,3 +240,5 @@
     "reasoning": "The application requires a role-based access model. A 'users' collection stores roles ('admin' or 'editor'). Admins can manage the plant structure (sectors, machines) and users. Editors can manage inventory and log usage. All authenticated users can read all data to maintain visibility."
   }
 }
+
+    

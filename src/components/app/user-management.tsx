@@ -6,36 +6,38 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Firestore, collection, doc } from 'firebase/firestore';
 import { useCollection, useMemoFirebase } from '@/firebase';
-import { UserProfile } from '@/lib/types';
+import { UserProfile, UserRole } from '@/lib/types';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '../ui/skeleton';
+import { User } from 'firebase/auth';
 
 type UserManagementViewProps = {
     firestore: Firestore;
-    currentUser: UserProfile | null;
+    currentUser: User | null;
 };
 
 export default function UserManagementView({ firestore, currentUser }: UserManagementViewProps) {
     const { toast } = useToast();
 
     const usersRef = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
-    // Correctly type the collection to expect UserProfile, the hook will add the `id`.
-    const { data: users, isLoading } = useCollection<UserProfile>(usersRef);
+    const { data: users, isLoading: isLoadingUsers } = useCollection<UserProfile>(usersRef);
 
-    const handleRoleChange = (user: UserProfile, newRole: 'admin' | 'editor') => {
-        if (!user.id) return;
-        const userRef = doc(firestore, 'users', user.id);
-        setDocumentNonBlocking(userRef, { role: newRole }, { merge: true });
+    const rolesRef = useMemoFirebase(() => collection(firestore, 'roles'), [firestore]);
+    const { data: roles, isLoading: isLoadingRoles } = useCollection<UserRole>(rolesRef);
+
+    const handleRoleChange = (userId: string, userEmail: string, newRole: 'admin' | 'editor') => {
+        const roleRef = doc(firestore, 'roles', userId);
+        setDocumentNonBlocking(roleRef, { role: newRole }, { merge: true });
         toast({
             title: "Rol Actualizado",
-            description: `El rol de ${user.email} se ha cambiado a ${newRole}.`,
+            description: `El rol de ${userEmail} se ha cambiado a ${newRole}.`,
         });
     };
     
-    if (isLoading) {
+    if (isLoadingUsers || isLoadingRoles) {
         return (
             <Card>
                 <CardHeader>
@@ -52,6 +54,8 @@ export default function UserManagementView({ firestore, currentUser }: UserManag
             </Card>
         )
     }
+
+    const rolesMap = new Map(roles?.map(role => [role.id, role.role]));
 
     return (
         <Card>
@@ -71,33 +75,38 @@ export default function UserManagementView({ firestore, currentUser }: UserManag
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {users?.sort((a,b) => a.email.localeCompare(b.email)).map(user => (
-                            <TableRow key={user.id}>
-                                <TableCell className="font-mono">{user.email}</TableCell>
-                                <TableCell>{user.displayName}</TableCell>
-                                <TableCell>
-                                    {currentUser?.id === user.id ? (
-                                        <Badge variant="secondary">{user.role}</Badge>
-                                    ) : (
-                                        <Select
-                                            value={user.role}
-                                            onValueChange={(newRole: 'admin' | 'editor') => handleRoleChange(user, newRole)}
-                                        >
-                                            <SelectTrigger className="w-[120px]">
-                                                <SelectValue placeholder="Seleccionar rol" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="admin">Admin</SelectItem>
-                                                <SelectItem value="editor">Editor</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    )}
-                                </TableCell>
-                            </TableRow>
-                        ))}
+                        {users?.sort((a,b) => a.email.localeCompare(b.email)).map(user => {
+                            const userRole = rolesMap.get(user.id) || 'editor';
+                            return (
+                                <TableRow key={user.id}>
+                                    <TableCell className="font-mono">{user.email}</TableCell>
+                                    <TableCell>{user.displayName}</TableCell>
+                                    <TableCell>
+                                        {currentUser?.uid === user.id ? (
+                                            <Badge variant="secondary">{userRole}</Badge>
+                                        ) : (
+                                            <Select
+                                                value={userRole}
+                                                onValueChange={(newRole: 'admin' | 'editor') => handleRoleChange(user.id, user.email, newRole)}
+                                            >
+                                                <SelectTrigger className="w-[120px]">
+                                                    <SelectValue placeholder="Seleccionar rol" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="admin">Admin</SelectItem>
+                                                    <SelectItem value="editor">Editor</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        )}
+                                    </TableCell>
+                                </TableRow>
+                            )
+                        })}
                     </TableBody>
                 </Table>
             </CardContent>
         </Card>
     );
 }
+
+    

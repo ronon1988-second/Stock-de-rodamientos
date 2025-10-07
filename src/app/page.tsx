@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -20,7 +21,6 @@ import {
   writeBatch,
   query,
   onSnapshot,
-  getDocs,
 } from 'firebase/firestore';
 
 import { Badge } from '@/components/ui/badge';
@@ -46,6 +46,7 @@ import {
   Machine,
   MachineAssignment,
   UserProfile,
+  UserRole,
 } from '@/lib/types';
 import { initialInventory } from '@/lib/data';
 import Dashboard from '@/components/app/dashboard';
@@ -108,10 +109,16 @@ function AppContent() {
     () => (user ? doc(firestore, 'users', user.uid) : null),
     [firestore, user]
   );
-  const { data: userProfile, isLoading: isProfileLoading } =
-    useDoc<UserProfile>(userProfileRef);
-  const userRole = userProfile?.role;
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
+
+  const userRoleRef = useMemoFirebase(
+    () => (user ? doc(firestore, 'roles', user.uid) : null),
+    [firestore, user]
+  );
+  const { data: userRoleDoc, isLoading: isRoleLoading } = useDoc<UserRole>(userRoleRef);
+  const userRole = userRoleDoc?.role;
   const isAdmin = userRole === 'admin';
+
 
   // --- Firestore Data Hooks ---
   const inventoryRef = useMemoFirebase(
@@ -464,7 +471,7 @@ function AppContent() {
       isSectorsLoading ||
       areMachinesLoading ||
       isSeeding ||
-      isProfileLoading;
+      isProfileLoading || isRoleLoading;
     if (isLoading) {
       return <Skeleton className="h-full w-full" />;
     }
@@ -507,7 +514,7 @@ function AppContent() {
     }
     if (view === 'users' && isAdmin) {
       return (
-        <UserManagementView firestore={firestore} currentUser={userProfile} />
+        <UserManagementView firestore={firestore} currentUser={user} />
       );
     }
     if (view.startsWith('machine-')) {
@@ -700,9 +707,9 @@ function AppContent() {
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>
                 {user?.email}
-                {userProfile?.role && (
+                {userRole && (
                   <Badge variant="secondary" className="ml-2">
-                    {userProfile.role}
+                    {userRole}
                   </Badge>
                 )}
               </DropdownMenuLabel>
@@ -742,3 +749,5 @@ export default function Page() {
 
   return <AppContent />;
 }
+
+    

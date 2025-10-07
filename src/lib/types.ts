@@ -46,6 +46,13 @@ export type UserProfile = {
   id: string;
   uid: string;
   email: string;
-  role: 'admin' | 'editor';
   displayName: string;
 };
+
+// Represents a user's role stored in Firestore.
+export type UserRole = {
+    id: string;
+    role: 'admin' | 'editor';
+}
+
+    

@@ -32,38 +32,33 @@ export default function LoginPage() {
   const { toast } = useToast();
   const router = useRouter();
 
-  const updateUserProfileAndClaims = async (user: User) => {
+  const updateUserProfile = async (user: User) => {
     const userRef = doc(firestore, "users", user.uid);
     const userDoc = await getDoc(userRef);
 
-    const isAdminUser = user.email === 'maurofbordon@gmail.com';
-    // Default role is 'editor', unless they are the admin or already have a role.
-    const role = isAdminUser ? 'admin' : (userDoc.exists() && userDoc.data().role ? userDoc.data().role : 'editor');
-
-    // Data to be set in Firestore
-    const userData = {
-        uid: user.uid,
-        email: user.email,
-        role: role,
-        displayName: user.email?.split('@')[0] || 'Usuario',
-    };
-    
-    let userDataToWrite = { ...userData };
-
-    // If the document doesn't exist, add a creation timestamp
     if (!userDoc.exists()) {
-        (userDataToWrite as any).createdAt = serverTimestamp();
+        const userData = {
+            uid: user.uid,
+            email: user.email,
+            displayName: user.email?.split('@')[0] || 'Usuario',
+            createdAt: serverTimestamp(),
+        };
+        await setDoc(userRef, userData);
+    }
+  };
+
+  const updateUserRole = async (user: User) => {
+    const roleRef = doc(firestore, "roles", user.uid);
+    const roleDoc = await getDoc(roleRef);
+
+    const isAdminUser = user.email === 'maurofbordon@gmail.com';
+    const role = isAdminUser ? 'admin' : (roleDoc.exists() && roleDoc.data().role ? roleDoc.data().role : 'editor');
+
+    if (!roleDoc.exists() || roleDoc.data().role !== role) {
+        await setDoc(roleRef, { role: role }, { merge: true });
     }
 
-
-    // Only write to Firestore if the document doesn't exist or the role needs an update
-    if (!userDoc.exists() || userDoc.data().role !== role) {
-        await setDoc(userRef, userDataToWrite, { merge: true });
-    }
-    
-    // If the user's role was determined to be admin, we must force a token refresh to get custom claims from the backend trigger.
     if (isAdminUser) {
-        // Force refresh of the ID token to get custom claims from the backend trigger.
         await user.getIdToken(true); 
     }
   };
@@ -89,8 +84,8 @@ export default function LoginPage() {
             userCredential = await createUserWithEmailAndPassword(auth, email, password);
         }
 
-        // After login or signup, ensure the user profile and claims are correct
-        await updateUserProfileAndClaims(userCredential.user);
+        await updateUserProfile(userCredential.user);
+        await updateUserRole(userCredential.user);
         
         toast({
             title: action === 'login' ? "Inicio de sesión exitoso" : "Cuenta creada",
@@ -175,3 +170,5 @@ export default function LoginPage() {
     </div>
   );
 }
+
+    
