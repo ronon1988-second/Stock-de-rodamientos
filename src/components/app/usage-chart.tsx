@@ -1,49 +1,39 @@
+
 "use client";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import {
   ChartContainer,
   ChartTooltipContent,
-  ChartLegend,
 } from "@/components/ui/chart";
-import type { Sector, UsageLog } from "@/lib/types";
-import { SECTORS } from "@/lib/types";
+import type { Sector, Machine, UsageLog } from "@/lib/types";
 
 type UsageChartProps = {
   usageData: UsageLog[];
+  sectors: Sector[];
+  machinesBySector: Record<string, Machine[]>;
 };
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#FF1919'];
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#FF1919', '#4CAF50', '#F44336', '#9C27B0', '#3F51B5'];
 
 
-export default function UsageChart({ usageData }: UsageChartProps) {
-    const isBySector = usageData.every(log => SECTORS.includes(log.sector));
+export default function UsageChart({ usageData, sectors }: UsageChartProps) {
+    
+    const dataBySector = sectors.reduce((acc, sector) => {
+        acc[sector.name] = 0;
+        return acc;
+    }, {} as Record<string, number>);
 
-    let chartData: { name: string, usage: number }[];
-
-    if (isBySector) {
-        // Aggregate by sector
-        const dataBySector = SECTORS.reduce((acc, sector) => {
-            acc[sector] = 0;
-            return acc;
-        }, {} as Record<Sector, number>);
-
-        usageData.forEach(log => {
-            if (log.sector && dataBySector.hasOwnProperty(log.sector)) {
-                dataBySector[log.sector] += log.quantity;
-            }
-        });
-        chartData = Object.entries(dataBySector).map(([name, usage]) => ({ name, usage })).filter(d => d.usage > 0);
-    } else {
-        // Aggregate by item name
-        const dataByItem = usageData.reduce((acc, log) => {
-            if (!acc[log.itemName]) {
-                acc[log.itemName] = 0;
-            }
-            acc[log.itemName] += log.quantity;
-            return acc;
-        }, {} as { [key: string]: number });
-        chartData = Object.entries(dataByItem).map(([name, usage]) => ({ name, usage })).sort((a,b) => b.usage - a.usage).slice(0, 10);
-    }
+    usageData.forEach(log => {
+        const sector = sectors.find(s => s.id === log.sectorId);
+        if (sector && dataBySector.hasOwnProperty(sector.name)) {
+            dataBySector[sector.name] += log.quantity;
+        }
+    });
+    
+    const chartData = Object.entries(dataBySector)
+      .map(([name, usage]) => ({ name, usage }))
+      .filter(d => d.usage > 0)
+      .sort((a,b) => b.usage - a.usage);
 
   if (chartData.length === 0) {
     return (

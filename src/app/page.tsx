@@ -11,12 +11,14 @@ import {
   Package,
   User,
   LogOut,
+  Settings,
+  HardDrive,
 } from "lucide-react";
 import {
   collection,
   doc,
   writeBatch,
-  getDocs,
+  query,
 } from "firebase/firestore";
 
 import { Badge } from "@/components/ui/badge";
@@ -29,27 +31,28 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { InventoryItem, UsageLog, Sector, SECTORS, SectorAssignment } from "@/lib/types";
-import { initialInventory, initialSectorAssignments } from "@/lib/data";
+import { InventoryItem, UsageLog, Sector, Machine, MachineAssignment } from "@/lib/types";
+import { initialInventory } from "@/lib/data";
 import Dashboard from "@/components/app/dashboard";
 import Reports from "@/components/app/reports";
 import { useToast } from "@/hooks/use-toast";
 import { Logo } from "@/components/app/logo";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import SectorView from "@/components/app/sector-view";
+import MachineView from "@/components/app/machine-view";
 import ToBuyView from "@/components/app/to-buy-view";
 import { useUser, useAuth, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import OrganizationView from "@/components/app/organization-view";
 
-type View = "dashboard" | "reports" | "to-buy" | `sector-${Sector}`;
+type View = "dashboard" | "reports" | "to-buy" | "organization" | `machine-${string}`;
 
 function AppContent() {
   const [view, setView] = useState<View>("dashboard");
   const { toast } = useToast();
-  const [isSectorsOpen, setIsSectorsOpen] = useState(true);
+  const [openSectors, setOpenSectors] = useState<string[]>([]);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const { user } = useUser();
   const auth = useAuth();
@@ -60,8 +63,37 @@ function AppContent() {
   const inventoryRef = useMemoFirebase(() => collection(firestore, "inventory"), [firestore]);
   const { data: inventory, isLoading: isInventoryLoading } = useCollection<Omit<InventoryItem, 'id'>>(inventoryRef);
 
-  const sectorAssignmentsRef = useMemoFirebase(() => collection(firestore, "sectorAssignments"), [firestore]);
-  const { data: sectorAssignments, isLoading: isAssignmentsLoading } = useCollection<Omit<SectorAssignment, 'id'>>(sectorAssignmentsRef);
+  const sectorsRef = useMemoFirebase(() => collection(firestore, "sectors"), [firestore]);
+  const { data: sectors, isLoading: isSectorsLoading } = useCollection<Omit<Sector, 'id'>>(sectorsRef);
+
+  const [machinesBySector, setMachinesBySector] = useState<Record<string, Machine[]>>({});
+  const [areMachinesLoading, setAreMachinesLoading] = useState(true);
+
+  useEffect(() => {
+    if (!sectors) return;
+    setAreMachinesLoading(true);
+    const machineQueries = sectors.map(sector => 
+        query(collection(firestore, `sectors/${sector.id}/machines`))
+    );
+
+    const unsubscribes = machineQueries.map((q, index) => {
+        return onSnapshot(q, (snapshot) => {
+            const sectorId = sectors[index].id;
+            const machines = snapshot.docs.map(d => ({ ...d.data(), id: d.id })) as Machine[];
+            setMachinesBySector(prev => ({ ...prev, [sectorId]: machines }));
+        });
+    });
+    
+    // A simple way to determine loading state.
+    Promise.all(machineQueries).then(() => setAreMachinesLoading(false));
+
+    return () => unsubscribes.forEach(unsub => unsub());
+
+  }, [firestore, sectors]);
+
+
+  const machineAssignmentsRef = useMemoFirebase(() => collection(firestore, "machineAssignments"), [firestore]);
+  const { data: machineAssignments, isLoading: isAssignmentsLoading } = useCollection<Omit<MachineAssignment, 'id'>>(machineAssignmentsRef);
 
   const usageLogRef = useMemoFirebase(() => collection(firestore, "usageLog"), [firestore]);
   const { data: usageLog, isLoading: isUsageLogLoading } = useCollection<Omit<UsageLog, 'id'>>(usageLogRef);
@@ -69,8 +101,8 @@ function AppContent() {
   // Effect to seed initial data if collections are empty
   useEffect(() => {
     const seedData = async () => {
-      if (inventory === null || sectorAssignments === null) return;
-      if (inventory.length === 0 && sectorAssignments.length === 0) {
+      if (inventory === null) return;
+      if (inventory.length === 0) {
         setIsSeeding(true);
         toast({
           title: "Cargando datos iniciales...",
@@ -82,13 +114,6 @@ function AppContent() {
         initialInventory.forEach(item => {
             const { id, ...data } = item;
             const docRef = doc(invRef, id);
-            batch.set(docRef, data);
-        });
-
-        const assignRef = collection(firestore, "sectorAssignments");
-        initialSectorAssignments.forEach(item => {
-            const { id, ...data } = item;
-            const docRef = doc(assignRef, id);
             batch.set(docRef, data);
         });
         
@@ -111,10 +136,11 @@ function AppContent() {
       }
     };
     seedData();
-  }, [inventory, sectorAssignments, firestore, toast]);
+  }, [inventory, firestore, toast]);
 
   const sortedInventory = useMemo(() => inventory ? [...inventory].sort((a, b) => a.name.localeCompare(b.name)) : [], [inventory]);
-  const sortedAssignments = useMemo(() => sectorAssignments ? [...sectorAssignments] : [], [sectorAssignments]);
+  const sortedSectors = useMemo(() => sectors ? [...sectors].sort((a,b) => a.name.localeCompare(b.name)) : [], [sectors]);
+  const sortedAssignments = useMemo(() => machineAssignments ? [...machineAssignments] : [], [machineAssignments]);
   const sortedUsageLog = useMemo(() => usageLog ? [...usageLog].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) : [], [usageLog]);
 
   const handleAddItem = (newItem: Omit<InventoryItem, 'id'>) => {
@@ -136,15 +162,16 @@ function AppContent() {
     });
   }
 
-  const handleAssignItemToSector = (itemId: string, sector: Sector, quantity: number) => {
+  const handleAssignItemToMachine = (itemId: string, machineId: string, sectorId: string, quantity: number) => {
     if (!inventory) return;
     const item = inventory.find(b => b.id === itemId);
     if (!item) return;
 
-    const assignRef = collection(firestore, "sectorAssignments");
+    const assignRef = collection(firestore, "machineAssignments");
     
-    const newAssignment: Omit<SectorAssignment, 'id'> = {
-      sector,
+    const newAssignment: Omit<MachineAssignment, 'id'> = {
+      sectorId,
+      machineId,
       itemId,
       itemName: item.name,
       quantity: quantity
@@ -154,24 +181,24 @@ function AppContent() {
 
     toast({
       title: "Artículo Asignado",
-      description: `Se han asignado ${quantity} unidades de ${item.name} al sector ${sector}.`,
+      description: `Se han asignado ${quantity} unidades de ${item.name}.`,
     });
   };
 
-  const handleRemoveItemFromSector = (assignmentId: string) => {
-    const assignment = sectorAssignments?.find(item => item.id === assignmentId);
+  const handleRemoveItemFromMachine = (assignmentId: string) => {
+    const assignment = machineAssignments?.find(item => item.id === assignmentId);
     if (!assignment) return;
 
-    const assignRef = doc(firestore, "sectorAssignments", assignmentId);
+    const assignRef = doc(firestore, "machineAssignments", assignmentId);
     deleteDocumentNonBlocking(assignRef);
 
     toast({
       title: "Asignación Eliminada",
-      description: `Se ha quitado el artículo ${assignment.itemName} del sector ${assignment.sector}.`,
+      description: `Se ha quitado el artículo ${assignment.itemName}.`,
     });
   };
 
-  const handleLogUsage = (itemId: string, quantity: number, sector: Sector) => {
+  const handleLogUsage = (itemId: string, quantity: number, machineId: string, sectorId: string) => {
     if (!inventory) return;
     const item = inventory.find(i => i.id === itemId);
     if (!item) return;
@@ -185,25 +212,24 @@ function AppContent() {
       return;
     }
     
-    // Update inventory stock
     const updatedStock = item.stock - quantity;
     const itemRef = doc(firestore, "inventory", itemId);
     updateDocumentNonBlocking(itemRef, { stock: updatedStock });
     
-    // Create usage log
     const newLog: Omit<UsageLog, 'id'> = {
-      itemId: itemId,
+      itemId,
       itemName: item.name,
       quantity,
       date: new Date().toISOString(),
-      sector: sector,
+      sectorId,
+      machineId,
     };
     const usageLogRef = collection(firestore, "usageLog");
     addDocumentNonBlocking(usageLogRef, newLog);
 
     toast({
       title: "Uso Registrado",
-      description: `Se han usado ${quantity} unidades de ${item.name} en ${sector}.`
+      description: `Se han usado ${quantity} unidades de ${item.name}.`
     });
 
     if (
@@ -219,22 +245,22 @@ function AppContent() {
   };
 
   const lowStockCount = useMemo(() => {
-    if (!inventory || !sectorAssignments) return 0;
-    const requiredBySector: { [itemId: string]: number } = {};
-    sectorAssignments.forEach(item => {
-        if (!requiredBySector[item.itemId]) {
-            requiredBySector[item.itemId] = 0;
+    if (!inventory || !machineAssignments) return 0;
+    const requiredByItem: { [itemId: string]: number } = {};
+    machineAssignments.forEach(item => {
+        if (!requiredByItem[item.itemId]) {
+            requiredByItem[item.itemId] = 0;
         }
-        requiredBySector[item.itemId] += item.quantity;
+        requiredByItem[item.itemId] += item.quantity;
     });
 
     return inventory.filter(b => {
-        const totalRequired = requiredBySector[b.id] || 0;
+        const totalRequired = requiredByItem[b.id] || 0;
         const safetyStock = b.threshold;
         const totalDemand = totalRequired + safetyStock;
         return b.stock < totalDemand;
     }).length;
-  }, [inventory, sectorAssignments]);
+  }, [inventory, machineAssignments]);
 
   const handleLogout = async () => {
     await auth.signOut();
@@ -267,7 +293,7 @@ function AppContent() {
       }}
       className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${
         view === targetView ? "bg-muted text-primary" : ""
-      } ${isSubItem ? 'pl-7' : ''}`}
+      } ${isSubItem ? 'pl-11' : ''}`}
     >
       {icon}
       {label}
@@ -283,15 +309,21 @@ function AppContent() {
     if (view === 'dashboard') return 'Panel de control';
     if (view === 'reports') return 'Reportes';
     if (view === 'to-buy') return 'Artículos a Comprar';
-    if (view.startsWith('sector-')) {
-        const sector = view.replace('sector-', '');
-        return `Sector: ${sector}`;
+    if (view === 'organization') return 'Organización de Planta';
+    if (view.startsWith('machine-')) {
+        const machineId = view.replace('machine-', '');
+        for (const sector of sortedSectors) {
+            const machine = machinesBySector[sector.id]?.find(m => m.id === machineId);
+            if (machine) {
+                return `${sector.name} / ${machine.name}`;
+            }
+        }
     }
     return 'Panel de control';
   }
 
   const renderContent = () => {
-    const isLoading = isInventoryLoading || isAssignmentsLoading || isUsageLogLoading || isSeeding;
+    const isLoading = isInventoryLoading || isAssignmentsLoading || isUsageLogLoading || isSectorsLoading || areMachinesLoading || isSeeding;
      if (isLoading) {
         return <Skeleton className="h-full w-full" />
     }
@@ -299,25 +331,34 @@ function AppContent() {
     if (view === 'dashboard') {
       return <Dashboard
         inventory={sortedInventory}
-        onLogUsage={handleLogUsage}
         onUpdateItem={handleUpdateItem}
         onAddItem={handleAddItem}
       />
     }
     if (view === 'reports') {
-      return <Reports usageLog={sortedUsageLog} />
+      return <Reports usageLog={sortedUsageLog} sectors={sortedSectors} machinesBySector={machinesBySector} />
     }
     if (view === 'to-buy') {
-        return <ToBuyView inventory={sortedInventory} sectorAssignments={sortedAssignments}/>
+        return <ToBuyView inventory={sortedInventory} machineAssignments={sortedAssignments}/>
     }
-    if (view.startsWith('sector-')) {
-        const sector = view.replace('sector-', '') as Sector;
-        return <SectorView 
+    if (view === 'organization') {
+        return <OrganizationView sectors={sortedSectors} machinesBySector={machinesBySector} firestore={firestore}/>
+    }
+    if (view.startsWith('machine-')) {
+        const machineId = view.replace('machine-', '');
+        const sector = sortedSectors.find(s => machinesBySector[s.id]?.some(m => m.id === machineId));
+        if (!sector) return null;
+        const machine = machinesBySector[sector.id].find(m => m.id === machineId);
+        if(!machine) return null;
+
+        return <MachineView 
             sector={sector} 
+            machine={machine}
             allInventory={sortedInventory} 
-            sectorAssignments={sortedAssignments.filter(item => item.sector === sector)}
-            onAssignItem={handleAssignItemToSector}
-            onRemoveItem={handleRemoveItemFromSector}
+            machineAssignments={sortedAssignments.filter(item => item.machineId === machineId)}
+            onAssignItem={handleAssignItemToMachine}
+            onRemoveItem={handleRemoveItemFromMachine}
+            onLogUsage={handleLogUsage}
         />
     }
     return null;
@@ -325,7 +366,13 @@ function AppContent() {
 
   const handleNavClick = (targetView: View) => {
     setView(targetView);
-    setIsSheetOpen(false); // Close sheet on navigation
+    setIsSheetOpen(false);
+  };
+  
+  const toggleSector = (sectorId: string) => {
+    setOpenSectors(prev => 
+      prev.includes(sectorId) ? prev.filter(id => id !== sectorId) : [...prev, sectorId]
+    );
   };
 
   const MainNav = ({ isMobile = false }) => (
@@ -336,41 +383,55 @@ function AppContent() {
         label="Panel de control"
         onClick={handleNavClick}
       />
-      <Collapsible open={isSectorsOpen} onOpenChange={setIsSectorsOpen}>
-          <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary [&[data-state=open]>div>svg.chevron]:rotate-90">
-              <div className="flex items-center gap-3">
-                  <Package className={isMobile ? "h-5 w-5" : "h-4 w-4"}/>
-                  <span>Sectores</span>
-              </div>
-              <ChevronRight className="chevron h-4 w-4 transition-transform" />
-          </CollapsibleTrigger>
-          <CollapsibleContent className="space-y-1 pt-1">
-              {SECTORS.map(sector => (
-                  <NavLink
-                      key={sector}
-                      targetView={`sector-${sector}`}
-                      icon={<div className="h-4 w-4" />} // Placeholder for alignment
-                      label={sector}
-                      isSubItem={true}
-                      onClick={handleNavClick}
-                  />
-              ))}
-          </CollapsibleContent>
-      </Collapsible>
+      <NavLink
+        targetView="organization"
+        icon={<Settings className={isMobile ? "h-5 w-5" : "h-4 w-4"} />}
+        label="Organización"
+        onClick={handleNavClick}
+      />
+      
+      <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Máquinas por Sector</div>
 
-      <NavLink
-        targetView="to-buy"
-        icon={<ShoppingCart className={isMobile ? "h-5 w-5" : "h-4 w-4"} />}
-        label="Artículos a Comprar"
-        badgeCount={lowStockCount}
-        onClick={handleNavClick}
-      />
-      <NavLink
-        targetView="reports"
-        icon={<LineChart className={isMobile ? "h-5 w-5" : "h-4 w-4"} />}
-        label="Reportes"
-        onClick={handleNavClick}
-      />
+        {sortedSectors.map(sector => (
+            <Collapsible key={sector.id} open={openSectors.includes(sector.id)} onOpenChange={() => toggleSector(sector.id)}>
+                <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary [&[data-state=open]>div>svg.chevron]:rotate-90">
+                    <div className="flex items-center gap-3">
+                        <Package className={isMobile ? "h-5 w-5" : "h-4 w-4"}/>
+                        <span className="font-semibold">{sector.name}</span>
+                    </div>
+                    <ChevronRight className="chevron h-4 w-4 transition-transform" />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-1 pt-1">
+                    {(machinesBySector[sector.id] || []).sort((a,b) => a.name.localeCompare(b.name)).map(machine => (
+                        <NavLink
+                            key={machine.id}
+                            targetView={`machine-${machine.id}`}
+                            icon={<HardDrive className="h-4 w-4"/>} 
+                            label={machine.name}
+                            isSubItem={true}
+                            onClick={handleNavClick}
+                        />
+                    ))}
+                </CollapsibleContent>
+            </Collapsible>
+        ))}
+      
+
+      <div className="mt-4 border-t pt-4">
+        <NavLink
+            targetView="to-buy"
+            icon={<ShoppingCart className={isMobile ? "h-5 w-5" : "h-4 w-4"} />}
+            label="Artículos a Comprar"
+            badgeCount={lowStockCount}
+            onClick={handleNavClick}
+        />
+        <NavLink
+            targetView="reports"
+            icon={<LineChart className={isMobile ? "h-5 w-5" : "h-4 w-4"} />}
+            label="Reportes"
+            onClick={handleNavClick}
+        />
+      </div>
     </nav>
   )
 

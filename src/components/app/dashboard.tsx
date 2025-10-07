@@ -8,18 +8,16 @@ import {
 } from "@/components/ui/card";
 import { AlertCircle, Package, ShoppingCart, Truck } from "lucide-react";
 import StockTable from "./stock-table";
-import type { InventoryItem, Sector } from "@/lib/types";
+import type { InventoryItem } from "@/lib/types";
 
 type DashboardProps = {
   inventory: InventoryItem[];
-  onLogUsage: (itemId: string, quantity: number, sector: Sector) => void;
   onUpdateItem: (item: InventoryItem) => void;
   onAddItem: (item: Omit<InventoryItem, 'id'>) => void;
 };
 
 export default function Dashboard({
   inventory,
-  onLogUsage,
   onUpdateItem,
   onAddItem
 }: DashboardProps) {
@@ -78,7 +76,6 @@ export default function Dashboard({
       <div className="grid gap-4 md:gap-8">
           <StockTable 
             inventory={inventory} 
-            onLogUsage={onLogUsage}
             onUpdateItem={onUpdateItem}
             onAddItem={onAddItem}
           />

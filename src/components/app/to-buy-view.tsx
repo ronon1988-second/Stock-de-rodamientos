@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { BrainCircuit, Loader2, Info, ShoppingCart, FileDown, CheckCircle, ChevronRight } from "lucide-react";
 import { getAIReorderRecommendations } from "@/app/actions";
-import type { InventoryItem, SectorAssignment } from "@/lib/types";
+import type { InventoryItem, MachineAssignment } from "@/lib/types";
 import { ReorderRecommendationsOutput } from "@/ai/flows/reorder-recommendations";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -30,7 +30,7 @@ import { Collapsible, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 type ToBuyViewProps = {
   inventory: InventoryItem[];
-  sectorAssignments: SectorAssignment[];
+  machineAssignments: MachineAssignment[];
 };
 
 type ReorderInfo = {
@@ -41,6 +41,7 @@ type ReorderInfo = {
 
 const getItemSeries = (name: string): string => {
   const normalizedName = name.toUpperCase().trim();
+  if (normalizedName.startsWith('HTD')) return 'Correas';
   if (normalizedName.startsWith('6')) {
     const series = normalizedName.substring(0, 2);
     if (['60', '62', '63', '68', '69'].includes(series)) {
@@ -60,7 +61,6 @@ const getItemSeries = (name: string): string => {
   }
   if (normalizedName.startsWith('NK') || normalizedName.startsWith('RNA') || normalizedName.startsWith('HK')) return 'Rodamientos de Agujas';
   if (normalizedName.startsWith('PHS') || normalizedName.startsWith('POS')) return 'Terminales de Rótula';
-  if (normalizedName.startsWith('HTD')) return 'Correas';
   if (normalizedName.startsWith('H')) return 'Manguitos de Montaje';
   if (normalizedName.startsWith('AEVU')) return 'Pistones';
   
@@ -68,7 +68,7 @@ const getItemSeries = (name: string): string => {
 };
 
 
-export default function ToBuyView({ inventory, sectorAssignments }: ToBuyViewProps) {
+export default function ToBuyView({ inventory, machineAssignments }: ToBuyViewProps) {
   const [recommendations, setRecommendations] =
     useState<ReorderRecommendationsOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -79,19 +79,19 @@ export default function ToBuyView({ inventory, sectorAssignments }: ToBuyViewPro
   const leadTime = 7;
 
   const itemsToReorder: ReorderInfo[] = useMemo(() => {
-    const requiredBySector: { [itemId: string]: number } = {};
-    sectorAssignments.forEach(item => {
-        if (!requiredBySector[item.itemId]) {
-            requiredBySector[item.itemId] = 0;
+    const requiredByItem: { [itemId: string]: number } = {};
+    machineAssignments.forEach(item => {
+        if (!requiredByItem[item.itemId]) {
+            requiredByItem[item.itemId] = 0;
         }
-        requiredBySector[item.itemId] += item.quantity;
+        requiredByItem[item.itemId] += item.quantity;
     });
 
     const result: ReorderInfo[] = [];
 
     inventory.forEach(item => {
-        const totalRequired = requiredBySector[item.id] || 0;
-        const safetyStock = item.threshold; // Now 2 for all
+        const totalRequired = requiredByItem[item.id] || 0;
+        const safetyStock = item.threshold;
         const totalDemand = totalRequired + safetyStock;
         const toBuy = totalDemand - item.stock;
 
@@ -105,7 +105,7 @@ export default function ToBuyView({ inventory, sectorAssignments }: ToBuyViewPro
     });
 
     return result.sort((a,b) => a.item.name.localeCompare(b.item.name));
-  }, [inventory, sectorAssignments]);
+  }, [inventory, machineAssignments]);
   
   useEffect(() => {
       if (itemsToReorder.length > 0 && openCollapsibles.length === 0) {
@@ -143,12 +143,11 @@ export default function ToBuyView({ inventory, sectorAssignments }: ToBuyViewPro
     setError(null);
     setRecommendations(null);
     
-    // The AI prompt needs a threshold, let's use the safety stock value.
     const reorderThreshold = 2;
 
     const input = {
       bearingTypes: inventory.map((b) => b.name),
-      historicalUsageData: "N/A", // Simplified for this view
+      historicalUsageData: "N/A", 
       currentStockLevels: JSON.stringify(
         inventory.map((b) => ({
           bearing: b.name,
@@ -180,7 +179,7 @@ export default function ToBuyView({ inventory, sectorAssignments }: ToBuyViewPro
   }
   
   const exportToCSV = () => {
-    let csvContent = "data:text/csv;charset=utf-8,Artículo,Stock Actual,Total Requerido en Sectores,Stock de Seguridad,Cantidad a Comprar (Calculado),Cantidad a Comprar (IA)\n";
+    let csvContent = "data:text/csv;charset=utf-8,Artículo,Stock Actual,Total Requerido en Máquinas,Stock de Seguridad,Cantidad a Comprar (Calculado),Cantidad a Comprar (IA)\n";
     
     itemsToReorder.forEach(item => {
       const { item: inventoryItem, totalRequired, toBuy } = item;
@@ -207,7 +206,7 @@ export default function ToBuyView({ inventory, sectorAssignments }: ToBuyViewPro
                 Lista de Artículos para Comprar
                 </CardTitle>
                 <CardDescription>
-                  Estos artículos se calculan en función de la demanda total de los sectores más un stock de seguridad.
+                  Estos artículos se calculan en función de la demanda total de las máquinas más un stock de seguridad.
                 </CardDescription>
             </div>
             <div className="flex gap-2">
@@ -246,7 +245,7 @@ export default function ToBuyView({ inventory, sectorAssignments }: ToBuyViewPro
               <TableRow>
                 <TableHead>Artículo</TableHead>
                 <TableHead className="text-right">Stock Actual</TableHead>
-                <TableHead className="text-right">Requerido (Sectores)</TableHead>
+                <TableHead className="text-right">Requerido (Máquinas)</TableHead>
                 <TableHead className="text-right">Stock de Seguridad</TableHead>
                 <TableHead className="text-right font-bold text-primary">Cantidad a Comprar</TableHead>
                 <TableHead className="text-right font-bold">Sugerencia IA</TableHead>
@@ -316,7 +315,3 @@ export default function ToBuyView({ inventory, sectorAssignments }: ToBuyViewPro
     </div>
   );
 }
-
-    
-
-    

@@ -19,7 +19,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import UpdateStockDialog from "./update-stock-dialog";
-import type { InventoryItem, Sector } from "@/lib/types";
+import type { InventoryItem } from "@/lib/types";
 import { MoreHorizontal, Search, ChevronRight, PlusCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -28,7 +28,6 @@ import AddItemDialog from "./add-item-dialog";
 
 type StockTableProps = {
   inventory: InventoryItem[];
-  onLogUsage: (itemId: string, quantity: number, sector: Sector) => void;
   onUpdateItem: (item: InventoryItem) => void;
   onAddItem: (item: Omit<InventoryItem, 'id'>) => void;
   title?: string;
@@ -38,6 +37,7 @@ type StockTableProps = {
 // Function to determine item series
 const getItemSeries = (name: string): string => {
   const normalizedName = name.toUpperCase().trim();
+  if (normalizedName.startsWith('HTD')) return 'Correas';
   if (normalizedName.startsWith('6')) {
     const series = normalizedName.substring(0, 2);
     if (['60', '62', '63', '68', '69'].includes(series)) {
@@ -57,7 +57,6 @@ const getItemSeries = (name: string): string => {
   }
   if (normalizedName.startsWith('NK') || normalizedName.startsWith('RNA') || normalizedName.startsWith('HK')) return 'Rodamientos de Agujas';
   if (normalizedName.startsWith('PHS') || normalizedName.startsWith('POS')) return 'Terminales de Rótula';
-  if (normalizedName.startsWith('HTD')) return 'Correas';
   if (normalizedName.startsWith('H')) return 'Manguitos de Montaje';
   if (normalizedName.startsWith('AEVU')) return 'Pistones';
   
@@ -65,8 +64,7 @@ const getItemSeries = (name: string): string => {
 };
 
 
-export default function StockTable({ inventory, onLogUsage, onUpdateItem, onAddItem, title, description }: StockTableProps) {
-  const [logUsageItem, setLogUsageItem] = useState<InventoryItem | null>(null);
+export default function StockTable({ inventory, onUpdateItem, onAddItem, title, description }: StockTableProps) {
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [addingItem, setAddingItem] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -213,11 +211,6 @@ export default function StockTable({ inventory, onLogUsage, onUpdateItem, onAddI
                                     <DropdownMenuContent align="end">
                                       <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                                       <DropdownMenuItem
-                                        onSelect={() => setLogUsageItem(item)}
-                                      >
-                                        Registrar Uso
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem
                                         onSelect={() => setEditingItem(item)}
                                       >
                                         Actualizar Stock
@@ -248,16 +241,6 @@ export default function StockTable({ inventory, onLogUsage, onUpdateItem, onAddI
           onClose={() => setAddingItem(false)}
           onConfirm={onAddItem}
           existingNames={inventory.map(i => i.name)}
-        />
-      )}
-      
-      {logUsageItem && (
-        <UpdateStockDialog
-          key={`log-${logUsageItem.id}`}
-          item={logUsageItem}
-          onClose={() => setLogUsageItem(null)}
-          onConfirm={(itemId, quantity, sector) => onLogUsage(itemId, quantity, sector!)}
-          mode="logUsage"
         />
       )}
 

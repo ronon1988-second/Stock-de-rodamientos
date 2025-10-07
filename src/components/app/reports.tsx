@@ -1,3 +1,4 @@
+
 "use client";
 import {
   Card,
@@ -16,14 +17,26 @@ import {
 } from "@/components/ui/table";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import type { UsageLog } from "@/lib/types";
+import type { UsageLog, Sector, Machine } from "@/lib/types";
 import UsageChart from "./usage-chart";
 
 type ReportsProps = {
   usageLog: UsageLog[];
+  sectors: Sector[];
+  machinesBySector: Record<string, Machine[]>;
 };
 
-export default function Reports({ usageLog }: ReportsProps) {
+export default function Reports({ usageLog, sectors, machinesBySector }: ReportsProps) {
+
+  const getMachineAndSectorName = (machineId: string, sectorId: string) => {
+    const sector = sectors.find(s => s.id === sectorId);
+    const machine = machinesBySector[sectorId]?.find(m => m.id === machineId);
+    return {
+      sectorName: sector?.name ?? 'Desconocido',
+      machineName: machine?.name ?? 'Desconocida'
+    }
+  }
+
   return (
     <div className="grid auto-rows-max items-start gap-4 md:gap-8">
       <Card>
@@ -34,7 +47,7 @@ export default function Reports({ usageLog }: ReportsProps) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <UsageChart usageData={usageLog} />
+          <UsageChart usageData={usageLog} sectors={sectors} machinesBySector={machinesBySector} />
         </CardContent>
       </Card>
       <Card>
@@ -47,25 +60,28 @@ export default function Reports({ usageLog }: ReportsProps) {
             <TableHeader>
               <TableRow>
                 <TableHead>Artículo</TableHead>
-                <TableHead>Sector</TableHead>
+                <TableHead>Máquina (Sector)</TableHead>
                 <TableHead className="text-right">Cantidad</TableHead>
                 <TableHead>Fecha</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {usageLog.length > 0 ? (
-                usageLog.map((log) => (
-                  <TableRow key={log.id}>
-                    <TableCell className="font-medium">
-                      {log.itemName}
-                    </TableCell>
-                    <TableCell>{log.sector}</TableCell>
-                    <TableCell className="text-right">{log.quantity}</TableCell>
-                    <TableCell>
-                      {format(new Date(log.date), "PPP p", { locale: es })}
-                    </TableCell>
-                  </TableRow>
-                ))
+                usageLog.map((log) => {
+                  const { machineName, sectorName } = getMachineAndSectorName(log.machineId, log.sectorId);
+                  return (
+                    <TableRow key={log.id}>
+                      <TableCell className="font-medium">
+                        {log.itemName}
+                      </TableCell>
+                      <TableCell>{machineName} ({sectorName})</TableCell>
+                      <TableCell className="text-right">{log.quantity}</TableCell>
+                      <TableCell>
+                        {format(new Date(log.date), "PPP p", { locale: es })}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
               ) : (
                 <TableRow>
                   <TableCell colSpan={4} className="h-24 text-center">

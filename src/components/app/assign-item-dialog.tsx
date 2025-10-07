@@ -29,13 +29,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { InventoryItem, Sector } from "@/lib/types";
+import { InventoryItem, Sector, Machine } from "@/lib/types";
 
 type AssignItemDialogProps = {
   sector: Sector;
+  machine: Machine;
   allInventory: InventoryItem[];
   onClose: () => void;
-  onAssign: (itemId: string, sector: Sector, quantity: number) => void;
+  onAssign: (itemId: string, machineId: string, sectorId: string, quantity: number) => void;
 };
 
 const AssignItemSchema = z.object({
@@ -47,6 +48,7 @@ const AssignItemSchema = z.object({
 
 export default function AssignItemDialog({
   sector,
+  machine,
   allInventory,
   onClose,
   onAssign,
@@ -60,7 +62,7 @@ export default function AssignItemDialog({
   });
 
   function onSubmit(values: z.infer<typeof AssignItemSchema>) {
-    onAssign(values.itemId, sector, values.quantity);
+    onAssign(values.itemId, machine.id, sector.id, values.quantity);
     onClose();
   }
 
@@ -68,9 +70,9 @@ export default function AssignItemDialog({
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Asignar Artículo a {sector}</DialogTitle>
+          <DialogTitle>Asignar Artículo a {machine.name}</DialogTitle>
           <DialogDescription>
-            Seleccione un artículo y la cantidad a asignar a este sector.
+            Seleccione un artículo y la cantidad a asignar a esta máquina en el sector {sector.name}.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>

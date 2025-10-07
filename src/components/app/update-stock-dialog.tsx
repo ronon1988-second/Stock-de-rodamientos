@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -21,21 +22,25 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { InventoryItem, SECTORS, Sector } from "@/lib/types";
+import { InventoryItem, Machine, Sector } from "@/lib/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type UpdateStockDialogProps = {
   item: InventoryItem;
   onClose: () => void;
-  onConfirm: (itemId: string, quantity: number, sector?: Sector) => void;
+  onConfirm: (itemId: string, quantity: number, machineId?: string, sectorId?: string) => void;
   mode: "logUsage" | "updateStock";
+  sectors?: Sector[];
+  machinesBySector?: Record<string, Machine[]>;
 };
 
 export default function UpdateStockDialog({
   item,
   onClose,
   onConfirm,
-  mode
+  mode,
+  sectors,
+  machinesBySector,
 }: UpdateStockDialogProps) {
 
   const logUsageSchema = z.object({
@@ -44,9 +49,8 @@ export default function UpdateStockDialog({
       .int()
       .positive("La cantidad debe ser positiva.")
       .max(item.stock, `No se puede usar más que el stock disponible (${item.stock}).`),
-    sector: z.enum(SECTORS, {
-      errorMap: () => ({ message: "Por favor seleccione un sector." }),
-    }),
+    sectorId: z.string({ required_error: "Por favor seleccione un sector." }),
+    machineId: z.string({ required_error: "Por favor seleccione una máquina." }),
   });
 
   const updateStockSchema = z.object({
@@ -59,16 +63,19 @@ export default function UpdateStockDialog({
     resolver: zodResolver(formSchema),
     defaultValues: mode === 'logUsage' ? {
       quantity: 1,
-      sector: undefined,
+      sectorId: undefined,
+      machineId: undefined,
     } : {
       stock: item.stock,
     },
   });
 
+  const selectedSectorId = form.watch('sectorId' as any);
+
   function onSubmit(values: z.infer<typeof formSchema>) {
     if (mode === 'logUsage') {
-      const { quantity, sector } = values as z.infer<typeof logUsageSchema>;
-      onConfirm(item.id, quantity, sector);
+      const { quantity, machineId, sectorId } = values as z.infer<typeof logUsageSchema>;
+      onConfirm(item.id, quantity, machineId, sectorId);
     } else {
       const { stock } = values as z.infer<typeof updateStockSchema>;
       onConfirm(item.id, stock);
@@ -85,7 +92,7 @@ export default function UpdateStockDialog({
           <DialogTitle>{isLogUsage ? 'Registrar Uso' : 'Actualizar Stock'} de {item.name}</DialogTitle>
           <DialogDescription>
              {isLogUsage 
-                ? 'Seleccione el sector e ingrese la cantidad utilizada.' 
+                ? 'Seleccione la máquina e ingrese la cantidad utilizada.' 
                 : 'Ingrese el nuevo total de stock para este artículo.'}
              <br />
              Stock actual: <strong>{item.stock} unidades</strong>
@@ -93,7 +100,7 @@ export default function UpdateStockDialog({
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 py-4">
-            {isLogUsage && (
+            {isLogUsage && sectors && machinesBySector && (
                 <>
                 <FormField
                   control={form.control}
@@ -110,7 +117,7 @@ export default function UpdateStockDialog({
                 />
                 <FormField
                   control={form.control}
-                  name="sector"
+                  name="sectorId"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Sector de Destino</FormLabel>
@@ -121,8 +128,8 @@ export default function UpdateStockDialog({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {SECTORS.map(sector => (
-                            <SelectItem key={sector} value={sector}>{sector}</SelectItem>
+                          {sectors.map(sector => (
+                            <SelectItem key={sector.id} value={sector.id}>{sector.name}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -130,6 +137,30 @@ export default function UpdateStockDialog({
                     </FormItem>
                   )}
                 />
+                {selectedSectorId && (
+                    <FormField
+                    control={form.control}
+                    name="machineId"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Máquina</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!selectedSectorId}>
+                            <FormControl>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Seleccione una máquina" />
+                            </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                            {(machinesBySector[selectedSectorId] || []).map(machine => (
+                                <SelectItem key={machine.id} value={machine.id}>{machine.name}</SelectItem>
+                            ))}
+                            </SelectContent>
+                        </Select>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                )}
                 </>
             )}
             {!isLogUsage && (

@@ -1,30 +1,36 @@
+
 "use client";
 
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { InventoryItem, Sector, SectorAssignment } from '@/lib/types';
-import { PackagePlus, Trash2 } from 'lucide-react';
-import AssignItemDialog from './assign-bearing-dialog';
+import { InventoryItem, Sector, Machine, MachineAssignment } from '@/lib/types';
+import { PackagePlus, Trash2, Edit } from 'lucide-react';
+import AssignItemDialog from './assign-item-dialog';
+import UpdateStockDialog from './update-stock-dialog';
 
-type SectorViewProps = {
+type MachineViewProps = {
     sector: Sector;
+    machine: Machine;
     allInventory: InventoryItem[];
-    sectorAssignments: SectorAssignment[];
-    onAssignItem: (itemId: string, sector: Sector, quantity: number) => void;
+    machineAssignments: MachineAssignment[];
+    onAssignItem: (itemId: string, machineId: string, sectorId: string, quantity: number) => void;
     onRemoveItem: (assignmentId: string) => void;
+    onLogUsage: (itemId: string, quantity: number, machineId: string, sectorId: string) => void;
 };
 
-export default function SectorView({ sector, allInventory, sectorAssignments, onAssignItem, onRemoveItem }: SectorViewProps) {
+export default function MachineView({ sector, machine, allInventory, machineAssignments, onAssignItem, onRemoveItem, onLogUsage }: MachineViewProps) {
     const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
+    const [logUsageItem, setLogUsageItem] = useState<InventoryItem | null>(null);
 
-    // Get full item info for items in this sector's inventory
-    const assignedItemsDetails = sectorAssignments.map(item => {
+    const assignedItemsDetails = machineAssignments.map(item => {
         const itemDetails = allInventory.find(b => b.id === item.itemId);
         return {
             ...item,
             stock: itemDetails?.stock ?? 'N/A',
+            threshold: itemDetails?.threshold ?? 0,
+            inventoryItem: itemDetails
         };
     }).sort((a, b) => a.itemName.localeCompare(b.itemName));
 
@@ -34,9 +40,9 @@ export default function SectorView({ sector, allInventory, sectorAssignments, on
                 <Card>
                     <CardHeader className="flex flex-row items-start justify-between">
                         <div>
-                            <CardTitle>Artículos en {sector}</CardTitle>
+                            <CardTitle>Artículos en {machine.name}</CardTitle>
                             <CardDescription>
-                                Esta es la lista de artículos asignados a este sector y la cantidad requerida.
+                                Esta es la lista de artículos asignados a esta máquina y la cantidad requerida.
                             </CardDescription>
                         </div>
                         <Button onClick={() => setIsAssignDialogOpen(true)}>
@@ -51,7 +57,7 @@ export default function SectorView({ sector, allInventory, sectorAssignments, on
                                     <TableHead>Artículo</TableHead>
                                     <TableHead className="text-right">Cantidad Asignada</TableHead>
                                     <TableHead className="text-right">Stock General Actual</TableHead>
-                                    <TableHead className="w-[80px]">Acciones</TableHead>
+                                    <TableHead className="w-[120px]">Acciones</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -61,7 +67,15 @@ export default function SectorView({ sector, allInventory, sectorAssignments, on
                                             <TableCell className="font-medium">{item.itemName}</TableCell>
                                             <TableCell className="text-right font-semibold">{item.quantity}</TableCell>
                                             <TableCell className="text-right">{item.stock}</TableCell>
-                                            <TableCell>
+                                            <TableCell className="flex justify-end gap-1">
+                                                 <Button 
+                                                    variant="outline" 
+                                                    size="sm" 
+                                                    disabled={item.inventoryItem?.stock === 0}
+                                                    onClick={() => item.inventoryItem && setLogUsageItem(item.inventoryItem)}
+                                                >
+                                                    Registrar Uso
+                                                </Button>
                                                 <Button 
                                                     variant="ghost" 
                                                     size="icon" 
@@ -76,7 +90,7 @@ export default function SectorView({ sector, allInventory, sectorAssignments, on
                                 ) : (
                                     <TableRow>
                                         <TableCell colSpan={4} className="h-24 text-center">
-                                            Aún no se han asignado artículos a este sector.
+                                            Aún no se han asignado artículos a esta máquina.
                                         </TableCell>
                                     </TableRow>
                                 )}
@@ -88,9 +102,19 @@ export default function SectorView({ sector, allInventory, sectorAssignments, on
             {isAssignDialogOpen && (
                 <AssignItemDialog
                     sector={sector}
+                    machine={machine}
                     allInventory={allInventory}
                     onClose={() => setIsAssignDialogOpen(false)}
                     onAssign={onAssignItem}
+                />
+            )}
+             {logUsageItem && (
+                <UpdateStockDialog
+                    key={`log-${logUsageItem.id}`}
+                    item={logUsageItem}
+                    onClose={() => setLogUsageItem(null)}
+                    onConfirm={(itemId, quantity) => onLogUsage(itemId, quantity, machine.id, sector.id)}
+                    mode="logUsage"
                 />
             )}
         </>

@@ -1,5 +1,15 @@
-export const SECTORS = ['Modulus', 'Alipack', 'Horno Linea 1', 'Horno Linea 2', 'Curva', 'Laminado L1', 'Laminado L2'] as const;
-export type Sector = typeof SECTORS[number];
+// Represents a single sector in the plant, managed by the user.
+export type Sector = {
+  id: string;
+  name: string;
+};
+
+// Represents a single machine within a sector, managed by the user.
+export type Machine = {
+  id: string;
+  name: string;
+  sectorId: string;
+};
 
 // Represents a single item in the shared inventory. The 'id' is the Firestore document ID.
 export type InventoryItem = {
@@ -9,20 +19,22 @@ export type InventoryItem = {
   threshold: number;
 };
 
-// Represents the usage of an item in a specific sector at a specific time. The 'id' is the Firestore document ID.
+// Represents the usage of an item by a specific machine at a specific time.
 export type UsageLog = {
   id: string;
   itemId: string;
   itemName: string;
   quantity: number;
   date: string; // ISO string
-  sector: Sector; 
+  sectorId: string;
+  machineId: string;
 };
 
-// Represents the assignment of items to a sector. The 'id' is the Firestore document ID.
-export type SectorAssignment = {
-  id: string;
-  sector: Sector;
+// Represents the assignment of items to a machine.
+export type MachineAssignment = {
+  id:string;
+  sectorId: string;
+  machineId: string;
   itemId: string;
   itemName: string;
   quantity: number;

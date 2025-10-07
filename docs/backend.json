@@ -1,10 +1,40 @@
 {
   "entities": {
-    "Bearing": {
+    "Sector": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Bearing",
+      "title": "Sector",
       "type": "object",
-      "description": "Represents a specific type of bearing. Renamed to InventoryItem for broader use.",
+      "description": "Represents a physical or logical area in the plant.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the sector."
+        }
+      },
+      "required": ["name"]
+    },
+    "Machine": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Machine",
+      "type": "object",
+      "description": "Represents a machine within a sector.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the machine."
+        },
+        "sectorId": {
+          "type": "string",
+          "description": "The ID of the sector this machine belongs to."
+        }
+      },
+      "required": ["name", "sectorId"]
+    },
+    "InventoryItem": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "InventoryItem",
+      "type": "object",
+      "description": "Represents a specific type of item in the inventory.",
       "properties": {
         "name": {
           "type": "string",
@@ -19,21 +49,21 @@
           "description": "The minimum quantity of this item that should be in stock."
         }
       },
-      "required": [
-        "name",
-        "stock",
-        "threshold"
-      ]
+      "required": ["name", "stock", "threshold"]
     },
-    "SectorAssignment": {
+    "MachineAssignment": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "SectorAssignment",
+      "title": "MachineAssignment",
       "type": "object",
-      "description": "Represents the assignment of a specific quantity of an inventory item to a sector.",
+      "description": "Represents the assignment of a specific quantity of an inventory item to a machine.",
       "properties": {
-        "sector": {
+        "sectorId": {
           "type": "string",
-          "description": "The sector to which the item is assigned."
+          "description": "Reference to the Sector's ID."
+        },
+        "machineId": {
+          "type": "string",
+          "description": "Reference to the Machine's ID."
         },
         "itemId": {
           "type": "string",
@@ -45,21 +75,16 @@
         },
         "quantity": {
           "type": "number",
-          "description": "The quantity required for that sector."
+          "description": "The quantity required for that machine."
         }
       },
-      "required": [
-        "sector",
-        "itemId",
-        "itemName",
-        "quantity"
-      ]
+      "required": ["sectorId", "machineId", "itemId", "itemName", "quantity"]
     },
     "UsageLog": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "UsageLog",
       "type": "object",
-      "description": "Represents a record of item usage.",
+      "description": "Represents a record of item usage by a machine.",
       "properties": {
         "itemId": {
           "type": "string",
@@ -77,57 +102,68 @@
           "type": "string",
           "description": "The ISO date and time when the item was used."
         },
-        "sector": {
+        "sectorId": {
           "type": "string",
           "description": "The sector where the item was used."
+        },
+        "machineId": {
+          "type": "string",
+          "description": "The machine that used the item."
         }
       },
-      "required": [
-        "itemId",
-        "itemName",
-        "quantity",
-        "date",
-        "sector"
-      ]
+      "required": ["itemId", "itemName", "quantity", "date", "sectorId", "machineId"]
     }
   },
   "auth": {
-    "providers": [
-      "password"
-    ]
+    "providers": ["password"]
   },
   "firestore": {
     "structure": [
+      {
+        "path": "sectors/{sectorId}",
+        "definition": {
+          "entityName": "Sector",
+          "schema": {
+            "$ref": "#/backend/entities/Sector"
+          },
+          "description": "Stores all sectors. Accessible by any authenticated user.",
+          "params": [{"name": "sectorId", "description": "The unique ID of the sector."}]
+        }
+      },
+      {
+        "path": "sectors/{sectorId}/machines/{machineId}",
+        "definition": {
+          "entityName": "Machine",
+          "schema": {
+            "$ref": "#/backend/entities/Machine"
+          },
+          "description": "Stores all machines within a sector. Accessible by any authenticated user.",
+          "params": [
+            {"name": "sectorId", "description": "The unique ID of the parent sector."},
+            {"name": "machineId", "description": "The unique ID of the machine."}
+          ]
+        }
+      },
       {
         "path": "inventory/{inventoryId}",
         "definition": {
           "entityName": "InventoryItem",
           "schema": {
-            "$ref": "#/backend/entities/Bearing"
+            "$ref": "#/backend/entities/InventoryItem"
           },
           "description": "Stores all shared inventory items. Accessible by any authenticated user.",
-          "params": [
-            {
-              "name": "inventoryId",
-              "description": "The unique ID of the inventory item."
-            }
-          ]
+          "params": [{"name": "inventoryId", "description": "The unique ID of the inventory item."}]
         }
       },
       {
-        "path": "sectorAssignments/{assignmentId}",
+        "path": "machineAssignments/{assignmentId}",
         "definition": {
-          "entityName": "SectorAssignment",
+          "entityName": "MachineAssignment",
           "schema": {
-            "$ref": "#/backend/entities/SectorAssignment"
+            "$ref": "#/backend/entities/MachineAssignment"
           },
-          "description": "Stores all shared sector assignments. Accessible by any authenticated user.",
-          "params": [
-            {
-              "name": "assignmentId",
-              "description": "The unique ID of the sector assignment."
-            }
-          ]
+          "description": "Stores all shared machine assignments. Accessible by any authenticated user.",
+          "params": [{"name": "assignmentId", "description": "The unique ID of the machine assignment."}]
         }
       },
       {
@@ -138,15 +174,10 @@
             "$ref": "#/backend/entities/UsageLog"
           },
           "description": "Stores the shared history of item usage. Accessible by any authenticated user.",
-          "params": [
-            {
-              "name": "usageLogId",
-              "description": "The unique ID of the usage log record."
-            }
-          ]
+          "params": [{"name": "usageLogId", "description": "The unique ID of the usage log record."}]
         }
       }
     ],
-    "reasoning": "The application requires a shared inventory model where any authenticated user can view and modify the same dataset. To achieve this, the Firestore collections (inventory, sectorAssignments, usageLog) are placed at the root level, removing the user-specific pathing ('users/{userId}'). This makes the data globally accessible to all authenticated users, aligning with the requirement that all modifications are visible to everyone in real-time."
+    "reasoning": "The application requires a shared inventory model where any authenticated user can view and modify the same dataset. A hierarchical structure of sectors and machines is introduced. All collections are at the root level to be globally accessible by any authenticated user."
   }
 }
