@@ -21,21 +21,21 @@
           "description": "The user's display name."
         }
       },
-      "required": ["uid", "email", "displayName"]
+      "required": ["uid", "email"]
     },
     "UserRole": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "title": "User Role",
-        "type": "object",
-        "description": "Represents a user's role in the application.",
-        "properties": {
-            "role": {
-                "type": "string",
-                "description": "The user's role.",
-                "enum": ["admin", "editor"]
-            }
-        },
-        "required": ["role"]
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User Role",
+      "type": "object",
+      "description": "Represents a user's role in the application, stored in a specific collection.",
+      "properties": {
+        "role": {
+          "type": "string",
+          "description": "The user's role.",
+          "enum": ["admin", "editor"]
+        }
+      },
+      "required": ["role"]
     },
     "Sector": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -108,5 +108,97 @@
         },
         "itemName": {
           "type": "string",
-...
-```
+          "description": "Denormalized name of the item for easier display."
+        },
+        "quantity": {
+          "type": "number",
+          "description": "The quantity of the item assigned to the machine."
+        }
+      },
+      "required": ["sectorId", "machineId", "itemId", "itemName", "quantity"]
+    },
+    "UsageLog": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UsageLog",
+      "type": "object",
+      "description": "Logs when an inventory item is used.",
+      "properties": {
+        "itemId": {
+          "type": "string"
+        },
+        "itemName": {
+          "type": "string"
+        },
+        "quantity": {
+          "type": "number"
+        },
+        "date": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "sectorId": {
+          "type": "string"
+        },
+        "machineId": {
+          "type": "string"
+        }
+      },
+      "required": ["itemId", "itemName", "quantity", "date", "sectorId", "machineId"]
+    }
+  },
+  "auth": {
+    "providers": ["password"],
+    "customClaims": {
+      "admin": {
+        "type": "boolean"
+      },
+      "editor": {
+        "type": "boolean"
+      }
+    }
+  },
+  "firestore": {
+    "/inventory/{itemId}": {
+      "schema": {
+        "$ref": "#/entities/InventoryItem"
+      },
+      "description": "Global inventory of all available items."
+    },
+    "/sectors/{sectorId}": {
+      "schema": {
+        "$ref": "#/entities/Sector"
+      },
+      "description": "Top-level organizational units of the plant."
+    },
+    "/sectors/{sectorId}/machines/{machineId}": {
+      "schema": {
+        "$ref": "#/entities/Machine"
+      },
+      "description": "Machines belonging to a specific sector."
+    },
+    "/machineAssignments/{assignmentId}": {
+      "schema": {
+        "$ref": "#/entities/MachineAssignment"
+      },
+      "description": "Associates inventory items with specific machines."
+    },
+    "/usageLog/{logId}": {
+      "schema": {
+        "$ref": "#/entities/UsageLog"
+      },
+      "description": "Historical log of all item usage."
+    },
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserProfile"
+      },
+      "description": "Stores public profile information for each user."
+    },
+    "/roles/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserRole"
+      },
+      "description": "Stores the role for each user, separate from their profile."
+    }
+  }
+}
