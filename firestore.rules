@@ -1,77 +1,99 @@
 /**
- * @fileoverview Firestore Security Rules for the Plant Management Application.
+ * @fileoverview Firestore Security Rules for the Inventory Management Application.
  *
  * Core Philosophy:
- * This ruleset implements a role-based access control (RBAC) model. User roles are stored in the `/users/{userId}` document.
- * Admins have full control over sectors, machines and inventory, editors can manage inventory and log usage,
- * and all authenticated users have read access to all data.
+ * This ruleset implements a role-based access control (RBAC) model, supplemented by ownership constraints where appropriate.
+ * Users are assigned roles ('admin' or 'editor') that determine their permissions.  Authenticated users can read almost all data.
  *
  * Data Structure:
- * - /users/{userId}: Stores user profile information, including their role ('admin' or 'editor').
- * - /sectors/{sectorId}: Stores sector information.
- * - /sectors/{sectorId}/machines/{machineId}: Stores machine information within each sector.
- * - /inventory/{inventoryId}: Stores inventory item information.
+ * - /users/{userId}: Stores user profiles, keyed by their Firebase Auth UID.  Used to determine user roles.
+ * - /sectors/{sectorId}: Stores sectors.
+ * - /sectors/{sectorId}/machines/{machineId}: Stores machines within sectors.
+ * - /inventory/{inventoryId}: Stores inventory items.
  * - /machineAssignments/{assignmentId}: Stores machine assignments.
  * - /usageLog/{usageLogId}: Stores usage logs.
  *
  * Key Security Decisions:
- * - Users collection is NOT listable to prevent discovery of user emails.
- * - Data is public for `get` and `list` to all signed-in users.
+ * - Roles are stored in the /users/{userId} document and are used to control access to other collections.
+ * - The `list` operation on `/users` is denied to prevent unauthorized enumeration of user accounts.
+ * - All authenticated users can read most data (sectors, machines, inventory, assignments, logs).
+ * - Admins have full control over sectors and machines.
+ * - Editors can manage inventory, assignments, and create usage logs.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the user is signed in.
+     * @description Checks if the current user is signed in.
+     * @path N/A (Helper Function)
+     * @allow N/A (Helper Function)
+     * @deny N/A (Helper Function)
+     * @principle Authentication required for all protected operations.
      */
     function isSignedIn() {
       return request.auth != null;
     }
 
     /**
-     * @description Checks if the user's role is 'admin'.
-     */
-    function isAdmin() {
-      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-    }
-
-    /**
-     * @description Checks if the user's role is 'editor'.
-     */
-    function isEditor() {
-      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'editor';
-    }
-    
-    /**
-     * @description Checks if the requesting user is the owner of the document.
+     * @description Checks if the current user's UID matches the provided userId.
+     * @path N/A (Helper Function)
+     * @allow N/A (Helper Function)
+     * @deny N/A (Helper Function)
+     * @principle Enforces user ownership.
      */
     function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return request.auth.uid == userId;
     }
 
     /**
-     * @description Checks if the requesting user is the owner of the document and the document exists.
+     * @description Checks if the current user is an existing owner (signed in, isOwner, and document exists).
+     * @path N/A (Helper Function)
+     * @allow N/A (Helper Function)
+     * @deny N/A (Helper Function)
+     * @principle Enforces user ownership and document existence for updates and deletes.
      */
     function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
+        return isSignedIn() && isOwner(userId) && resource != null;
+    }
+
+    /**
+     * @description Checks if the current user has the 'admin' role.
+     * @path N/A (Helper Function)
+     * @allow N/A (Helper Function)
+     * @deny N/A (Helper Function)
+     * @principle Requires admin role for privileged operations.
+     */
+    function isAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    /**
+     * @description Checks if the current user has the 'editor' role.
+     * @path N/A (Helper Function)
+     * @allow N/A (Helper Function)
+     * @deny N/A (Helper Function)
+     * @principle Requires editor role for privileged operations.
+     */
+    function isEditor() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'editor';
     }
 
     /**
      * @description Rules for user profiles.
      * @path /users/{userId}
-     * @allow (create) Signed-in user can create their own profile.
-     * @allow (get, update, delete) Signed-in user can read their own profile.
-     * @deny (create) Signed-in user cannot create a profile with a mismatched userId.
-     * @deny (list) Listing all users is not allowed.
-     * @principle Enforces user ownership for profile data and restricts listing of users.
+     * @allow (create) A user can create their own profile if the UID matches.
+     * @allow (get) Any signed-in user can read a profile.
+     * @deny (create) A user cannot create a profile for another user.
+     * @deny (update) A user cannot modify another user's profile.
+     * @principle Enforces user-ownership for profile creation, read-only for others.
      */
     match /users/{userId} {
-      allow get: if isOwner(userId);
+      allow get: if isSignedIn();
       allow list: if false;
       allow create: if isOwner(userId) && request.resource.data.uid == userId;
       allow update: if isExistingOwner(userId) && request.resource.data.uid == resource.data.uid;
-      allow delete: if isExistingOwner(userId);
+      allow delete: if false;
     }
 
     /**
@@ -80,13 +102,13 @@ service cloud.firestore {
      * @allow (get, list) Any signed-in user can read sectors.
      * @allow (create, update, delete) Only admins can manage sectors.
      * @deny (create, update, delete) Non-admins cannot manage sectors.
-     * @principle Admins control sector data, others can only read.
+     * @principle Read-only for all users, writeable by admins.
      */
     match /sectors/{sectorId} {
       allow get, list: if isSignedIn();
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
+      allow create: if isSignedIn() && isAdmin();
+      allow update: if isSignedIn() && isAdmin() && resource != null;
+      allow delete: if isSignedIn() && isAdmin() && resource != null;
     }
 
     /**
@@ -95,56 +117,56 @@ service cloud.firestore {
      * @allow (get, list) Any signed-in user can read machines.
      * @allow (create, update, delete) Only admins can manage machines.
      * @deny (create, update, delete) Non-admins cannot manage machines.
-     * @principle Admins control machine data, others can only read.
+     * @principle Read-only for all users, writeable by admins.
      */
     match /sectors/{sectorId}/machines/{machineId} {
       allow get, list: if isSignedIn();
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
+      allow create: if isSignedIn() && isAdmin();
+      allow update: if isSignedIn() && isAdmin() && resource != null;
+      allow delete: if isSignedIn() && isAdmin() && resource != null;
     }
 
     /**
      * @description Rules for inventory items.
      * @path /inventory/{inventoryId}
      * @allow (get, list) Any signed-in user can read inventory items.
-     * @allow (create, update, delete) Only admins and editors can manage inventory items.
-     * @deny (create, update, delete) Non-admins/editors cannot manage inventory items.
-     * @principle Admins and editors control inventory data, others can only read.
+     * @allow (create, update, delete) Only editors and admins can manage inventory items.
+     * @deny (create, update, delete) Non-editors/admins cannot manage inventory items.
+     * @principle Read-only for all users, writeable by editors and admins.
      */
     match /inventory/{inventoryId} {
       allow get, list: if isSignedIn();
-      allow create: if isAdmin() || isEditor();
-      allow update: if (isAdmin() || isEditor()) && resource != null;
-      allow delete: if (isAdmin() || isEditor()) && resource != null;
+      allow create: if isSignedIn() && (isAdmin() || isEditor());
+      allow update: if isSignedIn() && (isAdmin() || isEditor()) && resource != null;
+      allow delete: if isSignedIn() && (isAdmin() || isEditor()) && resource != null;
     }
 
     /**
      * @description Rules for machine assignments.
      * @path /machineAssignments/{assignmentId}
      * @allow (get, list) Any signed-in user can read machine assignments.
-     * @allow (create, update, delete) Only admins and editors can manage machine assignments.
-     * @deny (create, update, delete) Non-admins/editors cannot manage machine assignments.
-     * @principle Admins and editors control machine assignment data, others can only read.
+     * @allow (create, update, delete) Only editors and admins can manage machine assignments.
+     * @deny (create, update, delete) Non-editors/admins cannot manage machine assignments.
+     * @principle Read-only for all users, writeable by editors and admins.
      */
     match /machineAssignments/{assignmentId} {
       allow get, list: if isSignedIn();
-      allow create: if isAdmin() || isEditor();
-      allow update: if (isAdmin() || isEditor()) && resource != null;
-      allow delete: if (isAdmin() || isEditor()) && resource != null;
+      allow create: if isSignedIn() && (isAdmin() || isEditor());
+      allow update: if isSignedIn() && (isAdmin() || isEditor()) && resource != null;
+      allow delete: if isSignedIn() && (isAdmin() || isEditor()) && resource != null;
     }
 
     /**
      * @description Rules for usage logs.
      * @path /usageLog/{usageLogId}
      * @allow (get, list) Any signed-in user can read usage logs.
-     * @allow (create) Only admins and editors can create usage logs.
-     * @deny (create) Non-admins/editors cannot create usage logs.
-     * @principle Admins and editors control usage log creation, others can only read.
+     * @allow (create) Only editors and admins can create usage logs.
+     * @deny (update, delete) Usage logs cannot be updated or deleted.
+     * @principle Read-only for all users, createable by editors and admins.
      */
     match /usageLog/{usageLogId} {
       allow get, list: if isSignedIn();
-      allow create: if isAdmin() || isEditor();
+      allow create: if isSignedIn() && (isAdmin() || isEditor());
       allow update: if false;
       allow delete: if false;
     }
