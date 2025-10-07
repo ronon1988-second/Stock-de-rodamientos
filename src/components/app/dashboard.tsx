@@ -14,12 +14,14 @@ type DashboardProps = {
   inventory: InventoryItem[];
   onUpdateItem: (item: InventoryItem) => void;
   onAddItem: (item: Omit<InventoryItem, 'id'>) => void;
+  canEdit: boolean;
 };
 
 export default function Dashboard({
   inventory,
   onUpdateItem,
-  onAddItem
+  onAddItem,
+  canEdit
 }: DashboardProps) {
   const totalStock = inventory.reduce((sum, b) => sum + b.stock, 0);
   const lowStockCount = inventory.filter((b) => b.stock < b.threshold).length;
@@ -78,6 +80,7 @@ export default function Dashboard({
             inventory={inventory} 
             onUpdateItem={onUpdateItem}
             onAddItem={onAddItem}
+            canEdit={canEdit}
           />
       </div>
     </div>

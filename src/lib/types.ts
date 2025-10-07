@@ -1,3 +1,4 @@
+
 // Represents a single sector in the plant, managed by the user.
 export type Sector = {
   id: string;
@@ -38,4 +39,13 @@ export type MachineAssignment = {
   itemId: string;
   itemName: string;
   quantity: number;
+};
+
+// Represents a user profile stored in Firestore.
+export type UserProfile = {
+  id: string;
+  uid: string;
+  email: string;
+  role: 'admin' | 'editor';
+  displayName: string;
 };

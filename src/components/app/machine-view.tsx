@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { InventoryItem, Sector, Machine, MachineAssignment } from '@/lib/types';
-import { PackagePlus, Trash2, Edit } from 'lucide-react';
+import { PackagePlus, Trash2 } from 'lucide-react';
 import AssignItemDialog from './assign-item-dialog';
 import UpdateStockDialog from './update-stock-dialog';
 
@@ -18,9 +18,10 @@ type MachineViewProps = {
     onAssignItem: (itemId: string, machineId: string, sectorId: string, quantity: number) => void;
     onRemoveItem: (assignmentId: string) => void;
     onLogUsage: (itemId: string, quantity: number, machineId: string, sectorId: string) => void;
+    canEdit: boolean;
 };
 
-export default function MachineView({ sector, machine, allInventory, machineAssignments, onAssignItem, onRemoveItem, onLogUsage }: MachineViewProps) {
+export default function MachineView({ sector, machine, allInventory, machineAssignments, onAssignItem, onRemoveItem, onLogUsage, canEdit }: MachineViewProps) {
     const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
     const [logUsageItem, setLogUsageItem] = useState<InventoryItem | null>(null);
 
@@ -45,10 +46,12 @@ export default function MachineView({ sector, machine, allInventory, machineAssi
                                 Esta es la lista de artículos asignados a esta máquina y la cantidad requerida.
                             </CardDescription>
                         </div>
-                        <Button onClick={() => setIsAssignDialogOpen(true)}>
-                            <PackagePlus className="mr-2 h-4 w-4" />
-                            Asignar Artículo
-                        </Button>
+                        {canEdit && (
+                            <Button onClick={() => setIsAssignDialogOpen(true)}>
+                                <PackagePlus className="mr-2 h-4 w-4" />
+                                Asignar Artículo
+                            </Button>
+                        )}
                     </CardHeader>
                     <CardContent>
                         <Table>
@@ -57,7 +60,7 @@ export default function MachineView({ sector, machine, allInventory, machineAssi
                                     <TableHead>Artículo</TableHead>
                                     <TableHead className="text-right">Cantidad Asignada</TableHead>
                                     <TableHead className="text-right">Stock General Actual</TableHead>
-                                    <TableHead className="w-[120px]">Acciones</TableHead>
+                                    {canEdit && <TableHead className="w-[120px]">Acciones</TableHead>}
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -67,29 +70,31 @@ export default function MachineView({ sector, machine, allInventory, machineAssi
                                             <TableCell className="font-medium">{item.itemName}</TableCell>
                                             <TableCell className="text-right font-semibold">{item.quantity}</TableCell>
                                             <TableCell className="text-right">{item.stock}</TableCell>
-                                            <TableCell className="flex justify-end gap-1">
-                                                 <Button 
-                                                    variant="outline" 
-                                                    size="sm" 
-                                                    disabled={item.inventoryItem?.stock === 0}
-                                                    onClick={() => item.inventoryItem && setLogUsageItem(item.inventoryItem)}
-                                                >
-                                                    Registrar Uso
-                                                </Button>
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="icon" 
-                                                    onClick={() => onRemoveItem(item.id)}
-                                                    aria-label={`Quitar ${item.itemName}`}
-                                                >
-                                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                                </Button>
-                                            </TableCell>
+                                            {canEdit && (
+                                                <TableCell className="flex justify-end gap-1">
+                                                    <Button 
+                                                        variant="outline" 
+                                                        size="sm" 
+                                                        disabled={item.inventoryItem?.stock === 0}
+                                                        onClick={() => item.inventoryItem && setLogUsageItem(item.inventoryItem)}
+                                                    >
+                                                        Registrar Uso
+                                                    </Button>
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="icon" 
+                                                        onClick={() => onRemoveItem(item.id)}
+                                                        aria-label={`Quitar ${item.itemName}`}
+                                                    >
+                                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                                    </Button>
+                                                </TableCell>
+                                            )}
                                         </TableRow>
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={4} className="h-24 text-center">
+                                        <TableCell colSpan={canEdit ? 4 : 3} className="h-24 text-center">
                                             Aún no se han asignado artículos a esta máquina.
                                         </TableCell>
                                     </TableRow>
@@ -99,7 +104,7 @@ export default function MachineView({ sector, machine, allInventory, machineAssi
                     </CardContent>
                 </Card>
             </div>
-            {isAssignDialogOpen && (
+            {isAssignDialogOpen && canEdit && (
                 <AssignItemDialog
                     sector={sector}
                     machine={machine}
@@ -108,7 +113,7 @@ export default function MachineView({ sector, machine, allInventory, machineAssi
                     onAssign={onAssignItem}
                 />
             )}
-             {logUsageItem && (
+             {logUsageItem && canEdit && (
                 <UpdateStockDialog
                     key={`log-${logUsageItem.id}`}
                     item={logUsageItem}

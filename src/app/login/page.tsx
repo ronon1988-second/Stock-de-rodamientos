@@ -3,7 +3,6 @@
 
 import { useState } from "react";
 import {
-  getAuth,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
 } from "firebase/auth";
@@ -21,14 +20,14 @@ import { Label } from "@/components/ui/label";
 import { Logo } from "@/components/app/logo";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import { initiateEmailSignIn, initiateEmailSignUp } from "@/firebase/non-blocking-login";
+import { doc, setDoc, getDoc } from "firebase/firestore";
 
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { auth } = useFirebase();
+  const { auth, firestore } = useFirebase();
   const { toast } = useToast();
   const router = useRouter();
 
@@ -45,21 +44,37 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
+        let userCredential;
         if (action === "login") {
-            await signInWithEmailAndPassword(auth, email, password);
+            userCredential = await signInWithEmailAndPassword(auth, email, password);
             toast({
                 title: "Inicio de sesión exitoso",
                 description: "Bienvenido de nuevo.",
             });
-            router.push('/');
         } else {
-            await createUserWithEmailAndPassword(auth, email, password);
+            userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const user = userCredential.user;
+            
+            // Create user profile in Firestore
+            const userRef = doc(firestore, "users", user.uid);
+            
+            // Special case for first admin user
+            const isAdminUser = user.email === 'maurofbordon@gmail.com';
+            const role = isAdminUser ? 'admin' : 'editor';
+
+            await setDoc(userRef, { 
+              uid: user.uid,
+              email: user.email,
+              role: role,
+              displayName: user.email?.split('@')[0] || 'Usuario'
+            });
+
             toast({
                 title: "Cuenta creada",
                 description: "Se ha registrado exitosamente.",
             });
-            router.push('/');
         }
+        router.push('/');
     } catch (error: any) {
       let description = "Ha ocurrido un error inesperado.";
       if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {

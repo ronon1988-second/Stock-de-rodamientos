@@ -1,33 +1,38 @@
 /**
- * @fileoverview Firestore Security Rules for Prototyping.
+ * @fileoverview Firestore Security Rules for the Plant Inventory Application.
  *
  * Core Philosophy:
- * This ruleset allows any authenticated user to read and write to all collections.
- * This facilitates rapid prototyping by removing authorization barriers, but it
- * should be replaced with a more restrictive ruleset for production use.
+ * This ruleset implements a shared-access model. Any authenticated user can read and write to any data within the database.
  *
  * Data Structure:
- * All data is stored in root-level collections: /sectors, /inventory, etc.
- * There are subcollections under /sectors: /sectors/{sectorId}/machines/{machineId}.
+ * - /sectors/{sectorId}: Stores sector data.
+ * - /sectors/{sectorId}/machines/{machineId}: Stores machine data nested under sectors.
+ * - /inventory/{inventoryId}: Stores inventory item data.
+ * - /machineAssignments/{assignmentId}: Stores machine assignment data.
+ * - /usageLog/{usageLogId}: Stores usage log data.
  *
  * Key Security Decisions:
- * - Any signed-in user can read and write any document.
- * - This is NOT SECURE and should only be used for prototyping.
- *
- * Denormalization for Authorization: N/A (authorization is open to any signed-in user)
- * Structural Segregation: N/A (all data is globally accessible to signed-in users)
+ * - Any authenticated user can create, read, update, and delete any document.
+ * - No user-specific data or ownership is enforced.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows any authenticated user to read and write sectors.
-     * @path /databases/{database}/documents/sectors/{sectorId}
-     * @allow (get, list) Any signed-in user can read sector data.
-     * @allow (create, update, delete) Any signed-in user can modify sector data.
-     * @deny If the user is not signed in.
-     * @principle Allows open access for any authenticated user.
+     * @description Allows any authenticated user to manage sector data.
+     * @path /sectors/{sectorId}
+     * @allow (create) - Any authenticated user can create a sector.
+     * @allow (get) - Any authenticated user can read a sector.
+     * @allow (list) - Any authenticated user can list sectors.
+     * @allow (update) - Any authenticated user can update a sector.
+     * @allow (delete) - Any authenticated user can delete a sector.
+     * @deny (create) - If the user is not authenticated.
+     * @deny (get) - If the user is not authenticated.
+     * @deny (list) - If the user is not authenticated.
+     * @deny (update) - If the user is not authenticated.
+     * @deny (delete) - If the user is not authenticated.
+     * @principle Allows any authenticated user to read and write sector data.
      */
     match /sectors/{sectorId} {
       allow get, list: if isSignedIn();
@@ -35,12 +40,19 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows any authenticated user to read and write machines within a sector.
-     * @path /databases/{database}/documents/sectors/{sectorId}/machines/{machineId}
-     * @allow (get, list) Any signed-in user can read machine data.
-     * @allow (create, update, delete) Any signed-in user can modify machine data.
-     * @deny If the user is not signed in.
-     * @principle Allows open access for any authenticated user.
+     * @description Allows any authenticated user to manage machine data within a sector.
+     * @path /sectors/{sectorId}/machines/{machineId}
+     * @allow (create) - Any authenticated user can create a machine.
+     * @allow (get) - Any authenticated user can read a machine.
+     * @allow (list) - Any authenticated user can list machines.
+     * @allow (update) - Any authenticated user can update a machine.
+     * @allow (delete) - Any authenticated user can delete a machine.
+     * @deny (create) - If the user is not authenticated.
+     * @deny (get) - If the user is not authenticated.
+     * @deny (list) - If the user is not authenticated.
+     * @deny (update) - If the user is not authenticated.
+     * @deny (delete) - If the user is not authenticated.
+     * @principle Allows any authenticated user to read and write machine data.
      */
     match /sectors/{sectorId}/machines/{machineId} {
       allow get, list: if isSignedIn();
@@ -48,12 +60,19 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows any authenticated user to read and write inventory items.
-     * @path /databases/{database}/documents/inventory/{inventoryId}
-     * @allow (get, list) Any signed-in user can read inventory data.
-     * @allow (create, update, delete) Any signed-in user can modify inventory data.
-     * @deny If the user is not signed in.
-     * @principle Allows open access for any authenticated user.
+     * @description Allows any authenticated user to manage inventory item data.
+     * @path /inventory/{inventoryId}
+     * @allow (create) - Any authenticated user can create an inventory item.
+     * @allow (get) - Any authenticated user can read an inventory item.
+     * @allow (list) - Any authenticated user can list inventory items.
+     * @allow (update) - Any authenticated user can update an inventory item.
+     * @allow (delete) - Any authenticated user can delete an inventory item.
+     * @deny (create) - If the user is not authenticated.
+     * @deny (get) - If the user is not authenticated.
+     * @deny (list) - If the user is not authenticated.
+     * @deny (update) - If the user is not authenticated.
+     * @deny (delete) - If the user is not authenticated.
+     * @principle Allows any authenticated user to read and write inventory data.
      */
     match /inventory/{inventoryId} {
       allow get, list: if isSignedIn();
@@ -61,12 +80,19 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows any authenticated user to read and write machine assignments.
-     * @path /databases/{database}/documents/machineAssignments/{assignmentId}
-     * @allow (get, list) Any signed-in user can read assignment data.
-     * @allow (create, update, delete) Any signed-in user can modify assignment data.
-     * @deny If the user is not signed in.
-     * @principle Allows open access for any authenticated user.
+     * @description Allows any authenticated user to manage machine assignment data.
+     * @path /machineAssignments/{assignmentId}
+     * @allow (create) - Any authenticated user can create a machine assignment.
+     * @allow (get) - Any authenticated user can read a machine assignment.
+     * @allow (list) - Any authenticated user can list machine assignments.
+     * @allow (update) - Any authenticated user can update a machine assignment.
+     * @allow (delete) - Any authenticated user can delete a machine assignment.
+     * @deny (create) - If the user is not authenticated.
+     * @deny (get) - If the user is not authenticated.
+     * @deny (list) - If the user is not authenticated.
+     * @deny (update) - If the user is not authenticated.
+     * @deny (delete) - If the user is not authenticated.
+     * @principle Allows any authenticated user to read and write machine assignment data.
      */
     match /machineAssignments/{assignmentId} {
       allow get, list: if isSignedIn();
@@ -74,27 +100,27 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows any authenticated user to read and write usage logs.
-     * @path /databases/{database}/documents/usageLog/{usageLogId}
-     * @allow (get, list) Any signed-in user can read usage log data.
-     * @allow (create, update, delete) Any signed-in user can modify usage log data.
-     * @deny If the user is not signed in.
-     * @principle Allows open access for any authenticated user.
+     * @description Allows any authenticated user to manage usage log data.
+     * @path /usageLog/{usageLogId}
+     * @allow (create) - Any authenticated user can create a usage log.
+     * @allow (get) - Any authenticated user can read a usage log.
+     * @allow (list) - Any authenticated user can list usage logs.
+     * @allow (update) - Any authenticated user can update a usage log.
+     * @allow (delete) - Any authenticated user can delete a usage log.
+     * @deny (create) - If the user is not authenticated.
+     * @deny (get) - If the user is not authenticated.
+     * @deny (list) - If the user is not authenticated.
+     * @deny (update) - If the user is not authenticated.
+     * @deny (delete) - If the user is not authenticated.
+     * @principle Allows any authenticated user to read and write usage log data.
      */
     match /usageLog/{usageLogId} {
       allow get, list: if isSignedIn();
       allow create, update, delete: if isSignedIn();
     }
 
-    //-------------------  Helper functions  -------------------
-
-    /**
-     * @description Checks if the user is signed in.
-     * @return {boolean} True if the user is signed in, false otherwise.
-     */
     function isSignedIn() {
       return request.auth != null;
     }
-
   }
 }

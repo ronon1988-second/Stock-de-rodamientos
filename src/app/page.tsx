@@ -13,6 +13,7 @@ import {
   LogOut,
   Settings,
   HardDrive,
+  Users,
 } from "lucide-react";
 import {
   collection,
@@ -33,7 +34,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { InventoryItem, UsageLog, Sector, Machine, MachineAssignment } from "@/lib/types";
+import { InventoryItem, UsageLog, Sector, Machine, MachineAssignment, UserProfile } from "@/lib/types";
 import { initialInventory } from "@/lib/data";
 import Dashboard from "@/components/app/dashboard";
 import Reports from "@/components/app/reports";
@@ -42,14 +43,15 @@ import { Logo } from "@/components/app/logo";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import MachineView from "@/components/app/machine-view";
 import ToBuyView from "@/components/app/to-buy-view";
-import { useUser, useAuth, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
+import { useUser, useAuth, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { addDocumentNonBlocking, deleteDocumentNonBlocking, setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import OrganizationView from "@/components/app/organization-view";
+import UserManagementView from "@/components/app/user-management";
 
-type View = "dashboard" | "reports" | "to-buy" | "organization" | `machine-${string}`;
+type View = "dashboard" | "reports" | "to-buy" | "organization" | "users" | `machine-${string}`;
 
 function AppContent() {
   const [view, setView] = useState<View>("dashboard");
@@ -61,6 +63,12 @@ function AppContent() {
   const firestore = useFirestore();
   const [isSeeding, setIsSeeding] = useState(false);
   
+  // --- User Profile and Role ---
+  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, "users", user.uid) : null, [firestore, user]);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
+  const userRole = userProfile?.role;
+  const isAdmin = userRole === 'admin';
+
   // --- Firestore Data Hooks ---
   const inventoryRef = useMemoFirebase(() => collection(firestore, "inventory"), [firestore]);
   const { data: inventory, isLoading: isInventoryLoading } = useCollection<Omit<InventoryItem, 'id'>>(inventoryRef);
@@ -103,8 +111,7 @@ function AppContent() {
   // Effect to seed initial data if collections are empty
   useEffect(() => {
     const seedData = async () => {
-        // Only seed if the hook has loaded and the inventory is confirmed to be empty.
-        if (inventory && inventory.length === 0) {
+        if (inventory?.length === 0 && !isInventoryLoading) {
             setIsSeeding(true);
             toast({
                 title: "Cargando datos iniciales...",
@@ -137,7 +144,7 @@ function AppContent() {
         }
     };
     seedData();
-  }, [inventory, firestore, toast]);
+  }, [inventory, isInventoryLoading, firestore, toast]);
 
   const sortedInventory = useMemo(() => inventory ? [...inventory].sort((a, b) => a.name.localeCompare(b.name)) : [], [inventory]);
   const sortedSectors = useMemo(() => sectors ? [...sectors].sort((a,b) => a.name.localeCompare(b.name)) : [], [sectors]);
@@ -145,6 +152,7 @@ function AppContent() {
   const sortedUsageLog = useMemo(() => usageLog ? [...usageLog].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) : [], [usageLog]);
 
   const handleAddItem = (newItem: Omit<InventoryItem, 'id'>) => {
+    if (!isAdmin) return;
     const invRef = collection(firestore, "inventory");
     addDocumentNonBlocking(invRef, newItem);
     toast({
@@ -156,7 +164,7 @@ function AppContent() {
   const handleUpdateItem = (updatedItem: InventoryItem) => {
     const itemRef = doc(firestore, "inventory", updatedItem.id);
     const { id, ...data } = updatedItem;
-    updateDocumentNonBlocking(itemRef, data);
+    setDocumentNonBlocking(itemRef, data, { merge: true });
      toast({
         title: "Artículo Actualizado",
         description: `Se ha actualizado el stock de ${updatedItem.name}.`
@@ -215,7 +223,7 @@ function AppContent() {
     
     const updatedStock = item.stock - quantity;
     const itemRef = doc(firestore, "inventory", itemId);
-    updateDocumentNonBlocking(itemRef, { stock: updatedStock });
+    setDocumentNonBlocking(itemRef, { stock: updatedStock }, { merge: true });
     
     const newLog: Omit<UsageLog, 'id'> = {
       itemId,
@@ -278,6 +286,7 @@ function AppContent() {
     badgeCount,
     isSubItem = false,
     onClick,
+    disabled = false,
   }: {
     targetView: View;
     icon: React.ReactNode;
@@ -285,14 +294,19 @@ function AppContent() {
     badgeCount?: number;
     isSubItem?: boolean;
     onClick: (view: View) => void;
+    disabled?: boolean;
   }) => (
     <a
       href="#"
       onClick={(e) => {
         e.preventDefault();
-        onClick(targetView);
+        if (!disabled) onClick(targetView);
       }}
-      className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${
+      className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all ${
+        disabled 
+          ? 'cursor-not-allowed opacity-50'
+          : 'hover:text-primary'
+      } ${
         view === targetView ? "bg-muted text-primary" : ""
       } ${isSubItem ? 'pl-11' : ''}`}
     >
@@ -311,6 +325,7 @@ function AppContent() {
     if (view === 'reports') return 'Reportes';
     if (view === 'to-buy') return 'Artículos a Comprar';
     if (view === 'organization') return 'Organización de Planta';
+    if (view === 'users') return 'Gestionar Usuarios';
     if (view.startsWith('machine-')) {
         const machineId = view.replace('machine-', '');
         for (const sector of sortedSectors) {
@@ -324,7 +339,7 @@ function AppContent() {
   }
 
   const renderContent = () => {
-    const isLoading = isInventoryLoading || isAssignmentsLoading || isUsageLogLoading || isSectorsLoading || areMachinesLoading || isSeeding;
+    const isLoading = isInventoryLoading || isAssignmentsLoading || isUsageLogLoading || isSectorsLoading || areMachinesLoading || isSeeding || isProfileLoading;
      if (isLoading) {
         return <Skeleton className="h-full w-full" />
     }
@@ -334,6 +349,7 @@ function AppContent() {
         inventory={sortedInventory}
         onUpdateItem={handleUpdateItem}
         onAddItem={handleAddItem}
+        canEdit={isAdmin}
       />
     }
     if (view === 'reports') {
@@ -342,8 +358,11 @@ function AppContent() {
     if (view === 'to-buy') {
         return <ToBuyView inventory={sortedInventory} machineAssignments={sortedAssignments}/>
     }
-    if (view === 'organization') {
+    if (view === 'organization' && isAdmin) {
         return <OrganizationView sectors={sortedSectors} machinesBySector={machinesBySector} firestore={firestore}/>
+    }
+    if(view === 'users' && isAdmin) {
+        return <UserManagementView firestore={firestore} currentUser={userProfile} />
     }
     if (view.startsWith('machine-')) {
         const machineId = view.replace('machine-', '');
@@ -360,6 +379,7 @@ function AppContent() {
             onAssignItem={handleAssignItemToMachine}
             onRemoveItem={handleRemoveItemFromMachine}
             onLogUsage={handleLogUsage}
+            canEdit={isAdmin}
         />
     }
     return null;
@@ -389,6 +409,7 @@ function AppContent() {
         icon={<Settings className={isMobile ? "h-5 w-5" : "h-4 w-4"} />}
         label="Organización"
         onClick={handleNavClick}
+        disabled={!isAdmin}
       />
       
       <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Máquinas por Sector</div>
@@ -418,7 +439,7 @@ function AppContent() {
         ))}
       
 
-      <div className="mt-4 border-t pt-4">
+      <div className="mt-auto border-t pt-4">
         <NavLink
             targetView="to-buy"
             icon={<ShoppingCart className={isMobile ? "h-5 w-5" : "h-4 w-4"} />}
@@ -431,6 +452,13 @@ function AppContent() {
             icon={<LineChart className={isMobile ? "h-5 w-5" : "h-4 w-4"} />}
             label="Reportes"
             onClick={handleNavClick}
+        />
+        <NavLink
+            targetView="users"
+            icon={<Users className={isMobile ? "h-5 w-5" : "h-4 w-4"} />}
+            label="Gestionar Usuarios"
+            onClick={handleNavClick}
+            disabled={!isAdmin}
         />
       </div>
     </nav>
@@ -502,7 +530,10 @@ function AppContent() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>{user?.email}</DropdownMenuLabel>
+              <DropdownMenuLabel>
+                {user?.email}
+                {userProfile?.role && <Badge variant="secondary" className="ml-2">{userProfile.role}</Badge>}
+                </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4" />
@@ -539,3 +570,4 @@ export default function Page() {
 
   return <AppContent />;
 }
+

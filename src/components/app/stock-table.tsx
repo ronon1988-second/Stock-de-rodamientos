@@ -23,13 +23,13 @@ import type { InventoryItem } from "@/lib/types";
 import { MoreHorizontal, Search, ChevronRight, PlusCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import AddItemDialog from "./add-item-dialog";
 
 type StockTableProps = {
   inventory: InventoryItem[];
   onUpdateItem: (item: InventoryItem) => void;
   onAddItem: (item: Omit<InventoryItem, 'id'>) => void;
+  canEdit: boolean;
   title?: string;
   description?: string;
 };
@@ -38,6 +38,7 @@ type StockTableProps = {
 const getItemSeries = (name: string): string => {
   const normalizedName = name.toUpperCase().trim();
   if (normalizedName.startsWith('HTD')) return 'Correas';
+  if (normalizedName.startsWith('H')) return 'Manguitos de Montaje';
   if (normalizedName.startsWith('6')) {
     const series = normalizedName.substring(0, 2);
     if (['60', '62', '63', '68', '69'].includes(series)) {
@@ -57,14 +58,13 @@ const getItemSeries = (name: string): string => {
   }
   if (normalizedName.startsWith('NK') || normalizedName.startsWith('RNA') || normalizedName.startsWith('HK')) return 'Rodamientos de Agujas';
   if (normalizedName.startsWith('PHS') || normalizedName.startsWith('POS')) return 'Terminales de Rótula';
-  if (normalizedName.startsWith('H')) return 'Manguitos de Montaje';
   if (normalizedName.startsWith('AEVU')) return 'Pistones';
   
   return 'Otros';
 };
 
 
-export default function StockTable({ inventory, onUpdateItem, onAddItem, title, description }: StockTableProps) {
+export default function StockTable({ inventory, onUpdateItem, onAddItem, canEdit, title, description }: StockTableProps) {
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [addingItem, setAddingItem] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -127,10 +127,12 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, title, 
                 {description || 'Busca, visualiza y gestiona todo tu inventario.'}
               </CardDescription>
             </div>
-            <Button onClick={() => setAddingItem(true)}>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Agregar Artículo
-            </Button>
+            {canEdit && (
+              <Button onClick={() => setAddingItem(true)}>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Agregar Artículo
+              </Button>
+            )}
           </div>
           <div className="relative mt-4">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -151,9 +153,11 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, title, 
                   <TableHead>Nombre</TableHead>
                   <TableHead className="text-right">Stock</TableHead>
                   <TableHead className="text-center">Estado</TableHead>
-                  <TableHead>
-                    <span className="sr-only">Acciones</span>
-                  </TableHead>
+                  {canEdit && 
+                    <TableHead>
+                      <span className="sr-only">Acciones</span>
+                    </TableHead>
+                  }
                 </TableRow>
               </TableHeader>
                 <TableBody>
@@ -161,7 +165,7 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, title, 
                     groupedItems.map(([series, itemsInGroup]) => (
                       <React.Fragment key={series}>
                         <TableRow className="bg-muted/50 hover:bg-muted">
-                          <TableCell colSpan={4} className="p-0">
+                          <TableCell colSpan={canEdit ? 4 : 3} className="p-0">
                             <div
                               className="flex w-full cursor-pointer items-center gap-2 p-4 text-left font-bold"
                               onClick={() => toggleCollapsible(series)}
@@ -196,28 +200,30 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, title, 
                                 <TableCell className="text-center">
                                   <Badge variant={getStatusVariant(status)}>{status}</Badge>
                                 </TableCell>
-                                <TableCell>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button
-                                        aria-haspopup="true"
-                                        size="icon"
-                                        variant="ghost"
-                                      >
-                                        <MoreHorizontal className="h-4 w-4" />
-                                        <span className="sr-only">Alternar menú</span>
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                      <DropdownMenuItem
-                                        onSelect={() => setEditingItem(item)}
-                                      >
-                                        Actualizar Stock
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </TableCell>
+                                {canEdit &&
+                                  <TableCell>
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button
+                                          aria-haspopup="true"
+                                          size="icon"
+                                          variant="ghost"
+                                        >
+                                          <MoreHorizontal className="h-4 w-4" />
+                                          <span className="sr-only">Alternar menú</span>
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                                        <DropdownMenuItem
+                                          onSelect={() => setEditingItem(item)}
+                                        >
+                                          Actualizar Stock
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </TableCell>
+                                }
                               </TableRow>
                             );
                           })}
@@ -225,7 +231,7 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, title, 
                     ))
                 ) : (
                     <TableRow>
-                      <TableCell colSpan={4} className="h-24 text-center">
+                      <TableCell colSpan={canEdit ? 4 : 3} className="h-24 text-center">
                         {searchTerm ? "No se encontraron artículos." : "No hay artículos en el inventario."}
                       </TableCell>
                     </TableRow>
@@ -236,7 +242,7 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, title, 
         </CardContent>
       </Card>
 
-      {addingItem && (
+      {addingItem && canEdit && (
         <AddItemDialog
           onClose={() => setAddingItem(false)}
           onConfirm={onAddItem}
@@ -244,7 +250,7 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, title, 
         />
       )}
 
-      {editingItem && (
+      {editingItem && canEdit && (
          <UpdateStockDialog
             key={`edit-${editingItem.id}`}
             item={editingItem}
