@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -31,9 +32,7 @@ export default function UserManagementView() {
     const [role, setRole] = useState<'admin' | 'editor'>('editor');
     const [isLoading, setIsLoading] = useState(false);
     
-    // Fetch all user profiles. This is efficient for a reasonable number of users
-    // and avoids the need for a server-side query with a special index.
-    const usersRef = collection(firestore, 'users');
+    const usersRef = firestore ? collection(firestore, 'users') : null;
     const { data: users, isLoading: usersLoading } = useCollection<UserProfile>(usersRef);
 
     const handleUpdateRole = async () => {
@@ -48,7 +47,6 @@ export default function UserManagementView() {
         
         setIsLoading(true);
 
-        // Find the user in the locally fetched user list
         const targetUser = users?.find(user => user.email === email.trim());
 
         if (!targetUser) {
@@ -61,7 +59,6 @@ export default function UserManagementView() {
             return;
         }
 
-        // Call the server action with the found UID
         const result = await updateUserRole(targetUser.uid, role);
 
         if (result.success) {
@@ -116,3 +113,5 @@ export default function UserManagementView() {
         </Card>
     );
 }
+
+    

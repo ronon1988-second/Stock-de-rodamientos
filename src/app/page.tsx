@@ -23,6 +23,7 @@ import {
   serverTimestamp,
   getDocs,
   addDoc,
+  setDoc
 } from 'firebase/firestore';
 
 import { Badge } from '@/components/ui/badge';
@@ -104,7 +105,7 @@ function MachineList({
 }) {
   const firestore = useFirestore();
   const machinesRef = useMemoFirebase(
-    () => collection(firestore, `sectors/${sector.id}/machines`),
+    () => (firestore && sector.id ? collection(firestore, `sectors/${sector.id}/machines`) : null),
     [firestore, sector.id]
   );
   const { data: machines, isLoading } = useCollection<Machine>(machinesRef);
@@ -153,7 +154,7 @@ function AppContent() {
   const isMasterUser = user?.email === 'maurofbordon@gmail.com';
 
   const roleRef = useMemoFirebase(
-    () => (user ? doc(firestore, 'roles', user.uid) : null),
+    () => (user && firestore ? doc(firestore, 'roles', user.uid) : null),
     [firestore, user]
   );
   const { data: userRoleDoc, isLoading: isRoleLoading } = useDoc<UserRole>(roleRef);
@@ -176,7 +177,7 @@ function AppContent() {
             displayName: user.email?.split('@')[0] || 'Usuario',
             createdAt: serverTimestamp(),
         };
-        setDocumentNonBlocking(userRef, userData, { merge: true });
+        await setDoc(userRef, userData, { merge: true });
         toast({
           title: "Perfil de usuario creado",
           description: "¡Bienvenido! Su perfil ha sido guardado."
@@ -187,23 +188,23 @@ function AppContent() {
   }, [user, firestore, toast]);
 
   const userProfileRef = useMemoFirebase(
-    () => (user ? doc(firestore, 'users', user.uid) : null),
+    () => (user && firestore ? doc(firestore, 'users', user.uid) : null),
     [firestore, user]
   );
   const { data: userProfile, isLoading: isProfileLoading } =
     useDoc<UserProfile>(userProfileRef);
 
   // START: DATA FETCHING
-  const inventoryRef = useMemoFirebase(() => collection(firestore, 'inventory'), [firestore]);
+  const inventoryRef = useMemoFirebase(() => firestore ? collection(firestore, 'inventory') : null, [firestore]);
   const { data: inventory, isLoading: isInventoryLoading } = useCollection<InventoryItem>(inventoryRef);
 
-  const sectorsRef = useMemoFirebase(() => collection(firestore, 'sectors'), [firestore]);
+  const sectorsRef = useMemoFirebase(() => firestore ? collection(firestore, 'sectors') : null, [firestore]);
   const { data: sectors, isLoading: isSectorsLoading } = useCollection<Sector>(sectorsRef);
   
-  const assignmentsRef = useMemoFirebase(() => collection(firestore, 'machineAssignments'), [firestore]);
+  const assignmentsRef = useMemoFirebase(() => firestore ? collection(firestore, 'machineAssignments') : null, [firestore]);
   const { data: machineAssignments, isLoading: isAssignmentsLoading } = useCollection<MachineAssignment>(assignmentsRef);
   
-  const usageLogRef = useMemoFirebase(() => collection(firestore, 'usageLog'), [firestore]);
+  const usageLogRef = useMemoFirebase(() => firestore ? collection(firestore, 'usageLog') : null, [firestore]);
   const { data: usageLog, isLoading: isUsageLogLoading } = useCollection<UsageLog>(usageLogRef);
   // END: DATA FETCHING
     
@@ -670,7 +671,7 @@ function AppContent() {
   // This effect listens for when machines are loaded for any sector
   // and aggregates them into the allMachines state
   useEffect(() => {
-    if (!sectors) return;
+    if (!firestore || !sectors) return;
 
     const unsubscribes = sectors.map(sector => {
         const machinesQuery = query(collection(firestore, `sectors/${sector.id}/machines`));
@@ -797,3 +798,5 @@ export default function Page() {
 
   return <AppContent />;
 }
+
+    
