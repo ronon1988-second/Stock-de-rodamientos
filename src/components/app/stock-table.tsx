@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import UpdateStockDialog from "./update-stock-dialog";
 import type { InventoryItem } from "@/lib/types";
-import { MoreHorizontal, Search, ChevronRight, PlusCircle } from "lucide-react";
+import { MoreHorizontal, Search, PlusCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import AddItemDialog from "./add-item-dialog";
@@ -68,41 +68,15 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, canEdit
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [addingItem, setAddingItem] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [openCollapsibles, setOpenCollapsibles] = useState<string[]>([]);
 
-  const groupedItems = useMemo(() => {
-    const filtered = inventory.filter(item => 
-      item.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-    const groups = filtered.reduce((acc, item) => {
-      const series = getItemSeries(item.name);
-      if (!acc[series]) {
-        acc[series] = [];
-      }
-      acc[series].push(item);
-      return acc;
-    }, {} as Record<string, InventoryItem[]>);
-
-    // Sort groups
-    Object.values(groups).forEach(group => group.sort((a, b) => a.name.localeCompare(b.name)));
-    
-    // Set all as open if there is a search term
-    if(searchTerm && openCollapsibles.length === 0){
-        setOpenCollapsibles(Object.keys(groups));
-    } else if (!searchTerm && openCollapsibles.length === Object.keys(groups).length) { // Default to closed if no search
-        setOpenCollapsibles([]);
-    }
-
-
-    return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+  const filteredItems = useMemo(() => {
+    return inventory
+      .filter(item => 
+        item.name.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [inventory, searchTerm]);
 
-  const toggleCollapsible = (series: string) => {
-    setOpenCollapsibles(prev => 
-      prev.includes(series) ? prev.filter(s => s !== series) : [...prev, series]
-    );
-  };
 
   const getStatus = (item: InventoryItem) => {
     if (item.stock === 0) return "Sin Stock";
@@ -161,74 +135,54 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, canEdit
                 </TableRow>
               </TableHeader>
                 <TableBody>
-                {groupedItems.length > 0 ? (
-                    groupedItems.map(([series, itemsInGroup]) => (
-                      <React.Fragment key={series}>
-                        <TableRow className="bg-muted/50 hover:bg-muted">
-                          <TableCell colSpan={canEdit ? 4 : 3} className="p-0">
-                            <div
-                              className="flex w-full cursor-pointer items-center gap-2 p-4 text-left font-bold"
-                              onClick={() => toggleCollapsible(series)}
+                {filteredItems.length > 0 ? (
+                    filteredItems.map((item) => {
+                        const status = getStatus(item);
+                        return (
+                            <TableRow
+                            key={item.id}
+                            className={
+                                status === "Stock Bajo"
+                                ? "bg-amber-500/10"
+                                : status === "Sin Stock"
+                                ? "bg-destructive/10"
+                                : ""
+                            }
                             >
-                              <ChevronRight
-                                className={`h-4 w-4 transition-transform ${
-                                  openCollapsibles.includes(series) ? "rotate-90" : ""
-                                }`}
-                              />
-                              {series} ({itemsInGroup.length})
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                        {openCollapsibles.includes(series) &&
-                          itemsInGroup.map((item) => {
-                            const status = getStatus(item);
-                            return (
-                              <TableRow
-                                key={item.id}
-                                className={
-                                  status === "Stock Bajo"
-                                    ? "bg-amber-500/10"
-                                    : status === "Sin Stock"
-                                    ? "bg-destructive/10"
-                                    : ""
-                                }
-                              >
-                                <TableCell className="font-medium pl-12">
-                                  {item.name}
+                            <TableCell className="font-medium">
+                                {item.name}
+                            </TableCell>
+                            <TableCell className="text-right">{item.stock}</TableCell>
+                            <TableCell className="text-center">
+                                <Badge variant={getStatusVariant(status)}>{status}</Badge>
+                            </TableCell>
+                            {canEdit &&
+                                <TableCell>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                    <Button
+                                        aria-haspopup="true"
+                                        size="icon"
+                                        variant="ghost"
+                                    >
+                                        <MoreHorizontal className="h-4 w-4" />
+                                        <span className="sr-only">Alternar menú</span>
+                                    </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                    <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                                    <DropdownMenuItem
+                                        onSelect={() => setEditingItem(item)}
+                                    >
+                                        Actualizar Stock
+                                    </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
                                 </TableCell>
-                                <TableCell className="text-right">{item.stock}</TableCell>
-                                <TableCell className="text-center">
-                                  <Badge variant={getStatusVariant(status)}>{status}</Badge>
-                                </TableCell>
-                                {canEdit &&
-                                  <TableCell>
-                                    <DropdownMenu>
-                                      <DropdownMenuTrigger asChild>
-                                        <Button
-                                          aria-haspopup="true"
-                                          size="icon"
-                                          variant="ghost"
-                                        >
-                                          <MoreHorizontal className="h-4 w-4" />
-                                          <span className="sr-only">Alternar menú</span>
-                                        </Button>
-                                      </DropdownMenuTrigger>
-                                      <DropdownMenuContent align="end">
-                                        <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                        <DropdownMenuItem
-                                          onSelect={() => setEditingItem(item)}
-                                        >
-                                          Actualizar Stock
-                                        </DropdownMenuItem>
-                                      </DropdownMenuContent>
-                                    </DropdownMenu>
-                                  </TableCell>
-                                }
-                              </TableRow>
-                            );
-                          })}
-                      </React.Fragment>
-                    ))
+                            }
+                            </TableRow>
+                        );
+                    })
                 ) : (
                     <TableRow>
                       <TableCell colSpan={canEdit ? 4 : 3} className="h-24 text-center">

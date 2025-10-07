@@ -53,11 +53,6 @@ import Dashboard from '@/components/app/dashboard';
 import Reports from '@/components/app/reports';
 import { useToast } from '@/hooks/use-toast';
 import { Logo } from '@/components/app/logo';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
 import MachineView from '@/components/app/machine-view';
 import ToBuyView from '@/components/app/to-buy-view';
 import {
@@ -119,7 +114,7 @@ function MachineList({
   }
 
   return (
-    <CollapsibleContent className="space-y-1 pt-1">
+    <div className="space-y-1 pt-1 pl-7">
       {(machines || [])
         .sort((a, b) => a.name.localeCompare(b.name))
         .map(machine => (
@@ -130,20 +125,19 @@ function MachineList({
               e.preventDefault();
               onNavClick(`machine-${machine.id}`);
             }}
-            className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary pl-11"
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary pl-4"
           >
             <HardDrive className="h-4 w-4" />
             {machine.name}
           </a>
         ))}
-    </CollapsibleContent>
+    </div>
   );
 }
 
 function AppContent() {
   const [view, setView] = useState<View>('dashboard');
   const { toast } = useToast();
-  const [openSectors, setOpenSectors] = useState<string[]>([]);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const { user } = useUser();
   const auth = useAuth();
@@ -543,14 +537,6 @@ function AppContent() {
     setIsSheetOpen(false);
   };
 
-  const toggleSector = (sectorId: string) => {
-    setOpenSectors(prev =>
-      prev.includes(sectorId)
-        ? prev.filter(id => id !== sectorId)
-        : [...prev, sectorId]
-    );
-  };
-
   const MainNav = ({ isMobile = false }) => (
     <nav
       className={`grid items-start ${
@@ -576,20 +562,15 @@ function AppContent() {
       </div>
 
       {sortedSectors.map(sector => (
-        <Collapsible
-          key={sector.id}
-          open={openSectors.includes(sector.id)}
-          onOpenChange={() => toggleSector(sector.id)}
-        >
-          <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary [&[data-state=open]>div>svg.chevron]:rotate-90">
+        <div key={sector.id} className="flex flex-col">
+           <div className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-muted-foreground">
             <div className="flex items-center gap-3">
               <Package className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />
               <span className="font-semibold">{sector.name}</span>
             </div>
-            <ChevronRight className="chevron h-4 w-4 transition-transform" />
-          </CollapsibleTrigger>
+          </div>
           <MachineList sector={sector} onNavClick={handleNavClick} />
-        </Collapsible>
+        </div>
       ))}
 
       <div className="mt-auto border-t pt-4">
