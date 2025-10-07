@@ -22,11 +22,17 @@ type UserManagementViewProps = {
 export default function UserManagementView({ firestore, currentUser }: UserManagementViewProps) {
     const { toast } = useToast();
 
-    const rolesRef = useMemoFirebase(() => collection(firestore, 'roles'), [firestore]);
-    const { data: roles, isLoading: isLoadingRoles } = useCollection<UserRole>(rolesRef);
+    // TEMPORARILY DISABLED TO PREVENT CRASH
+    // const rolesRef = useMemoFirebase(() => collection(firestore, 'roles'), [firestore]);
+    // const { data: roles, isLoading: isLoadingRoles } = useCollection<UserRole>(rolesRef);
 
-    const usersRef = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
-    const { data: users, isLoading: isLoadingUsers } = useCollection<UserProfile>(usersRef);
+    // const usersRef = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
+    // const { data: users, isLoading: isLoadingUsers } = useCollection<UserProfile>(usersRef);
+    const roles: UserRole[] = [];
+    const users: UserProfile[] = [];
+    const isLoadingRoles = false;
+    const isLoadingUsers = false;
+
 
     const handleRoleChange = (userId: string, newRole: 'admin' | 'editor') => {
         const roleRef = doc(firestore, 'roles', userId);
@@ -84,32 +90,40 @@ export default function UserManagementView({ firestore, currentUser }: UserManag
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {combinedUsers.map(user => {
-                            return (
-                                <TableRow key={user.id}>
-                                    <TableCell>{user.email}</TableCell>
-                                    <TableCell className="font-medium">{user.displayName}</TableCell>
-                                    <TableCell>
-                                        {currentUser?.uid === user.uid ? (
-                                            <Badge variant="secondary">{user.role}</Badge>
-                                        ) : (
-                                            <Select
-                                                value={user.role}
-                                                onValueChange={(newRole: 'admin' | 'editor') => handleRoleChange(user.uid, newRole)}
-                                            >
-                                                <SelectTrigger className="w-[120px]">
-                                                    <SelectValue placeholder="Seleccionar rol" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="admin">Admin</SelectItem>
-                                                    <SelectItem value="editor">Editor</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        )}
-                                    </TableCell>
-                                </TableRow>
-                            )
-                        })}
+                        {combinedUsers.length > 0 ? (
+                            combinedUsers.map(user => {
+                                return (
+                                    <TableRow key={user.id}>
+                                        <TableCell>{user.email}</TableCell>
+                                        <TableCell className="font-medium">{user.displayName}</TableCell>
+                                        <TableCell>
+                                            {currentUser?.uid === user.uid ? (
+                                                <Badge variant="secondary">{user.role}</Badge>
+                                            ) : (
+                                                <Select
+                                                    value={user.role}
+                                                    onValueChange={(newRole: 'admin' | 'editor') => handleRoleChange(user.uid, newRole)}
+                                                >
+                                                    <SelectTrigger className="w-[120px]">
+                                                        <SelectValue placeholder="Seleccionar rol" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="admin">Admin</SelectItem>
+                                                        <SelectItem value="editor">Editor</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+                                )
+                            })
+                        ) : (
+                            <TableRow>
+                                <TableCell colSpan={3} className="h-24 text-center">
+                                    No hay otros usuarios para mostrar.
+                                </TableCell>
+                            </TableRow>
+                        )}
                     </TableBody>
                 </Table>
             </CardContent>
