@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { PlusCircle, Trash2, Edit, Save, X } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Save, X, ChevronRight } from 'lucide-react';
 import { Sector, Machine } from '@/lib/types';
 import { Firestore, collection, doc } from 'firebase/firestore';
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
@@ -102,48 +102,50 @@ export default function OrganizationView({ sectors, machinesBySector, firestore 
                     <Accordion type="multiple" className="w-full">
                         {sectors.map(sector => (
                             <AccordionItem key={sector.id} value={sector.id}>
-                                <AccordionTrigger>
-                                    <div className="flex items-center justify-between w-full">
-                                        {editingSector?.id === sector.id ? (
-                                            <div className="flex items-center gap-2 flex-grow" onClick={(e) => e.stopPropagation()}>
-                                                <Input 
-                                                    value={editingSector.name}
-                                                    onChange={(e) => setEditingSector({...editingSector, name: e.target.value})}
-                                                    className="h-8"
-                                                    onKeyDown={(e) => e.key === 'Enter' && handleUpdateSector()}
-                                                />
-                                                <Button size="icon" className="h-8 w-8" onClick={handleUpdateSector}><Save className="h-4 w-4"/></Button>
-                                                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditingSector(null)}><X className="h-4 w-4"/></Button>
-                                            </div>
-                                        ) : (
-                                            <span className="font-semibold text-lg">{sector.name}</span>
-                                        )}
-                                        <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                                            <Button variant="ghost" size="icon" onClick={() => setEditingSector({id: sector.id, name: sector.name})}>
-                                                <Edit className="h-4 w-4"/>
-                                            </Button>
-                                            <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                     <Button variant="ghost" size="icon">
-                                                        <Trash2 className="h-4 w-4 text-destructive"/>
-                                                    </Button>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader>
-                                                    <AlertDialogTitle>¿Está seguro?</AlertDialogTitle>
-                                                    <AlertDialogDescription>
-                                                        Esta acción no se puede deshacer. Esto eliminará permanentemente el sector y todas las máquinas y asignaciones asociadas.
-                                                    </AlertDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <AlertDialogFooter>
-                                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                    <AlertDialogAction onClick={() => handleDeleteSector(sector)}>Eliminar</AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
+                                <div className="flex items-center justify-between w-full border-b">
+                                    {editingSector?.id === sector.id ? (
+                                        <div className="flex items-center gap-2 flex-grow p-4" onClick={(e) => e.stopPropagation()}>
+                                            <Input 
+                                                value={editingSector.name}
+                                                onChange={(e) => setEditingSector({...editingSector, name: e.target.value})}
+                                                className="h-8"
+                                                onKeyDown={(e) => e.key === 'Enter' && handleUpdateSector()}
+                                            />
+                                            <Button size="icon" className="h-8 w-8" onClick={handleUpdateSector}><Save className="h-4 w-4"/></Button>
+                                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditingSector(null)}><X className="h-4 w-4"/></Button>
                                         </div>
-                                    </div>
-                                </AccordionTrigger>
+                                    ) : (
+                                        <>
+                                            <AccordionTrigger className="flex-1 py-4 pr-2 text-left">
+                                                <span className="font-semibold text-lg">{sector.name}</span>
+                                            </AccordionTrigger>
+                                             <div className="flex items-center gap-1 pr-4" onClick={e => e.stopPropagation()}>
+                                                <Button variant="ghost" size="icon" onClick={() => setEditingSector({id: sector.id, name: sector.name})}>
+                                                    <Edit className="h-4 w-4"/>
+                                                </Button>
+                                                <AlertDialog>
+                                                    <AlertDialogTrigger asChild>
+                                                         <Button variant="ghost" size="icon">
+                                                            <Trash2 className="h-4 w-4 text-destructive"/>
+                                                        </Button>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent>
+                                                        <AlertDialogHeader>
+                                                        <AlertDialogTitle>¿Está seguro?</AlertDialogTitle>
+                                                        <AlertDialogDescription>
+                                                            Esta acción no se puede deshacer. Esto eliminará permanentemente el sector y todas las máquinas y asignaciones asociadas.
+                                                        </AlertDialogDescription>
+                                                        </AlertDialogHeader>
+                                                        <AlertDialogFooter>
+                                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                        <AlertDialogAction onClick={() => handleDeleteSector(sector)}>Eliminar</AlertDialogAction>
+                                                        </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                </AlertDialog>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
                                 <AccordionContent>
                                     <div className="pl-4">
                                         <div className="flex gap-2 my-4">
@@ -211,3 +213,5 @@ export default function OrganizationView({ sectors, machinesBySector, firestore 
         </div>
     );
 }
+
+    
