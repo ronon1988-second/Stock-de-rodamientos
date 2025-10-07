@@ -144,6 +144,10 @@ function AppContent() {
   const auth = useAuth();
   const firestore = useFirestore();
   const [isSeeding, setIsSeeding] = useState(false);
+  
+  // Temporary flag to test admin features
+  const isTestingAdmin = true;
+
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEditor, setIsEditor] = useState(false);
 
@@ -153,6 +157,11 @@ function AppContent() {
 
   useEffect(() => {
     const fetchUserClaims = async () => {
+      if (isTestingAdmin) {
+        setIsAdmin(true);
+        setIsEditor(true);
+        return;
+      }
       if (user) {
         try {
           const idTokenResult = await user.getIdTokenResult(true); // Force refresh
@@ -171,7 +180,7 @@ function AppContent() {
     };
 
     fetchUserClaims();
-  }, [user]);
+  }, [user, isTestingAdmin]);
 
 
   // DATA FETCHING
@@ -476,7 +485,7 @@ function AppContent() {
       isSeeding ||
       (isAdmin && isAllUsersLoading);
 
-    if (isDataLoading) {
+    if (isDataLoading && !isTestingAdmin) {
       return <Skeleton className="h-full w-full" />;
     }
     
@@ -625,7 +634,7 @@ function AppContent() {
     </nav>
   );
 
-  const isLoading = isUserLoading || isRoleLoading;
+  const isLoading = isUserLoading || (isRoleLoading && !isTestingAdmin);
   if (isLoading) {
       return (
         <div className="flex items-center justify-center min-h-screen">
@@ -727,14 +736,15 @@ function AppContent() {
 export default function Page() {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
+  const isTestingAdmin = true; // Match the flag in AppContent
 
   useEffect(() => {
-    if (!isUserLoading && !user) {
+    if (!isUserLoading && !user && !isTestingAdmin) {
       router.push('/login');
     }
-  }, [user, isUserLoading, router]);
+  }, [user, isUserLoading, router, isTestingAdmin]);
 
-  if (isUserLoading || !user) {
+  if ((isUserLoading || !user) && !isTestingAdmin) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Skeleton className="h-[95vh] w-[95vw] rounded-lg" />
@@ -744,3 +754,5 @@ export default function Page() {
 
   return <AppContent />;
 }
+
+    
