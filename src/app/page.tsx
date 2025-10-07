@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -152,7 +151,7 @@ function AppContent() {
   // Master user has all privileges, bypassing role checks.
   const isMasterUser = user?.email === 'maurofbordon@gmail.com';
   const isAdmin = isMasterUser; // Simplified admin logic
-  const isEditor = true; // All authenticated users are editors for UI purposes
+  const isEditor = isMasterUser || false; // Only master user can edit initially
 
   // This effect handles the creation of user profile on first login
   useEffect(() => {
@@ -551,7 +550,7 @@ function AppContent() {
             toast({ title: "Acceso denegado", description: "Necesita permisos de administrador.", variant: "destructive"})
             return null;
         }
-      return <UserManagementView isAdmin={isAdmin}/>;
+      return <UserManagementView />;
     }
     if (view.startsWith('machine-')) {
       const machineId = view.replace('machine-', '');

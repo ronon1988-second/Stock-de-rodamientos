@@ -4,6 +4,8 @@
 import { getReorderRecommendations, ReorderRecommendationsInput } from "@/ai/flows/reorder-recommendations";
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAdminApp } from "@/firebase/server-app";
+import { doc, setDoc } from 'firebase/firestore';
+import { getSdks } from "@/firebase";
 
 export async function getAIReorderRecommendations(input: ReorderRecommendationsInput) {
     try {
@@ -17,19 +19,20 @@ export async function getAIReorderRecommendations(input: ReorderRecommendationsI
 
 /**
  * Secure server action to update a user's role in the /roles collection.
- * This function now receives a UID directly and writes to Firestore,
- * avoiding the need for the Admin Auth SDK for claims.
+ * This function now receives a UID directly and writes to Firestore.
  */
 export async function updateUserRole(userId: string, role: 'admin' | 'editor'): Promise<{ success: boolean, error?: string }> {
     if (!userId || !role) {
         return { success: false, error: 'Se requieren el ID de usuario y el rol.' };
     }
     try {
-        // Use the Admin SDK for Firestore to bypass security rules for this trusted server action.
-        const adminDb = getFirestore(getAdminApp());
-        const roleRef = adminDb.collection('roles').doc(userId);
+        // We can't use the Admin SDK, so we use the regular server-side SDK.
+        // This relies on the security rules allowing the write.
+        // The rule is "allow write: if request.auth != null;", so this will work.
+        const { firestore } = getSdks();
+        const roleRef = doc(firestore, 'roles', userId);
         
-        await roleRef.set({ role: role });
+        await setDoc(roleRef, { role: role });
 
         return { success: true };
 
@@ -39,4 +42,5 @@ export async function updateUserRole(userId: string, role: 'admin' | 'editor'): 
         return { success: false, error: 'Ocurrió un error inesperado al escribir el rol en la base de datos.' };
     }
 }
+
 
