@@ -57,11 +57,6 @@ export default function LoginPage() {
     if (!roleDoc.exists() || roleDoc.data().role !== role) {
         await setDoc(roleRef, { role: role }, { merge: true });
     }
-
-    if (isAdminUser) {
-        // Force refresh of the token to get custom claims
-        await user.getIdToken(true); 
-    }
   };
 
 
@@ -81,15 +76,14 @@ export default function LoginPage() {
         let userCredential;
         if (action === "login") {
             userCredential = await signInWithEmailAndPassword(auth, email, password);
+            // The role is NOT updated on login to prevent permission errors.
+            // The user should get their role from the initial signup or be assigned one.
         } else {
             userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            // On signup, also create the user profile
+            // On signup, create profile and role
             await updateUserProfile(userCredential.user);
+            await updateUserRole(userCredential.user);
         }
-
-        // For both login and signup, ensure the role is correct.
-        // This will grant admin rights on login if the email matches.
-        await updateUserRole(userCredential.user);
         
         toast({
             title: action === 'login' ? "Inicio de sesión exitoso" : "Cuenta creada",
