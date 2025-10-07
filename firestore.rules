@@ -1,69 +1,79 @@
 /**
- * @fileoverview Firestore Security Rules for the rodamiento stock app.
+ * @fileoverview Firestore Security Rules for the application.
  *
  * Core Philosophy:
- * This ruleset enforces a role-based access control model where users have different levels of access
- * based on their assigned role (admin, editor, or regular user). It prioritizes security by default,
- * restricting access unless explicitly granted.
+ * This ruleset enforces a role-based access control model where users can only
+ * read their own role, admins can read user profiles, and admins/editors can
+ * manage articles. It prioritizes secure authorization based on user roles
+ * and identities.
  *
  * Data Structure:
- * - /users/{userId}: Stores public user profile information. Only admins can list all users, but
- *   any authenticated user can read their own profile.
- * - /roles/{userId}: Stores the role for each user. Only the user themselves can read their own role.
- * - /inventory/{itemId}: Stores global inventory information. All authenticated users can read,
- *   but only admins or editors can write.
- * - /sectors/{sectorId}: Stores sector information. All authenticated users can read. Admins and editors can write.
- * - /sectors/{sectorId}/machines/{machineId}: Stores machine information within a sector. Authenticated users can read, admins and editors write.
- * - /machineAssignments/{assignmentId}: Stores assignments of inventory items to machines. All authenticated users can read. Admins and editors write.
- * - /usageLog/{logId}: Stores historical usage logs. All authenticated users can read, admins and editors write.
+ * - /roles/{userId}: Stores user roles, readable only by the user themselves.
+ * - /users/{userId}: Stores user profiles, readable only by admins.
+ * - /articles/{articleId}: Stores article content, readable by all authenticated users,
+ *   writable by admins and editors.
+ * - /inventory/{itemId}: Stores inventory information.
+ * - /sectors/{sectorId}: Stores sector information.
+ * - /sectors/{sectorId}/machines/{machineId}: Stores machine information for each sector.
+ * - /machineAssignments/{assignmentId}: Stores assignments of inventory items to machines.
+ * - /usageLog/{logId}: Stores usage logs for inventory items.
  *
  * Key Security Decisions:
- * - User listing is restricted to admins only to prevent unauthorized data harvesting.
- * - The /roles/{userId} collection is strictly read-only for the user themselves, enforcing self-service role determination.
- * - All write operations on core data collections (/inventory, /sectors, /machines, /machineAssignments, /usageLog)
- *   are restricted to admins and editors.
+ * - User listing is disallowed to prevent unauthorized access to user data.
+ * - Articles are publicly readable but only writable by authorized roles.
+ * - The rules explicitly deny write access to roles and user profiles to
+ *   prevent unauthorized role elevation or profile modification.
+ * - Flexible schema on data writes for rapid prototyping.
+ *
+ * Denormalization for Authorization:
+ *  - User roles are stored in a separate /roles/{userId} document. While this design requires a `get()` call in more complex scenarios, it aligns with the principle of separating authorization data. For the rules provided, this is the only means necessary.
+ *
+ * Structural Segregation:
+ *  - User roles and profiles are stored in separate collections to simplify
+ *    access control and prevent accidental exposure of sensitive information.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows authenticated users to read their own role document.
+     * @description Allows a user to read their own role.
      * @path /roles/{userId}
-     * @allow (get) User 'test_user' with UID 'test_user' can read their own role.
-     * @deny (get) User 'another_user' with UID 'another_user' cannot read 'test_user's role.
-     * @principle Enforces strict user-ownership for role documents.
+     * @allow (get, list) if the requesting user's UID matches the document ID.
+     *          Example: User with UID 'user123' requests 'get' on /roles/user123.
+     * @deny (get, list) if the requesting user's UID does not match the document ID.
+     *          Example: User with UID 'user456' requests 'get' on /roles/user123.
+     * @principle Enforces document ownership for reads.
      */
     match /roles/{userId} {
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow get, list: if isSignedIn() && isOwner(userId);
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Allows admins to read all user profiles.
+     * @description Allows admins to read user profiles.
      * @path /users/{userId}
-     * @allow (list) Admin user can list all user profiles.
-     * @deny (list) Non-admin user cannot list all user profiles.
-     * @principle Restricts user listing to admin roles.
+     * @allow (get, list) if the requesting user has the 'admin' role.
+     *          Example: User with 'admin' role requests 'get' on /users/user123.
+     * @deny (get, list) if the requesting user does not have the 'admin' role.
+     *          Example: User without 'admin' role requests 'get' on /users/user123.
+     * @principle Restricts access to user profiles to admins only.
      */
     match /users/{userId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn() && isAdmin();
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isOwner(userId);
-      allow delete: if false;
+      allow get, list: if isSignedIn() && isAdmin();
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Allows authenticated users to read articles, and admins/editors to write.
+     * @description Allows authenticated users to read articles and admins/editors to write them.
      * @path /articles/{articleId}
-     * @allow (get, list) Any authenticated user can read articles.
-     * @allow (create, update, delete) Admin or editor can write articles.
-     * @deny (create, update, delete) Regular user cannot write articles.
-     * @principle Role-based access control for content management.
+     * @allow (get, list) if the requesting user is authenticated.
+     *          Example: Any authenticated user requests 'get' on /articles/article123.
+     * @allow (create, update, delete) if the requesting user has the 'admin' or 'editor' role.
+     *          Example: User with 'admin' role requests 'create' on /articles/article456.
+     * @deny (create, update, delete) if the requesting user does not have the 'admin' or 'editor' role.
+     *          Example: User without 'admin' or 'editor' role requests 'create' on /articles/article456.
+     * @principle Provides public read access to articles while restricting write access to authorized roles.
      */
     match /articles/{articleId} {
       allow get, list: if isSignedIn();
@@ -71,85 +81,86 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows authenticated users to read inventory items, and admins/editors to write.
+     * @description Allows anyone to read inventory items.
      * @path /inventory/{itemId}
-     * @allow (get, list) Any authenticated user can read inventory items.
-     * @allow (create, update, delete) Admin or editor can write inventory items.
-     * @deny (create, update, delete) Regular user cannot write inventory items.
-     * @principle Role-based access control for inventory management.
+     * @allow (get, list) if true (public read).
+     *          Example: Any user requests 'get' on /inventory/item123.
+     * @deny (create, update, delete) all write operations.
+     * @principle Allows public read access to inventory items.
      */
     match /inventory/{itemId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn() && (isAdmin() || isEditor());
-    }
-
-      /**
-       * @description Allows authenticated users to read sectors, and admins/editors to write.
-       * @path /sectors/{sectorId}
-       * @allow (get, list) Any authenticated user can read sectors.
-       * @allow (create, update, delete) Admin or editor can write sectors.
-       * @deny (create, update, delete) Regular user cannot write sectors.
-       * @principle Role-based access control for sector management.
-       */
-    match /sectors/{sectorId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn() && (isAdmin() || isEditor());
+      allow get, list: if true;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Allows authenticated users to read machines within sectors, and admins/editors to write.
+     * @description Allows anyone to read sectors.
+     * @path /sectors/{sectorId}
+     * @allow (get, list) if true (public read).
+     *          Example: Any user requests 'get' on /sectors/sector123.
+     * @deny (create, update, delete) all write operations.
+     * @principle Allows public read access to sectors.
+     */
+    match /sectors/{sectorId} {
+      allow get, list: if true;
+      allow create, update, delete: if false;
+    }
+
+    /**
+     * @description Allows anyone to read machines within a sector.
      * @path /sectors/{sectorId}/machines/{machineId}
-     * @allow (get, list) Any authenticated user can read machines within sectors.
-     * @allow (create, update, delete) Admin or editor can write machines within sectors.
-     * @deny (create, update, delete) Regular user cannot write machines within sectors.
-     * @principle Role-based access control for machine management within sectors.
+     * @allow (get, list) if true (public read).
+     *          Example: Any user requests 'get' on /sectors/sector123/machines/machine456.
+     * @deny (create, update, delete) all write operations.
+     * @principle Allows public read access to machines within sectors.
      */
     match /sectors/{sectorId}/machines/{machineId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn() && (isAdmin() || isEditor());
+      allow get, list: if true;
+      allow create, update, delete: if false;
     }
 
-      /**
-       * @description Allows authenticated users to read machine assignments, and admins/editors to write.
-       * @path /machineAssignments/{assignmentId}
-       * @allow (get, list) Any authenticated user can read machine assignments.
-       * @allow (create, update, delete) Admin or editor can write machine assignments.
-       * @deny (create, update, delete) Regular user cannot write machine assignments.
-       * @principle Role-based access control for machine assignment management.
-       */
+    /**
+     * @description Allows anyone to read machine assignments.
+     * @path /machineAssignments/{assignmentId}
+     * @allow (get, list) if true (public read).
+     *          Example: Any user requests 'get' on /machineAssignments/assignment123.
+     * @deny (create, update, delete) all write operations.
+     * @principle Allows public read access to machine assignments.
+     */
     match /machineAssignments/{assignmentId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn() && (isAdmin() || isEditor());
+      allow get, list: if true;
+      allow create, update, delete: if false;
     }
 
-      /**
-       * @description Allows authenticated users to read usage logs, and admins/editors to write.
-       * @path /usageLog/{logId}
-       * @allow (get, list) Any authenticated user can read usage logs.
-       * @allow (create, update, delete) Admin or editor can write usage logs.
-       * @deny (create, update, delete) Regular user cannot write usage logs.
-       * @principle Role-based access control for usage log management.
-       */
+     /**
+      * @description Allows anyone to read usage logs.
+      * @path /usageLog/{logId}
+      * @allow (get, list) if true (public read).
+      *          Example: Any user requests 'get' on /usageLog/log123.
+      * @deny (create, update, delete) all write operations.
+      * @principle Allows public read access to usage logs.
+      */
     match /usageLog/{logId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn() && (isAdmin() || isEditor());
+      allow get, list: if true;
+      allow create, update, delete: if false;
     }
 
-    // Helper functions
-    function isSignedIn() {
-      return request.auth != null;
-    }
+  }
 
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
+  // Helper functions
+  function isSignedIn() {
+    return request.auth != null;
+  }
 
-    function isAdmin() {
-      return request.auth.token.admin == true;
-    }
+  function isOwner(userId) {
+    return request.auth.uid == userId;
+  }
+
+  function isAdmin() {
+    return request.auth.token.role == 'admin';
+  }
 
     function isEditor() {
-      return request.auth.token.editor == true;
-    }
+    return request.auth.token.role == 'editor';
   }
 }
