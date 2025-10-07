@@ -49,6 +49,7 @@ import {
   Machine,
   MachineAssignment,
   UserProfile,
+  UserRole,
 } from '@/lib/types';
 import { initialInventory, initialSectors, initialMachines } from '@/lib/data';
 import Dashboard from '@/components/app/dashboard';
@@ -149,6 +150,14 @@ function AppContent() {
   const firestore = useFirestore();
   const [isSeeding, setIsSeeding] = useState(false);
   
+  // Get user role
+  const roleRef = useMemoFirebase(() => user ? doc(firestore, 'roles', user.uid) : null, [firestore, user]);
+  const { data: userRole, isLoading: isRoleLoading } = useDoc<UserRole>(roleRef);
+  
+  const isAdmin = useMemo(() => userRole?.role === 'admin', [userRole]);
+  const isEditor = useMemo(() => userRole?.role === 'admin' || userRole?.role === 'editor', [userRole]);
+
+
   // This effect handles the creation of user profile on first login
   useEffect(() => {
     const setupUser = async () => {
@@ -477,7 +486,8 @@ function AppContent() {
       isUsageLogLoading ||
       isSectorsLoading ||
       isSeeding ||
-      isProfileLoading;
+      isProfileLoading ||
+      isRoleLoading;
 
     if (isLoading) {
       return <Skeleton className="h-full w-full" />;
@@ -489,7 +499,7 @@ function AppContent() {
           inventory={sortedInventory}
           onUpdateItem={handleUpdateItem}
           onAddItem={handleAddItem}
-          canEdit={true}
+          canEdit={isEditor}
         />
       );
     }
@@ -510,7 +520,7 @@ function AppContent() {
         />
       );
     }
-    if (view === 'organization') {
+    if (view === 'organization' && isAdmin) {
       return (
         <OrganizationView
           sectors={sortedSectors}
@@ -518,7 +528,7 @@ function AppContent() {
         />
       );
     }
-    if (view === 'users') {
+    if (view === 'users' && isAdmin) {
       return <UserManagementView />;
     }
     if (view.startsWith('machine-')) {
@@ -539,7 +549,7 @@ function AppContent() {
           onAssignItem={handleAssignItemToMachine}
           onRemoveItem={handleRemoveItemFromMachine}
           onLogUsage={handleLogUsage}
-          canEdit={true}
+          canEdit={isEditor}
         />
       );
     }
@@ -563,12 +573,14 @@ function AppContent() {
         label="Panel de control"
         onClick={handleNavClick}
       />
-      <NavLink
-        targetView="organization"
-        icon={<Settings className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
-        label="Organización"
-        onClick={handleNavClick}
-      />
+      {isAdmin && (
+        <NavLink
+          targetView="organization"
+          icon={<Settings className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
+          label="Organización"
+          onClick={handleNavClick}
+        />
+      )}
 
       <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
         Máquinas por Sector
@@ -604,12 +616,14 @@ function AppContent() {
           label="Reportes"
           onClick={handleNavClick}
         />
-        <NavLink
-          targetView="users"
-          icon={<Users className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
-          label="Gestionar Usuarios"
-          onClick={handleNavClick}
-        />
+        {isAdmin && (
+           <NavLink
+            targetView="users"
+            icon={<Users className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
+            label="Gestionar Usuarios"
+            onClick={handleNavClick}
+           />
+        )}
       </div>
     </nav>
   );
@@ -704,7 +718,7 @@ function AppContent() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>
-                {user?.email}
+                {user?.email} {isAdmin && '(Admin)'} {isEditor && !isAdmin && '(Editor)'}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={handleLogout}>
@@ -742,3 +756,5 @@ export default function Page() {
 
   return <AppContent />;
 }
+
+    
