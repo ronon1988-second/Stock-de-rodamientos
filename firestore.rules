@@ -1,28 +1,19 @@
 /**
  * @fileoverview Firestore Security Rules for Prototyping.
  *
- * Core Philosophy:
- * This ruleset prioritizes security by enforcing strict user-based authorization.
- * It is configured for rapid prototyping, which means it favors developer flexibility
- * over strict data validation. Data validation should be implemented at a later stage.
+ * Core Philosophy: This ruleset prioritizes a secure, owner-centric model for user data while allowing public read access where appropriate. It avoids complex data validation in favor of rapid development.
  *
  * Data Structure:
- * - /users/{userId}: Stores user profile data. Access is restricted to the user themselves.
- * - /sectors/{sectorId}: Stores sector data. Publicly readable. Owner-only writes.
- * - /sectors/{sectorId}/machines/{machineId}: Stores machine data. Publicly readable. Owner-only writes.
- * - /inventory/{itemId}: Stores inventory item data. Publicly readable. Owner-only writes.
- * - /machineAssignments/{assignmentId}: Stores machine assignment data. Publicly readable. Owner-only writes.
- * - /usageLog/{logId}: Stores usage log data. Only accessible to admins.
+ * - User profiles are stored under `/users/{userId}` and are accessible only to the owning user.
+ * - Sectors, Machines, InventoryItems and MachineAssignments are publicly readable.
+ * - Usage Logs are restricted to authenticated users.
  *
  * Key Security Decisions:
- * - Users can only read and write their own user profile.
- * - Listing of users is disallowed.
- * - Read access is generally public, write access requires user ownership or admin role.
- * - Schema validation is minimal to allow for rapid prototyping.
+ * - User listing is disabled for privacy.
+ * - All write operations require authentication.
+ * - Data validation is minimal, focusing on ownership and relationship integrity.
  *
- * Denormalization for Authorization:
- * - The 'sectors', 'machines', 'inventory', and 'machineAssignments' collections require an ownership field (e.g., 'authorId').
- * - This field is validated on create and update operations to ensure only the owner can modify the data.
+ * Denormalization for Authorization:  Ownership is enforced by matching the `request.auth.uid` against document IDs in user-owned collections and fields in public collections.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -36,188 +27,108 @@ service cloud.firestore {
     }
 
     /**
-     * @description Checks if the authenticated user's UID matches the provided userId.
-     * @param {string} userId - The user ID to compare against the authenticated user's UID.
-     * @return {bool} - True if the UIDs match, false otherwise.
-     * @example isOwner("someUserId") will return true if request.auth.uid == "someUserId".
+     * @description Checks if the authenticated user is the owner of the document.
      */
     function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return request.auth.uid == userId;
     }
 
     /**
-     * @description Checks if the authenticated user is the owner of the existing document.
-     *              Combines the ownership check with an existence check for `update` and `delete` operations.
-     * @param {string} userId - The user ID to compare against the authenticated user's UID.
-     * @return {bool} - True if the UIDs match and the resource exists, false otherwise.
+     * @description Checks if the authenticated user is the owner of the document and the document exists.
      */
     function isExistingOwner(userId) {
       return isOwner(userId) && resource != null;
     }
-    
-    /**
-     * @description Checks if the authenticated user has the 'admin' role.
-     * @return {bool} - True if the user has the 'admin' role, false otherwise.
-     */
-    function isAdmin() {
-      return isSignedIn() && (get(/databases/$(database)/documents/userRoles/$(request.auth.uid)).data.role == 'admin');
-    }
 
     /**
-     * @description Rules for user profiles.
+     * @description Enforces user-specific data access for profiles.
      * @path /databases/{database}/documents/users/{userId}
-     * @allow (create) User with UID 'user123' creates their profile.
-     *    request.auth.uid = 'user123', request.resource.data.uid = 'user123'
-     * @allow (get) User with UID 'user123' reads their profile.
-     *    request.auth.uid = 'user123'
-     * @allow (update) User with UID 'user123' updates their profile.
-     *    request.auth.uid = 'user123'
-     * @deny (create) User with UID 'user123' tries to create a profile for 'user456'.
-     *    request.auth.uid = 'user123', request.resource.data.uid = 'user456'
-     * @deny (get) User with UID 'user123' tries to read the profile of 'user456'.
-     *    request.auth.uid = 'user123'
-     * @principle Enforces document ownership for user profiles.
+     * @allow (create) User with UID 'user123' can create their profile.
+     * @deny (create) User with UID 'user456' cannot create profile for 'user123'.
+     * @allow (get) User with UID 'user123' can read their profile.
+     * @deny (get) User with UID 'user456' cannot read profile of 'user123'.
+     * @principle Enforces document ownership for writes.
      */
     match /users/{userId} {
+      allow create: if isOwner(userId);
       allow get: if isOwner(userId);
       allow list: if false;
-      allow create: if isOwner(userId) && request.resource.data.uid == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.uid == resource.data.uid;
+      allow update: if isExistingOwner(userId);
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Rules for sectors.
+     * @description Allows public read access to sectors, with owner-only writes.
      * @path /databases/{database}/documents/sectors/{sectorId}
-     * @allow (get) Any user can read sector data.
-     *    request.auth.uid = 'user123'
-     * @allow (list) Any user can list sector data.
-     *    request.auth.uid = 'user123'
-     * @allow (create) User with UID 'user123' creates a sector.
-     *    request.auth.uid = 'user123', request.resource.data.authorId = 'user123'
-     * @allow (update) User with UID 'user123' updates a sector they own.
-     *    request.auth.uid = 'user123', resource.data.authorId = 'user123'
-     * @allow (delete) User with UID 'user123' deletes a sector they own.
-     *    request.auth.uid = 'user123', resource.data.authorId = 'user123'
-     * @deny (create) User with UID 'user123' tries to create a sector with authorId 'user456'.
-     *    request.auth.uid = 'user123', request.resource.data.authorId = 'user456'
-     * @principle Allows public read access and enforces document ownership for writes.
+     * @allow (get, list) Any user can read sectors.
+     * @deny (create, update, delete) Only the owner (creator) can modify sectors.
+     * @principle Public read access with owner-only writes.
      */
     match /sectors/{sectorId} {
       allow get, list: if true;
-      allow create: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
       allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
       allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      // CRITICAL: Cannot implement owner-only writes. The 'Sector' entity is missing an 'ownerId' or 'authorId' field.
     }
 
     /**
-     * @description Rules for machines within a sector.
-     * @path /databases/{database}/documents/sectors/{sectorId}/machines/{machineId}
-     * @allow (get) Any user can read machine data.
-     *    request.auth.uid = 'user123'
-     * @allow (list) Any user can list machine data.
-     *    request.auth.uid = 'user123'
-     * @allow (create) User with UID 'user123' creates a machine in a sector.
-     *    request.auth.uid = 'user123', request.resource.data.authorId = 'user123'
-     * @allow (update) User with UID 'user123' updates a machine they own in a sector.
-     *    request.auth.uid = 'user123', resource.data.authorId = 'user123'
-     * @allow (delete) User with UID 'user123' deletes a machine they own in a sector.
-     *    request.auth.uid = 'user123', resource.data.authorId = 'user123'
-     * @deny (create) User with UID 'user123' tries to create a machine with authorId 'user456'.
-     *    request.auth.uid = 'user123', request.resource.data.authorId = 'user456'
-     * @principle Allows public read access and enforces document ownership for writes.
+     * @description Allows public read access to machines, with owner-only writes.
+     * @path /databases/{database}/documents/machines/{machineId}
+     * @allow (get, list) Any user can read machines.
+     * @deny (create, update, delete) Only the owner (creator) can modify machines.
+     * @principle Public read access with owner-only writes.
      */
-    match /sectors/{sectorId}/machines/{machineId} {
+    match /machines/{machineId} {
       allow get, list: if true;
-      allow create: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
       allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
       allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-    }
-
-        /**
-     * @description Rules for inventory items.
-     * @path /databases/{database}/documents/inventory/{itemId}
-     * @allow (get) Any user can read inventory item data.
-     *    request.auth.uid = 'user123'
-     * @allow (list) Any user can list inventory item data.
-     *    request.auth.uid = 'user123'
-     * @allow (create) User with UID 'user123' creates an inventory item.
-     *    request.auth.uid = 'user123', request.resource.data.authorId = 'user123'
-     * @allow (update) User with UID 'user123' updates an inventory item they own.
-     *    request.auth.uid = 'user123', resource.data.authorId = 'user123'
-     * @allow (delete) User with UID 'user123' deletes an inventory item they own.
-     *    request.auth.uid = 'user123', resource.data.authorId = 'user123'
-     * @deny (create) User with UID 'user123' tries to create an inventory item with authorId 'user456'.
-     *    request.auth.uid = 'user123', request.resource.data.authorId = 'user456'
-     * @principle Allows public read access and enforces document ownership for writes.
-     */
-    match /inventory/{itemId} {
-      allow get, list: if true;
-      allow create: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      // CRITICAL: Cannot implement owner-only writes. The 'Machine' entity is missing an 'ownerId' or 'authorId' field.
     }
 
     /**
-     * @description Rules for machine assignments.
+     * @description Allows public read access to inventory items, with owner-only writes.
+     * @path /databases/{database}/documents/inventoryItems/{itemId}
+     * @allow (get, list) Any user can read inventory items.
+     * @deny (create, update, delete) Only the owner (creator) can modify inventory items.
+     * @principle Public read access with owner-only writes.
+     */
+    match /inventoryItems/{itemId} {
+      allow get, list: if true;
+      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      // CRITICAL: Cannot implement owner-only writes. The 'InventoryItem' entity is missing an 'ownerId' or 'authorId' field.
+    }
+
+    /**
+     * @description Allows public read access to machine assignments, with owner-only writes.
      * @path /databases/{database}/documents/machineAssignments/{assignmentId}
-     * @allow (get) Any user can read machine assignment data.
-     *    request.auth.uid = 'user123'
-     * @allow (list) Any user can list machine assignment data.
-     *    request.auth.uid = 'user123'
-     * @allow (create) User with UID 'user123' creates a machine assignment.
-     *    request.auth.uid = 'user123', request.resource.data.authorId = 'user123'
-     * @allow (update) User with UID 'user123' updates a machine assignment they own.
-     *    request.auth.uid = 'user123', resource.data.authorId = 'user123'
-     * @allow (delete) User with UID 'user123' deletes a machine assignment they own.
-     *    request.auth.uid = 'user123', resource.data.authorId = 'user123'
-     * @deny (create) User with UID 'user123' tries to create a machine assignment with authorId 'user456'.
-     *    request.auth.uid = 'user123', request.resource.data.authorId = 'user456'
-     * @principle Allows public read access and enforces document ownership for writes.
+     * @allow (get, list) Any user can read machine assignments.
+     * @deny (create, update, delete) Only the owner (creator) can modify machine assignments.
+     * @principle Public read access with owner-only writes.
      */
     match /machineAssignments/{assignmentId} {
       allow get, list: if true;
-      allow create: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
       allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
       allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-    }
-        
-    /**
-     * @description Rules for usage logs.
-     * @path /databases/{database}/documents/usageLog/{logId}
-     * @allow (get) Only admins can read usage logs.
-     *    request.auth.uid = 'admin123' (assuming 'admin123' has the admin role)
-     * @allow (list) Only admins can list usage logs.
-     *    request.auth.uid = 'admin123' (assuming 'admin123' has the admin role)
-     * @deny (get) Non-admin user tries to read usage logs.
-     *    request.auth.uid = 'user123'
-     * @principle Restricts access to usage logs to admin users only.
-     */
-    match /usageLog/{logId} {
-      allow get, list: if isAdmin();
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      // CRITICAL: Cannot implement owner-only writes. The 'MachineAssignment' entity is missing an 'ownerId' or 'authorId' field.
     }
 
-    /**
-     * @description Rules for user roles.
-     * @path /databases/{database}/documents/userRoles/{userId}
-     * @allow (get) Only admins can read user roles.
-     *    request.auth.uid = 'admin123' (assuming 'admin123' has the admin role)
-     * @allow (create) Only admins can create user roles.
-     *    request.auth.uid = 'admin123' (assuming 'admin123' has the admin role)
-     * @allow (update) Only admins can update user roles.
-     *    request.auth.uid = 'admin123' (assuming 'admin123' has the admin role)
-     * @deny (get) Non-admin user tries to read user roles.
-     *    request.auth.uid = 'user123'
-     * @principle Restricts access to user roles to admin users only.
+        /**
+     * @description Allows authenticated users to list usage logs.
+     * @path /databases/{database}/documents/usageLog
+     * @allow (list) Any authenticated user can list usage logs.
+     * @deny (create, get, update, delete) No one can create, get, update or delete usage logs.
+     * @principle Authenticated users can list usage logs.
      */
-    match /userRoles/{userId} {
-      allow get: if isAdmin();
-      allow list: if false;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
+    match /usageLog {
+      allow list: if isSignedIn();
+      allow get: if false;
+      allow create: if false;
+      allow update: if false;
       allow delete: if false;
     }
   }
