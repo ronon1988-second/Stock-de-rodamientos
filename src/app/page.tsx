@@ -50,7 +50,6 @@ import {
   Machine,
   MachineAssignment,
   UserProfile,
-  UserRole,
 } from '@/lib/types';
 import { initialInventory, initialSectors, initialMachines } from '@/lib/data';
 import Dashboard from '@/components/app/dashboard';
@@ -151,19 +150,18 @@ function AppContent() {
   const firestore = useFirestore();
   const [isSeeding, setIsSeeding] = useState(false);
   
-  // Get user role
-  const roleRef = useMemoFirebase(() => user ? doc(firestore, 'roles', user.uid) : null, [firestore, user]);
-  const { data: userRole, isLoading: isRoleLoading } = useDoc<UserRole>(roleRef);
-  
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEditor, setIsEditor] = useState(false);
+  const [areClaimsLoading, setAreClaimsLoading] = useState(true);
 
   const refreshUserClaims = useCallback(async () => {
     if (!user) return;
+    setAreClaimsLoading(true);
     const tokenResult = await getIdToken(user, true); // Force refresh
     const claims = tokenResult.claims;
     setIsAdmin(!!claims.admin);
-    setIsEditor(!!claims.admin || !!claims.editor);
+    setIsEditor(!!claims.admin || !!claims.editor); // Admin is also an editor
+    setAreClaimsLoading(false);
   }, [user]);
 
   useEffect(() => {
@@ -500,7 +498,7 @@ function AppContent() {
       isSectorsLoading ||
       isSeeding ||
       isProfileLoading ||
-      isRoleLoading;
+      areClaimsLoading;
 
     if (isLoading) {
       return <Skeleton className="h-full w-full" />;
