@@ -149,12 +149,12 @@ function AppContent() {
   const firestore = useFirestore();
   const [isSeeding, setIsSeeding] = useState(false);
   
-  const roleRef = useMemoFirebase(() => (user ? doc(firestore, 'roles', user.uid) : null), [user, firestore]);
-  const { data: userRole, isLoading: isRoleLoading } = useDoc<UserRole>(roleRef);
+  const isMasterUser = user?.email === 'maurofbordon@gmail.com';
+  const [userRole, setUserRole] = useState<{ role: 'admin' | 'editor' | null }>({ role: null });
+  const [isRoleLoading, setIsRoleLoading] = useState(true);
 
-  const isAdmin = userRole?.role === 'admin';
-  const isEditor = userRole?.role === 'editor' || isAdmin;
-
+  const isAdmin = isMasterUser || userRole?.role === 'admin';
+  const isEditor = isMasterUser || isAdmin || userRole?.role === 'editor';
 
   // This effect handles the creation of user profile on first login
   useEffect(() => {
@@ -164,7 +164,6 @@ function AppContent() {
       const userRef = doc(firestore, "users", user.uid);
       const userDoc = await getDoc(userRef);
 
-      // Create user profile if it doesn't exist
       if (!userDoc.exists()) {
         const userData = {
             uid: user.uid,
@@ -181,6 +180,26 @@ function AppContent() {
     };
     setupUser();
   }, [user, firestore, toast]);
+
+   // Effect to get user role from custom claims
+   useEffect(() => {
+    if (user) {
+        setIsRoleLoading(true);
+        user.getIdTokenResult(true).then((idTokenResult) => {
+            const claims = idTokenResult.claims;
+            if (claims.admin) {
+                setUserRole({ role: 'admin' });
+            } else if (claims.editor) {
+                setUserRole({ role: 'editor' });
+            } else {
+                setUserRole({ role: null });
+            }
+            setIsRoleLoading(false);
+        });
+    } else {
+        setIsRoleLoading(false);
+    }
+  }, [user]);
 
   const userProfileRef = useMemoFirebase(
     () => (user ? doc(firestore, 'users', user.uid) : null),
@@ -738,7 +757,7 @@ function AppContent() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>
-                {user?.email} {isAdmin && '(Admin)'} {isEditor && !isAdmin && '(Editor)'}
+                {user?.email} {isMasterUser && '(Master)'} {isAdmin && !isMasterUser && '(Admin)'} {isEditor && !isAdmin && '(Editor)'}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={handleLogout}>
@@ -776,3 +795,5 @@ export default function Page() {
 
   return <AppContent />;
 }
+
+    

@@ -1,24 +1,32 @@
 /**
- * @file Firestore Security Rules
- * @description This ruleset enforces a role-based access control model, with specific rules for user profiles, roles, inventory, sectors, machines, machine assignments, and usage logs.
+ * @fileoverview Firestore Security Rules for the application.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a hybrid security model:
+ *   - User profiles are private and owned by the respective user.
+ *   - Inventory, Sectors, Machines, MachineAssignments, and UsageLogs are accessible based on roles.
+ *   - A "master user" (maurofbordon@gmail.com) bypasses role checks and has full access.
  *
  * Data Structure:
- * - /inventory/{itemId}: Global inventory of items.
- * - /sectors/{sectorId}: Sectors in the plant.
- * - /sectors/{sectorId}/machines/{machineId}: Machines within sectors.
+ * - /users/{userId}: User profile information.
+ * - /roles/{userId}: User roles (e.g., admin, editor).
+ * - /inventory/{itemId}: Global inventory items.
+ * - /sectors/{sectorId}: Sectors within the plant.
+ * - /sectors/{sectorId}/machines/{machineId}: Machines within each sector.
  * - /machineAssignments/{assignmentId}: Assignments of inventory items to machines.
- * - /usageLog/{logId}: Historical usage logs.
- * - /users/{userId}: User profiles.
- * - /roles/{userId}: User roles (admin, editor).
+ * - /usageLog/{logId}: Historical logs of item usage.
  *
  * Key Security Decisions:
- * - User profiles and roles are strictly user-owned; users can only read/write their own data.
- * - Listing of user profiles and roles is disallowed.
- * - Inventory, sectors, machines, machine assignments, and usage logs are accessible to users with 'admin' or 'editor' roles.
- * - Schema validation is relaxed to allow for rapid prototyping. Only authorization-critical fields are validated.
+ * - User profiles are strictly private; users can only access their own profiles.
+ * - Listing of users or roles is disallowed.
+ * - The "master user" (maurofbordon@gmail.com) has full access, bypassing other role-based restrictions.
  *
  * Denormalization for Authorization:
- * - User roles are stored in a separate collection (`/roles/{userId}`) to simplify role management.
+ *  - User roles are stored in a separate `/roles/{userId}` document to simplify role checks.
+ *  - MachineAssignments denormalize `itemName` for easier display.
+ *
+ * Structural Segregation:
+ *  - No explicit segregation is used in this model.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -26,166 +34,169 @@ service cloud.firestore {
 
     /**
      * @description Checks if the user is signed in.
+     * @return {boolean} True if the user is signed in, false otherwise.
      */
     function isSignedIn() {
       return request.auth != null;
     }
 
     /**
-     * @description Checks if the authenticated user's ID matches the provided user ID.
+     * @description Checks if the authenticated user's UID matches the provided userId.
+     * @param {string} userId The user ID to compare against.
+     * @return {boolean} True if the user is the owner, false otherwise.
      */
     function isOwner(userId) {
-      return request.auth.uid == userId;
+      return isSignedIn() && request.auth.uid == userId;
     }
 
     /**
-     * @description Checks if the user is an admin.
+     * @description Checks if the authenticated user is the "master user".
+     * @return {boolean} True if the user is the master user, false otherwise.
      */
-    function isAdmin() {
-      return isSignedIn() && (request.auth.token.admin == true);
+    function isMasterUser() {
+      return isSignedIn() && request.auth.token.email == 'maurofbordon@gmail.com';
+    }
+     /**
+      * @description Checks if a role exists for a user.
+      * @param {string} roleId The user ID.
+      * @return {boolean} True if the role exists, false otherwise.
+      */
+    function roleExists(roleId) {
+      return exists(/databases/$(database)/documents/roles/$(roleId));
+    }
+
+
+    /**
+     * @description Checks if the authenticated user has a specific role.
+     * @param {string} role The role to check for (e.g., 'admin', 'editor').
+     * @return {boolean} True if the user has the role, false otherwise.
+     */
+    function hasRole(role) {
+      return isSignedIn() && roleExists(request.auth.uid) && get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role == role;
     }
 
      /**
-      * @description Checks if the user is an editor.
+      * @description Determines if the user is an admin.
+      * @return {boolean} True if the user is an admin, false otherwise.
+      */
+    function isAdmin() {
+       return isMasterUser() || hasRole('admin');
+    }
+
+     /**
+      * @description Determines if the user is an editor.
+      * @return {boolean} True if the user is an editor, false otherwise.
       */
     function isEditor() {
-      return isSignedIn() && (request.auth.token.editor == true);
+       return isMasterUser() || hasRole('editor') || isAdmin();
     }
 
     /**
-     * @description Checks if the user is an admin or editor.
+     * @description Checks if the authenticated user is the owner of an existing document.
+     * @param {string} userId The user ID to compare against.
+     * @return {boolean} True if the user is the owner and the resource exists.
      */
-    function isAdminOrEditor() {
-      return isAdmin() || isEditor();
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
     }
 
-
     /**
-     * @description User profile information.
+     * @description Rules for user profiles.
      * @path /users/{userId}
-     * @allow (create) User with UID 'user123' creates their own profile document with matching userId and uid.
-     * @allow (get) User with UID 'user123' reads their own profile.
-     * @allow (update) User with UID 'user123' updates their own profile.
-     * @allow (delete) User with UID 'user123' deletes their own profile.
-     * @deny (create) User with UID 'user123' tries to create a profile for userId 'otherUser'.
-     * @deny (get) User with UID 'user123' tries to read profile for userId 'otherUser'.
+     * @allow (create) - User creates their own profile if the userId matches their auth UID.
+     * @allow (get, update, delete) - User can only access/modify their own profile.
+     * @deny (create) - User attempts to create a profile with a mismatched userId.
      * @principle Enforces document ownership for user profiles.
      */
     match /users/{userId} {
       allow get: if isOwner(userId);
       allow list: if false;
-      allow create: if isOwner(userId) && request.resource.data.uid == userId;
-      allow update: if isOwner(userId) && request.resource.data.uid == resource.data.uid;
-      allow delete: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.uid == userId && request.auth.token.email == request.resource.data.email;
+      allow update: if isExistingOwner(userId) && request.resource.data.uid == userId;
+      allow delete: if isExistingOwner(userId);
     }
 
-    /**
-     * @description User roles (admin, editor).
-     * @path /roles/{userId}
-     * @allow (create) User with UID 'user123' creates their own role document with matching userId.
-     * @allow (get) User with UID 'user123' reads their own role.
-     * @allow (update) User with UID 'user123' updates their own role.
-     * @allow (delete) User with UID 'user123' deletes their own role.
-     * @deny (create) User with UID 'user123' tries to create a role for userId 'otherUser'.
-     * @deny (get) User with UID 'user123' tries to read role for userId 'otherUser'.
-     * @principle Enforces document ownership for user roles.
-     */
+     /**
+      * @description Rules for user roles.
+      * @path /roles/{userId}
+      * @allow (create, update, delete) - Only admin users can create, update, or delete roles. Master user can also do this.
+      * @allow (get) - Only the user themselves can retrieve their role.
+      * @deny (list) - Listing roles is not allowed.
+      * @principle Restricts role management to admins and allows users to view their own role.
+      */
     match /roles/{userId} {
       allow get: if isOwner(userId);
       allow list: if false;
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
-      allow delete: if isOwner(userId);
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
+
     /**
-     * @description Global inventory of all available items.
+     * @description Rules for inventory items.
      * @path /inventory/{itemId}
-     * @allow (get) Any signed-in user can read inventory items.
-     * @allow (list) Any signed-in user can list inventory items.
-     * @allow (create) Only admins or editors can create inventory items.
-     * @allow (update) Only admins or editors can update inventory items.
-     * @allow (delete) Only admins or editors can delete inventory items.
-     * @principle Enforces admin/editor role for inventory management.
+     * @allow (get, list) - Public read access.
+     * @allow (create, update, delete) - Only admins can create, update, or delete inventory items.
+     * @deny (create, update, delete) - Non-admin users cannot modify inventory.
      */
     match /inventory/{itemId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isAdminOrEditor();
-      allow update: if isAdminOrEditor();
-      allow delete: if isAdminOrEditor();
+      allow get, list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Top-level organizational units of the plant.
+     * @description Rules for sectors.
      * @path /sectors/{sectorId}
-     * @allow (get) Any signed-in user can read sectors.
-     * @allow (list) Any signed-in user can list sectors.
-     * @allow (create) Only admins or editors can create sectors.
-     * @allow (update) Only admins or editors can update sectors.
-     * @allow (delete) Only admins or editors can delete sectors.
-     * @principle Enforces admin/editor role for sector management.
+     * @allow (get, list) - Public read access.
+     * @allow (create, update, delete) - Only admins can create, update, or delete sectors.
      */
     match /sectors/{sectorId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isAdminOrEditor();
-      allow update: if isAdminOrEditor();
-      allow delete: if isAdminOrEditor();
+      allow get, list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Machines belonging to a specific sector.
+     * @description Rules for machines within a sector.
      * @path /sectors/{sectorId}/machines/{machineId}
-     * @allow (get) Any signed-in user can read machines.
-     * @allow (list) Any signed-in user can list machines.
-     * @allow (create) Only admins or editors can create machines.
-     * @allow (update) Only admins or editors can update machines.
-     * @allow (delete) Only admins or editors can delete machines.
-     * @principle Enforces admin/editor role for machine management.
+     * @allow (get, list) - Public read access.
+     * @allow (create, update, delete) - Only admins can create, update, or delete machines.
      */
     match /sectors/{sectorId}/machines/{machineId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isAdminOrEditor();
-      allow update: if isAdminOrEditor();
-      allow delete: if isAdminOrEditor();
+      allow get, list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Associates inventory items with specific machines.
+     * @description Rules for machine assignments.
      * @path /machineAssignments/{assignmentId}
-     * @allow (get) Any signed-in user can read machine assignments.
-     * @allow (list) Any signed-in user can list machine assignments.
-     * @allow (create) Only admins or editors can create machine assignments.
-     * @allow (update) Only admins or editors can update machine assignments.
-     * @allow (delete) Only admins or editors can delete machine assignments.
-     * @principle Enforces admin/editor role for machine assignment management.
+     * @allow (get, list) - Public read access.
+     * @allow (create, update, delete) - Only editors and admins can create, update, or delete machine assignments.
      */
     match /machineAssignments/{assignmentId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isAdminOrEditor();
-      allow update: if isAdminOrEditor();
-      allow delete: if isAdminOrEditor();
+      allow get, list: if true;
+      allow create: if isEditor();
+      allow update: if isEditor();
+      allow delete: if isEditor();
     }
 
     /**
-     * @description Historical log of all item usage.
+     * @description Rules for usage logs.
      * @path /usageLog/{logId}
-     * @allow (get) Any signed-in user can read usage logs.
-     * @allow (list) Any signed-in user can list usage logs.
-     * @allow (create) Only admins or editors can create usage logs.
-     * @allow (update) Only admins or editors can update usage logs.
-     * @allow (delete) Only admins or editors can delete usage logs.
-     * @principle Enforces admin/editor role for usage log management.
+     * @allow (get, list) - Public read access.
+     * @allow (create) - Only editors and admins can create usage logs.
+     * @allow (update, delete) - No updates or deletes allowed.
      */
     match /usageLog/{logId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isAdminOrEditor();
-      allow update: if isAdminOrEditor();
-      allow delete: if isAdminOrEditor();
+      allow get, list: if true;
+      allow create: if isEditor();
+      allow update, delete: if false;
     }
   }
 }

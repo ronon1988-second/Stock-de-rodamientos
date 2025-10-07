@@ -27,13 +27,7 @@ export async function updateUserRoleByEmail(email: string, role: 'admin' | 'edit
         const userRecord = await auth.getUserByEmail(email);
         const uid = userRecord.uid;
 
-        // Set the role in the /roles/{userId} document in Firestore
-        const roleRef = firestore.collection('roles').doc(uid);
-        await roleRef.set({ role: role });
-
-        // Optional: We can still set custom claims if we want the backend (e.g. server actions)
-        // to have immediate access to the role without a DB lookup. But for client-side logic,
-        // the Firestore listener is more reliable. Let's keep it for robustness.
+        // Set custom claims for backend access control
         const currentClaims = userRecord.customClaims || {};
         await auth.setCustomUserClaims(uid, {
             ...currentClaims,
@@ -56,3 +50,6 @@ export async function updateUserRoleByEmail(email: string, role: 'admin' | 'edit
     }
 }
 
+
+
+    
