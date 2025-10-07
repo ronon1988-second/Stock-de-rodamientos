@@ -25,6 +25,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+
 
 type ToBuyViewProps = {
   inventory: InventoryItem[];
@@ -37,6 +39,36 @@ type ReorderInfo = {
     toBuy: number;
 }
 
+const getItemSeries = (name: string): string => {
+  const normalizedName = name.toUpperCase().trim();
+  if (normalizedName.startsWith('HTD')) return 'Correas';
+  if (normalizedName.startsWith('H')) return 'Manguitos de Montaje';
+  if (normalizedName.startsWith('6')) {
+    const series = normalizedName.substring(0, 2);
+    if (['60', '62', '63', '68', '69'].includes(series)) {
+      return `Rodamientos Serie ${series}xx`;
+    }
+  }
+  if (normalizedName.startsWith('UC')) return 'Rodamientos Serie UC (Insertos)';
+  if (normalizedName.startsWith('12') || normalizedName.startsWith('13') || normalizedName.startsWith('22') || normalizedName.startsWith('23')) {
+    const series = normalizedName.substring(0, 2);
+    if (['12', '13', '22', '23'].includes(series)) {
+        return `Rodamientos Serie ${series}xx (Autoalineables)`;
+    }
+  }
+  if (normalizedName.startsWith('30') || normalizedName.startsWith('32') || normalizedName.startsWith('33')) {
+      const series = normalizedName.substring(0, 2);
+      return `Rodamientos Serie ${series}xxx (Rodillos Cónicos)`;
+  }
+  if (normalizedName.startsWith('NK') || normalizedName.startsWith('RNA') || normalizedName.startsWith('HK')) return 'Rodamientos de Agujas';
+  if (normalizedName.startsWith('PHS') || normalizedName.startsWith('POS')) return 'Terminales de Rótula';
+  if (normalizedName.startsWith('AEVU')) return 'Pistones';
+  if (normalizedName.startsWith('FL')) return 'Soportes';
+  
+  return 'Otros';
+};
+
+
 export default function ToBuyView({ inventory, machineAssignments }: ToBuyViewProps) {
   const [recommendations, setRecommendations] =
     useState<ReorderRecommendationsOutput | null>(null);
@@ -46,7 +78,7 @@ export default function ToBuyView({ inventory, machineAssignments }: ToBuyViewPr
 
   const leadTime = 7;
 
-  const itemsToReorder: ReorderInfo[] = useMemo(() => {
+  const groupedItemsToReorder = useMemo(() => {
     const requiredByItem: { [itemId: string]: number } = {};
     machineAssignments.forEach(item => {
         if (!requiredByItem[item.itemId]) {
@@ -55,7 +87,7 @@ export default function ToBuyView({ inventory, machineAssignments }: ToBuyViewPr
         requiredByItem[item.itemId] += item.quantity;
     });
 
-    const result: ReorderInfo[] = [];
+    const itemsToReorder: ReorderInfo[] = [];
 
     inventory.forEach(item => {
         const totalRequired = requiredByItem[item.id] || 0;
@@ -64,7 +96,7 @@ export default function ToBuyView({ inventory, machineAssignments }: ToBuyViewPr
         const toBuy = totalDemand - item.stock;
 
         if (toBuy > 0) {
-            result.push({
+            itemsToReorder.push({
                 item,
                 totalRequired,
                 toBuy,
@@ -72,8 +104,24 @@ export default function ToBuyView({ inventory, machineAssignments }: ToBuyViewPr
         }
     });
 
-    return result.sort((a,b) => a.item.name.localeCompare(b.item.name));
+    const grouped = itemsToReorder.reduce((acc, item) => {
+        const series = getItemSeries(item.item.name);
+        if (!acc.has(series)) {
+            acc.set(series, []);
+        }
+        acc.get(series)!.push(item);
+        return acc;
+    }, new Map<string, ReorderInfo[]>());
+
+    grouped.forEach(items => items.sort((a, b) => a.item.name.localeCompare(b.item.name)));
+    
+    return new Map([...grouped.entries()].sort((a, b) => a[0].localeCompare(b[0])));
   }, [inventory, machineAssignments]);
+
+  const totalItemsToReorderCount = useMemo(() => {
+    return Array.from(groupedItemsToReorder.values()).reduce((acc, items) => acc + items.length, 0);
+  }, [groupedItemsToReorder]);
+
 
   const handleGetAIRecommendations = async () => {
     setIsLoading(true);
@@ -118,11 +166,13 @@ export default function ToBuyView({ inventory, machineAssignments }: ToBuyViewPr
   const exportToCSV = () => {
     let csvContent = "data:text/csv;charset=utf-8,Artículo,Stock Actual,Total Requerido en Máquinas,Stock de Seguridad,Cantidad a Comprar (Calculado),Cantidad a Comprar (IA)\n";
     
-    itemsToReorder.forEach(item => {
-      const { item: inventoryItem, totalRequired, toBuy } = item;
-      const aiQty = getAIRecommendationFor(inventoryItem.name) ?? "";
-      csvContent += `${inventoryItem.name},${inventoryItem.stock},${totalRequired},${inventoryItem.threshold},${toBuy},${aiQty}\n`;
-    });
+    for (const items of groupedItemsToReorder.values()) {
+        items.forEach(itemInfo => {
+            const { item, totalRequired, toBuy } = itemInfo;
+            const aiQty = getAIRecommendationFor(item.name) ?? "";
+            csvContent += `${item.name},${item.stock},${totalRequired},${item.threshold},${toBuy},${aiQty}\n`;
+        });
+    }
 
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -149,7 +199,7 @@ export default function ToBuyView({ inventory, machineAssignments }: ToBuyViewPr
             <div className="flex gap-2">
                 <Button
                     onClick={handleGetAIRecommendations}
-                    disabled={isLoading || itemsToReorder.length === 0}
+                    disabled={isLoading || totalItemsToReorderCount === 0}
                 >
                     {isLoading ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -160,7 +210,7 @@ export default function ToBuyView({ inventory, machineAssignments }: ToBuyViewPr
                 </Button>
                  <Button 
                     onClick={exportToCSV}
-                    disabled={itemsToReorder.length === 0}
+                    disabled={totalItemsToReorderCount === 0}
                     variant="outline"
                 >
                     <FileDown className="mr-2 h-4 w-4" />
@@ -177,53 +227,60 @@ export default function ToBuyView({ inventory, machineAssignments }: ToBuyViewPr
             </Alert>
           )}
 
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Artículo</TableHead>
-                <TableHead className="text-right">Stock Actual</TableHead>
-                <TableHead className="text-right">Requerido (Máquinas)</TableHead>
-                <TableHead className="text-right">Stock de Seguridad</TableHead>
-                <TableHead className="text-right font-bold text-primary">Cantidad a Comprar</TableHead>
-                <TableHead className="text-right font-bold">Sugerencia IA</TableHead>
-              </TableRow>
-            </TableHeader>
-            
-            <TableBody>
-              {itemsToReorder.length > 0 ? (
-                itemsToReorder.map((item) => {
-                    const { item: inventoryItem, totalRequired, toBuy } = item;
-                    const aiRecommendation = getAIRecommendationFor(inventoryItem.name);
-                    return (
-                    <TableRow key={inventoryItem.id} className="bg-amber-500/5">
-                        <TableCell className="font-medium">{inventoryItem.name}</TableCell>
-                        <TableCell className="text-right text-destructive font-semibold">{inventoryItem.stock}</TableCell>
-                        <TableCell className="text-right">{totalRequired}</TableCell>
-                        <TableCell className="text-right">{inventoryItem.threshold}</TableCell>
-                        <TableCell className="text-right font-bold text-primary">{toBuy}</TableCell>
-                        <TableCell className="text-right font-bold">
-                            {aiRecommendation !== null ? (
-                                <div className="flex items-center justify-end gap-2">
+          {totalItemsToReorderCount > 0 ? (
+            <Accordion type="multiple" className="w-full" defaultValue={Array.from(groupedItemsToReorder.keys())}>
+              {Array.from(groupedItemsToReorder.entries()).map(([series, items]) => (
+                <AccordionItem value={series} key={series}>
+                  <AccordionTrigger className="text-lg font-semibold sticky top-0 bg-card z-10 px-4 py-3 border-b">
+                    {series} ({items.length})
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Artículo</TableHead>
+                          <TableHead className="text-right">Stock Actual</TableHead>
+                          <TableHead className="text-right">Requerido (Máquinas)</TableHead>
+                          <TableHead className="text-right">Stock de Seguridad</TableHead>
+                          <TableHead className="text-right font-bold text-primary">Cantidad a Comprar</TableHead>
+                          <TableHead className="text-right font-bold">Sugerencia IA</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {items.map((itemInfo) => {
+                          const { item, totalRequired, toBuy } = itemInfo;
+                          const aiRecommendation = getAIRecommendationFor(item.name);
+                          return (
+                            <TableRow key={item.id} className="bg-amber-500/5">
+                              <TableCell className="font-medium">{item.name}</TableCell>
+                              <TableCell className="text-right text-destructive font-semibold">{item.stock}</TableCell>
+                              <TableCell className="text-right">{totalRequired}</TableCell>
+                              <TableCell className="text-right">{item.threshold}</TableCell>
+                              <TableCell className="text-right font-bold text-primary">{toBuy}</TableCell>
+                              <TableCell className="text-right font-bold">
+                                {aiRecommendation !== null ? (
+                                  <div className="flex items-center justify-end gap-2">
                                     <BrainCircuit size={16} className="text-blue-500" />
                                     <span>{aiRecommendation}</span>
-                                </div>
-                            ) : recommendations ? '-' : ''}
-                        </TableCell>
-                    </TableRow>
-                )})
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-48 text-center">
-                      <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
-                          <CheckCircle className="h-10 w-10 text-green-500"/>
-                          <p className="text-lg font-semibold">¡Todo en orden!</p>
-                          <p className="text-sm">No hay artículos que necesiten reposición en este momento.</p>
-                      </div>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                                  </div>
+                                ) : recommendations ? '-' : ''}
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })}
+                      </TableBody>
+                    </Table>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          ) : (
+             <div className="h-48 text-center flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                <CheckCircle className="h-10 w-10 text-green-500"/>
+                <p className="text-lg font-semibold">¡Todo en orden!</p>
+                <p className="text-sm">No hay artículos que necesiten reposición en este momento.</p>
+            </div>
+          )}
         </CardContent>
         {recommendations && (
         <CardFooter>
