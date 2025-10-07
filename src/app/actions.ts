@@ -25,6 +25,8 @@ export async function setupUserAndRole(uid: string, email: string): Promise<{ su
 
     try {
         const { firestore } = getSdks();
+        const adminApp = getAdminApp();
+        const auth = getAuth(adminApp);
         
         const userRef = doc(firestore, 'users', uid);
         const userData: Omit<UserProfile, 'id'|'uid'> = {
@@ -35,16 +37,13 @@ export async function setupUserAndRole(uid: string, email: string): Promise<{ su
 
         const roleRef = doc(firestore, 'roles', uid);
         
-        if (email === 'maurofbordon@gmail.com') {
+        // Temporary bypass: Force admin role for specific UID
+        if (email === 'maurofbordon@gmail.com' || uid === 'zqq7dO1wxbgZVcIXSNwRU6DEXqw1') {
             await setDoc(roleRef, { role: 'admin' });
-            const adminApp = getAdminApp();
-            const auth = getAuth(adminApp);
             await auth.setCustomUserClaims(uid, { admin: true, editor: true });
-
+            console.log(`Force assigning admin role to UID: ${uid}`);
         } else {
             await setDoc(roleRef, { role: 'editor' });
-             const adminApp = getAdminApp();
-            const auth = getAuth(adminApp);
             await auth.setCustomUserClaims(uid, { editor: true });
         }
 
@@ -81,4 +80,3 @@ export async function updateUserRole(uid: string, role: 'admin' | 'editor'): Pro
 }
 
     
-
