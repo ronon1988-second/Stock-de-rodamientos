@@ -42,6 +42,7 @@ type ReorderInfo = {
 const getItemSeries = (name: string): string => {
   const normalizedName = name.toUpperCase().trim();
   if (normalizedName.startsWith('HTD')) return 'Correas';
+  if (normalizedName.startsWith('H')) return 'Manguitos de Montaje';
   if (normalizedName.startsWith('6')) {
     const series = normalizedName.substring(0, 2);
     if (['60', '62', '63', '68', '69'].includes(series)) {
@@ -61,7 +62,6 @@ const getItemSeries = (name: string): string => {
   }
   if (normalizedName.startsWith('NK') || normalizedName.startsWith('RNA') || normalizedName.startsWith('HK')) return 'Rodamientos de Agujas';
   if (normalizedName.startsWith('PHS') || normalizedName.startsWith('POS')) return 'Terminales de Rótula';
-  if (normalizedName.startsWith('H')) return 'Manguitos de Montaje';
   if (normalizedName.startsWith('AEVU')) return 'Pistones';
   
   return 'Otros';
@@ -107,15 +107,6 @@ export default function ToBuyView({ inventory, machineAssignments }: ToBuyViewPr
     return result.sort((a,b) => a.item.name.localeCompare(b.item.name));
   }, [inventory, machineAssignments]);
   
-  useEffect(() => {
-      if (itemsToReorder.length > 0 && openCollapsibles.length === 0) {
-          const allGroups = [...new Set(itemsToReorder.map(item => getItemSeries(item.item.name)))];
-          setOpenCollapsibles(allGroups);
-      } else if (itemsToReorder.length === 0) {
-          setOpenCollapsibles([]);
-      }
-  }, [itemsToReorder]);
-
 
 
   const groupedItems = useMemo(() => {
