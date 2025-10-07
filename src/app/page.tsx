@@ -103,39 +103,72 @@ function AppContent() {
   // Effect to seed initial data if collections are empty
   useEffect(() => {
     const seedData = async () => {
-      if (inventory === null) return;
-      if (inventory.length === 0) {
-        setIsSeeding(true);
-        toast({
-          title: "Cargando datos iniciales...",
-          description: "Por favor espere. Esto puede tardar un momento.",
-        });
-        const batch = writeBatch(firestore);
+        if (!inventory) return;
 
-        const invRef = collection(firestore, "inventory");
-        initialInventory.forEach(item => {
-            const { id, ...data } = item;
-            const docRef = doc(invRef, id);
-            batch.set(docRef, data);
-        });
-        
-        try {
-          await batch.commit();
-          toast({
-            title: "Datos cargados",
-            description: "El inventario inicial se ha cargado correctamente.",
-          });
-        } catch (error) {
-          console.error("Error seeding data: ", error);
-          toast({
-            variant: "destructive",
-            title: "Error al cargar datos",
-            description: "No se pudo cargar el inventario inicial.",
-          });
-        } finally {
-            setIsSeeding(false);
+        // Force update all items to stock: 0 one time.
+        const shouldForceUpdate = localStorage.getItem('hasForcedStockUpdate') !== 'true';
+
+        if (inventory.length > 0 && shouldForceUpdate) {
+            setIsSeeding(true);
+            toast({
+                title: "Actualizando stock a cero...",
+                description: "Aplicando los valores iniciales de inventario.",
+            });
+            const batch = writeBatch(firestore);
+            inventory.forEach(item => {
+                const docRef = doc(firestore, "inventory", item.id);
+                batch.update(docRef, { stock: 0 });
+            });
+
+            try {
+                await batch.commit();
+                toast({
+                    title: "Stock Actualizado",
+                    description: "Todos los artículos se han establecido en stock 0.",
+                });
+                localStorage.setItem('hasForcedStockUpdate', 'true'); // Mark as updated
+            } catch (error) {
+                console.error("Error forcing stock update: ", error);
+                toast({
+                    variant: "destructive",
+                    title: "Error al actualizar",
+                    description: "No se pudo actualizar el stock a cero.",
+                });
+            } finally {
+                setIsSeeding(false);
+            }
+        } else if (inventory.length === 0) {
+            setIsSeeding(true);
+            toast({
+                title: "Cargando datos iniciales...",
+                description: "Por favor espere. Esto puede tardar un momento.",
+            });
+            const batch = writeBatch(firestore);
+            const invRef = collection(firestore, "inventory");
+            initialInventory.forEach(item => {
+                const { id, ...data } = item;
+                const docRef = doc(invRef, id);
+                batch.set(docRef, data);
+            });
+            
+            try {
+                await batch.commit();
+                toast({
+                    title: "Datos cargados",
+                    description: "El inventario inicial se ha cargado correctamente.",
+                });
+                localStorage.setItem('hasForcedStockUpdate', 'true');
+            } catch (error) {
+                console.error("Error seeding data: ", error);
+                toast({
+                    variant: "destructive",
+                    title: "Error al cargar datos",
+                    description: "No se pudo cargar el inventario inicial.",
+                });
+            } finally {
+                setIsSeeding(false);
+            }
         }
-      }
     };
     seedData();
   }, [inventory, firestore, toast]);
@@ -540,3 +573,5 @@ export default function Page() {
 
   return <AppContent />;
 }
+
+    
