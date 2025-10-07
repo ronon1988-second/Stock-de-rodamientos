@@ -503,16 +503,13 @@ function AppContent() {
     }
     if (view === 'users') {
       if (!isAdmin) {
-        return (
-          <Card>
-            <CardHeader>
-              <CardTitle>Acceso Denegado</CardTitle>
-              <CardDescription>
-                No tienes permisos para gestionar usuarios.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        );
+        setView('dashboard'); // Redirect to dashboard if not admin
+        toast({
+          variant: "destructive",
+          title: "Acceso Denegado",
+          description: "No tiene permisos para gestionar usuarios."
+        });
+        return <Skeleton className="h-full w-full" />;
       }
       return <UserManagementView firestore={firestore} currentUser={user} />;
     }
