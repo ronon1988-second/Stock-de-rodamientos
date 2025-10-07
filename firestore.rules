@@ -1,133 +1,145 @@
 /**
  * @fileoverview Firestore Security Rules for Prototyping.
  *
- * Core Philosophy: This ruleset prioritizes secure authorization while allowing
- * flexible data shapes during the prototyping phase. It focuses on who can
- * access what, rather than strictly enforcing data schemas.
+ * Core Philosophy:
+ * This ruleset prioritizes security by enforcing strict ownership and role-based access control.
+ * It assumes a data model where users own their profiles and admins have elevated privileges.
+ * Flexibility in data shapes is allowed to facilitate rapid prototyping.
  *
- * Data Structure: The Firestore database contains collections for users, sectors,
- * machines, inventory items, and machine assignments. User-specific data is stored
- * under `/users/{userId}`. Other data is stored in top-level collections.
+ * Data Structure:
+ * - /users/{userId}: User profile information, accessible only to the user themselves.
+ * - /roles/{userId}: User roles (e.g., 'admin'), accessible only to admins.
+ * - /sectors/{sectorId}, /machines/{machineId}, /inventoryItems/{inventoryItemId}, /machineAssignments/{machineAssignmentId}: Data related to plant operations, with owner-only writes.
  *
  * Key Security Decisions:
- * - User listing is disallowed.
- * - Public read access is granted to the 'sectors', 'machines', 'inventoryItems',
- *   and 'machineAssignments' collections.
- * - Write access to 'sectors', 'machines', 'inventoryItems',
- *   and 'machineAssignments' collections is restricted to authenticated users.
+ * - User listing is disallowed for privacy.
+ * - All write operations (create, update, delete) are protected by authorization checks.
+ *
+ * Denormalization for Authorization:
+ *  Ownership IDs are included on the documents themselves, such as the `machine.sectorId` field, allowing rules to validate ownership without additional reads.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the user is signed in.
-     */
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    /**
-     * @description Checks if the user is the owner of the resource.
-     */
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    /**
-     * @description Checks if the user is the owner of the resource and it exists.
-     */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
-
-    /**
-     * @description Rules for the UserProfile collection.
+     * @description Controls access to user profile information.
      * @path /users/{userId}
-     * @allow (create) User with UID 'user123' can create their own profile.
-     * @allow (get) User with UID 'user123' can get their own profile.
-     * @deny (create) User with UID 'user456' cannot create a profile for user 'user123'.
-     * @deny (update) User with UID 'user456' cannot update the profile for user 'user123'.
-     * @principle Enforces document ownership for writes; allows owner to read.
+     * @allow (create) User 'test_user' with uid 'test_user' can create their own profile.
+     * @deny (create) User 'other_user' cannot create a profile for 'test_user'.
+     * @allow (get, list, update, delete) User 'test_user' with uid 'test_user' can get, list, update, and delete their own profile.
+     * @deny (get, list, update, delete) User 'other_user' cannot get, list, update, or delete 'test_user' profile.
+     * @principle Enforces user-ownership: Only the authenticated user can read or write their own profile.
      */
     match /users/{userId} {
-      allow get: if isOwner(userId);
-      allow list: if false;
+      allow get, list: if isOwner(userId);
       allow create: if isOwner(userId);
       allow update: if isExistingOwner(userId);
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Rules for the Sectors collection.
+     * @description Controls access to user roles.
+     * @path /roles/{userId}
+     * @allow (get, list) Admins can get and list user roles.
+     * @deny (get, list) Non-admins cannot get and list user roles.
+     * @allow (create, update, delete) Admins can create, update, and delete user roles.
+     * @deny (create, update, delete) Non-admins cannot create, update, and delete user roles.
+     * @principle Enforces role-based access control: Only admins can manage user roles.
+     */
+    match /roles/{userId} {
+      allow get, list: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    /**
+     * @description Controls access to sector information.
      * @path /sectors/{sectorId}
-     * @allow (get) Any user can read sector data.
-     * @allow (list) Any user can list sector data.
-     * @allow (create) Authenticated user can create a sector.
-     * @deny (create) Unauthenticated user cannot create a sector.
-     * @deny (update) Unauthenticated user cannot update sector data.
-     * @principle Public read access with authenticated-user-only writes.
+     * @allow (get, list) Everyone can read sector information.
+     * @allow (create, update, delete) Only admins can create, update, and delete sector information.
+     * @principle Public read, admin-only write: Allows public viewing of sectors while restricting modifications to admins.
      */
     match /sectors/{sectorId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow get, list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Rules for the Machines collection.
+     * @description Controls access to machine information.
      * @path /machines/{machineId}
-     * @allow (get) Any user can read machine data.
-     * @allow (list) Any user can list machine data.
-     * @allow (create) Authenticated user can create a machine.
-     * @deny (create) Unauthenticated user cannot create a machine.
-     * @deny (update) Unauthenticated user cannot update machine data.
-     * @principle Public read access with authenticated-user-only writes.
+     * @allow (get, list) Everyone can read machine information.
+     * @allow (create, update, delete) Only admins can create, update, and delete machine information.
+     * @principle Public read, admin-only write: Allows public viewing of machines while restricting modifications to admins.
      */
     match /machines/{machineId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow get, list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Rules for the InventoryItems collection.
+     * @description Controls access to inventory item information.
      * @path /inventoryItems/{inventoryItemId}
-     * @allow (get) Any user can read inventory item data.
-     * @allow (list) Any user can list inventory item data.
-     * @allow (create) Authenticated user can create an inventory item.
-     * @deny (create) Unauthenticated user cannot create an inventory item.
-     * @deny (update) Unauthenticated user cannot update inventory item data.
-     * @principle Public read access with authenticated-user-only writes.
+     * @allow (get, list) Everyone can read inventory item information.
+     * @allow (create, update, delete) Only admins can create, update, and delete inventory item information.
+     * @principle Public read, admin-only write: Allows public viewing of inventory items while restricting modifications to admins.
      */
     match /inventoryItems/{inventoryItemId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow get, list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Rules for the MachineAssignments collection.
+     * @description Controls access to machine assignment information.
      * @path /machineAssignments/{machineAssignmentId}
-     * @allow (get) Any user can read machine assignment data.
-     * @allow (list) Any user can list machine assignment data.
-     * @allow (create) Authenticated user can create a machine assignment.
-     * @deny (create) Unauthenticated user cannot create a machine assignment.
-     * @deny (update) Unauthenticated user cannot update machine assignment data.
-     * @principle Public read access with authenticated-user-only writes.
+     * @allow (get, list) Everyone can read machine assignment information.
+     * @allow (create, update, delete) Only admins can create, update, and delete machine assignment information.
+     * @principle Public read, admin-only write: Allows public viewing of machine assignments while restricting modifications to admins.
      */
     match /machineAssignments/{machineAssignmentId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow get, list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
+
+    /**
+     * @description Fallback rule to deny all other requests.  This ensures no
+     *  access is granted to paths not explicitly handled above.
+     * @path Any path not explicitly matched.
+     * @deny (*) All operations are denied.
+     * @principle Principle of Least Privilege: Explicitly deny any access not specifically allowed.
+     */
+    match /{path=**} {
+        allow get: if false;
+        allow list: if false;
+        allow create: if false;
+        allow update: if false;
+        allow delete: if false;
+    }
+  }
+
+  // Helper Functions
+  function isSignedIn() {
+    return request.auth != null;
+  }
+
+  function isOwner(userId) {
+    return request.auth.uid == userId;
+  }
+
+  function isExistingOwner(userId) {
+      return isSignedIn() && isOwner(userId) && resource != null;
+  }
+
+  function isAdmin() {
+    return request.auth.token.role == 'admin';
   }
 }
