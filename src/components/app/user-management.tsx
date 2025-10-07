@@ -30,9 +30,11 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import { updateUserRoleByEmail } from '@/app/actions';
+import { updateUserRole } from '@/app/actions';
 import { Loader2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useFirestore } from '@/firebase';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 
 
 const UserRoleSchema = z.object({
@@ -47,6 +49,7 @@ type UserRoleFormValues = z.infer<typeof UserRoleSchema>;
 export default function UserManagementView({ isAdmin }: { isAdmin: boolean }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const firestore = useFirestore();
 
   const form = useForm<UserRoleFormValues>({
     resolver: zodResolver(UserRoleSchema),
@@ -58,7 +61,21 @@ export default function UserManagementView({ isAdmin }: { isAdmin: boolean }) {
   const onSubmit = async (data: UserRoleFormValues) => {
     setIsSubmitting(true);
     try {
-      const result = await updateUserRoleByEmail(data.email, data.role);
+      // 1. Find the user's UID from the 'users' collection based on their email.
+      const usersRef = collection(firestore, 'users');
+      const q = query(usersRef, where("email", "==", data.email));
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        throw new Error("No se encontró ningún usuario con ese correo electrónico.");
+      }
+
+      const userDoc = querySnapshot.docs[0];
+      const uid = userDoc.id;
+
+      // 2. Call the server action with the UID and role.
+      const result = await updateUserRole(uid, data.role);
+      
       if (result.success) {
         toast({
           title: 'Rol Actualizado',
