@@ -46,15 +46,22 @@ export default function LoginPage() {
         email: user.email,
         role: role,
         displayName: user.email?.split('@')[0] || 'Usuario',
-        createdAt: serverTimestamp() // Add a creation timestamp
     };
+    
+    let userDataToWrite = { ...userData };
 
-    // Only write to Firestore if the document doesn't exist, the role needs an update, or the display name is missing
-    if (!userDoc.exists() || userDoc.data().role !== role || !userDoc.data().displayName) {
-        await setDoc(userRef, userData, { merge: true });
+    // If the document doesn't exist, add a creation timestamp
+    if (!userDoc.exists()) {
+        (userDataToWrite as any).createdAt = serverTimestamp();
+    }
+
+
+    // Only write to Firestore if the document doesn't exist or the role needs an update
+    if (!userDoc.exists() || userDoc.data().role !== role) {
+        await setDoc(userRef, userDataToWrite, { merge: true });
     }
     
-    // If the user's role was determined to be admin, we must force a token refresh to get custom claims.
+    // If the user's role was determined to be admin, we must force a token refresh to get custom claims from the backend trigger.
     if (isAdminUser) {
         // Force refresh of the ID token to get custom claims from the backend trigger.
         await user.getIdToken(true); 
@@ -101,6 +108,7 @@ export default function LoginPage() {
       } else if (error.code === 'auth/weak-password') {
           description = "La contraseña debe tener al menos 6 caracteres."
       }
+      console.error("Auth Error:", error);
       toast({
         variant: "destructive",
         title: `Error de ${action === 'login' ? 'inicio de sesión' : 'registro'}`,
