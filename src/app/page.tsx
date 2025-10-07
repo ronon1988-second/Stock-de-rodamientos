@@ -149,11 +149,6 @@ function AppContent() {
   const firestore = useFirestore();
   const [isSeeding, setIsSeeding] = useState(false);
   
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isEditor, setIsEditor] = useState(false);
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [isRoleLoading, setIsRoleLoading] = useState(true);
-
   // This effect handles the creation of user profile on first login
   useEffect(() => {
     const setupUser = async () => {
@@ -176,71 +171,9 @@ function AppContent() {
           description: "¡Bienvenido! Su perfil ha sido guardado."
         });
       }
-      
-      const roleRef = doc(firestore, 'roles', user.uid);
-      const roleDoc = await getDoc(roleRef);
-      if (!roleDoc.exists()) {
-          const isDefaultAdmin = user.email === 'maurofbordon@gmail.com';
-          const defaultRole = isDefaultAdmin ? 'admin' : 'editor';
-          setDocumentNonBlocking(roleRef, { role: defaultRole }, { merge: true });
-
-          if (isDefaultAdmin) {
-              try {
-                  const { updateUserRoleByEmail } = await import('@/app/actions');
-                  const result = await updateUserRoleByEmail(user.email!, 'admin');
-                  if (result.success) {
-                      await user.getIdToken(true); // Force token refresh
-                      toast({
-                          title: 'Rol de Administrador Asignado',
-                          description: 'Se le han otorgado permisos de administrador. Puede que necesite refrescar la página.',
-                      });
-                  } else {
-                      throw new Error(result.error);
-                  }
-              } catch (e: any) {
-                  console.error('Failed to set admin custom claim:', e);
-                  toast({ variant: 'destructive', title: 'Error al asignar rol de Admin', description: e.message });
-              }
-          }
-      }
     };
     setupUser();
   }, [user, firestore, toast]);
-
-  // Effect to get user role from custom claims
-  useEffect(() => {
-      if (!user) {
-        setIsRoleLoading(false);
-        return;
-      };
-
-      setIsRoleLoading(true);
-      user.getIdTokenResult(true) // Force refresh to get latest claims
-        .then((idTokenResult) => {
-            const claims = idTokenResult.claims;
-            const isAdminClaim = !!claims.admin;
-            const isEditorClaim = !!claims.editor;
-            
-            setIsAdmin(isAdminClaim);
-            setIsEditor(isEditorClaim);
-            
-            if (isAdminClaim) setUserRole('admin');
-            else if (isEditorClaim) setUserRole('editor');
-            else setUserRole('editor'); // Default to editor if no specific role claim
-
-            setIsRoleLoading(false);
-        })
-        .catch(error => {
-            console.error("Error getting user role from claims:", error);
-            setIsRoleLoading(false);
-            // Default to non-admin, non-editor roles on error
-            setIsAdmin(false);
-            setIsEditor(false);
-            setUserRole(null);
-        });
-
-  }, [user]);
-
 
   const userProfileRef = useMemoFirebase(
     () => (user ? doc(firestore, 'users', user.uid) : null),
@@ -364,7 +297,6 @@ function AppContent() {
   }, [machinesBySector]);
 
   const handleAddItem = (newItem: Omit<InventoryItem, 'id'>) => {
-    if (!isAdmin && !isEditor) return;
     const invRef = collection(firestore, 'inventory');
     addDocumentNonBlocking(invRef, newItem);
     toast({
@@ -374,7 +306,6 @@ function AppContent() {
   };
 
   const handleUpdateItem = (updatedItem: InventoryItem) => {
-    if (!isAdmin && !isEditor) return;
     const itemRef = doc(firestore, 'inventory', updatedItem.id);
     const { id, ...data } = updatedItem;
     setDocumentNonBlocking(itemRef, data, { merge: true });
@@ -390,7 +321,7 @@ function AppContent() {
     sectorId: string,
     quantity: number
   ) => {
-    if (!inventory || (!isAdmin && !isEditor)) return;
+    if (!inventory) return;
     const item = inventory.find(b => b.id === itemId);
     if (!item) return;
 
@@ -413,7 +344,6 @@ function AppContent() {
   };
 
   const handleRemoveItemFromMachine = (assignmentId: string) => {
-    if (!isAdmin && !isEditor) return;
     const assignment = machineAssignments?.find(item => item.id === assignmentId);
     if (!assignment) return;
 
@@ -432,7 +362,7 @@ function AppContent() {
     machineId: string,
     sectorId: string
   ) => {
-    if (!inventory || (!isAdmin && !isEditor)) return;
+    if (!inventory) return;
     const item = inventory.find(i => i.id === itemId);
     if (!item) return;
 
@@ -547,23 +477,19 @@ function AppContent() {
       isUsageLogLoading ||
       isSectorsLoading ||
       isSeeding ||
-      isProfileLoading ||
-      isRoleLoading;
+      isProfileLoading;
 
     if (isLoading) {
       return <Skeleton className="h-full w-full" />;
     }
     
-    const canEditInventory = isAdmin || isEditor;
-    const canEditOrganization = isAdmin;
-
     if (view === 'dashboard') {
       return (
         <Dashboard
           inventory={sortedInventory}
           onUpdateItem={handleUpdateItem}
           onAddItem={handleAddItem}
-          canEdit={canEditInventory}
+          canEdit={true}
         />
       );
     }
@@ -585,7 +511,6 @@ function AppContent() {
       );
     }
     if (view === 'organization') {
-      if (!canEditOrganization) return null;
       return (
         <OrganizationView
           sectors={sortedSectors}
@@ -594,15 +519,6 @@ function AppContent() {
       );
     }
     if (view === 'users') {
-      if (!isAdmin) {
-        setView('dashboard'); // Redirect to dashboard if not admin
-        toast({
-          variant: "destructive",
-          title: "Acceso Denegado",
-          description: "No tiene permisos para gestionar usuarios."
-        });
-        return <Skeleton className="h-full w-full" />;
-      }
       return <UserManagementView />;
     }
     if (view.startsWith('machine-')) {
@@ -623,7 +539,7 @@ function AppContent() {
           onAssignItem={handleAssignItemToMachine}
           onRemoveItem={handleRemoveItemFromMachine}
           onLogUsage={handleLogUsage}
-          canEdit={canEditInventory}
+          canEdit={true}
         />
       );
     }
@@ -652,7 +568,6 @@ function AppContent() {
         icon={<Settings className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
         label="Organización"
         onClick={handleNavClick}
-        disabled={!isAdmin}
       />
 
       <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
@@ -694,7 +609,6 @@ function AppContent() {
           icon={<Users className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
           label="Gestionar Usuarios"
           onClick={handleNavClick}
-          disabled={!isAdmin}
         />
       </div>
     </nav>
@@ -784,18 +698,13 @@ function AppContent() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="secondary" size="icon" className="rounded-full">
-                <User className="h-5 w-5" />
+                <User className="h-5 w-4" />
                 <span className="sr-only">Perfil de usuario</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>
                 {user?.email}
-                {userRole && (
-                  <Badge variant="secondary" className="ml-2 capitalize">
-                    {userRole}
-                  </Badge>
-                )}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={handleLogout}>
