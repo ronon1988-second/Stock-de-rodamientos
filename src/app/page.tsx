@@ -22,6 +22,8 @@ import {
   onSnapshot,
   getDoc,
   serverTimestamp,
+  getDocs,
+  addDoc,
 } from 'firebase/firestore';
 
 import { Badge } from '@/components/ui/badge';
@@ -47,9 +49,8 @@ import {
   Machine,
   MachineAssignment,
   UserProfile,
-  UserRole,
 } from '@/lib/types';
-import { initialInventory } from '@/lib/data';
+import { initialInventory, initialSectors, initialMachines } from '@/lib/data';
 import Dashboard from '@/components/app/dashboard';
 import Reports from '@/components/app/reports';
 import { useToast } from '@/hooks/use-toast';
@@ -169,7 +170,6 @@ function AppContent() {
             displayName: user.email?.split('@')[0] || 'Usuario',
             createdAt: serverTimestamp(),
         };
-        // Use setDocumentNonBlocking to avoid blocking UI, error is handled globally
         setDocumentNonBlocking(userRef, userData, { merge: true });
         toast({
           title: "Perfil de usuario creado",
@@ -269,42 +269,69 @@ function AppContent() {
 
   useEffect(() => {
     const seedData = async () => {
-      if (!firestore || !user || isInventoryLoading || isSeeding) return;
+        if (!firestore || !user || isInventoryLoading || isSectorsLoading || isSeeding) return;
 
-      if (inventory && inventory.length === 0) {
-        setIsSeeding(true);
-        toast({
-          title: 'Cargando datos iniciales...',
-          description: 'Por favor espere. Esto puede tardar un momento.',
-        });
-        try {
-          const batch = writeBatch(firestore);
-          const invRef = collection(firestore, 'inventory');
-          initialInventory.forEach(item => {
-            const { id, ...data } = item;
-            const docRef = doc(invRef, id);
-            batch.set(docRef, data);
-          });
-          await batch.commit();
-          toast({
-            title: 'Datos de inventario listos',
-            description: 'El inventario ha sido inicializado correctamente.',
-          });
-        } catch (error) {
-          console.error('Error seeding data: ', error);
-          toast({
-            variant: 'destructive',
-            title: 'Error al sembrar datos',
-            description: 'No se pudo inicializar el inventario.',
-          });
-        } finally {
-          setIsSeeding(false);
+        const invSnapshot = await getDocs(collection(firestore, 'inventory'));
+        const sectorsSnapshot = await getDocs(collection(firestore, 'sectors'));
+        
+        if (invSnapshot.empty && sectorsSnapshot.empty) {
+            setIsSeeding(true);
+            toast({
+                title: 'Cargando datos iniciales...',
+                description: 'Por favor espere. Esto puede tardar un momento.',
+            });
+            try {
+                const batch = writeBatch(firestore);
+
+                // Seed inventory
+                const invRef = collection(firestore, 'inventory');
+                initialInventory.forEach(item => {
+                    const docRef = doc(invRef); // Firestore generates ID
+                    batch.set(docRef, item);
+                });
+
+                // Seed sectors and get their new IDs
+                const sectorPromises = initialSectors.map(async (sectorData) => {
+                    const sectorRef = await addDoc(collection(firestore, 'sectors'), sectorData);
+                    return { name: sectorData.name, id: sectorRef.id };
+                });
+                const createdSectors = await Promise.all(sectorPromises);
+                const sectorIdMap = createdSectors.reduce((acc, sec) => {
+                    acc[sec.name] = sec.id;
+                    return acc;
+                }, {} as Record<string, string>);
+
+                // Seed machines with the correct sectorId
+                initialMachines.forEach(machineData => {
+                    const sectorId = sectorIdMap[machineData.sectorName];
+                    if (sectorId) {
+                        const machineRef = doc(collection(firestore, `sectors/${sectorId}/machines`));
+                        const { sectorName, ...data } = machineData;
+                        batch.set(machineRef, { ...data, sectorId });
+                    }
+                });
+
+                await batch.commit();
+                toast({
+                    title: 'Datos iniciales listos',
+                    description: 'El inventario, sectores y máquinas han sido inicializados.',
+                });
+            } catch (error) {
+                console.error('Error seeding data: ', error);
+                toast({
+                    variant: 'destructive',
+                    title: 'Error al sembrar datos',
+                    description: 'No se pudo inicializar la estructura de datos.',
+                });
+            } finally {
+                setIsSeeding(false);
+            }
         }
-      }
     };
 
     seedData();
-  }, [inventory, isInventoryLoading, firestore, user, toast, isSeeding]);
+  }, [firestore, user, toast, isSeeding, isInventoryLoading, isSectorsLoading]);
+
 
   const sortedInventory = useMemo(
     () =>
@@ -806,7 +833,3 @@ export default function Page() {
 
   return <AppContent />;
 }
-
-    
-
-    

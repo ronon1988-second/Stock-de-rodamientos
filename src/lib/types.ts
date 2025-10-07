@@ -54,5 +54,3 @@ export type UserRole = {
     id: string;
     role: 'admin' | 'editor';
 }
-
-    
