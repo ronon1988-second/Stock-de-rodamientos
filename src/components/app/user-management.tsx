@@ -84,7 +84,7 @@ export default function UserManagementView() {
       <CardHeader>
         <CardTitle>Gestionar Roles de Usuario</CardTitle>
         <CardDescription>
-          Asigne un rol a un usuario específico utilizando su dirección de correo electrónico.
+          Asigne un rol a un usuario específico utilizando su dirección de correo electrónico. Los cambios pueden tardar unos momentos en reflejarse.
         </CardDescription>
       </CardHeader>
       <CardContent>

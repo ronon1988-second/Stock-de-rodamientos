@@ -5,7 +5,6 @@ import { useState } from "react";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  User,
 } from "firebase/auth";
 import { useFirebase } from "@/firebase/provider";
 import { Button } from "@/components/ui/button";
@@ -21,48 +20,14 @@ import { Label } from "@/components/ui/label";
 import { Logo } from "@/components/app/logo";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
-
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { auth, firestore } = useFirebase();
+  const { auth } = useFirebase();
   const { toast } = useToast();
   const router = useRouter();
-
-  const updateUserProfile = async (user: User) => {
-    const userRef = doc(firestore, "users", user.uid);
-    const userDoc = await getDoc(userRef);
-
-    if (!userDoc.exists()) {
-        const userData = {
-            uid: user.uid,
-            email: user.email,
-            displayName: user.email?.split('@')[0] || 'Usuario',
-            createdAt: serverTimestamp(),
-        };
-        await setDoc(userRef, userData);
-    }
-  };
-
-  const updateUserRole = async (user: User) => {
-    const roleRef = doc(firestore, "roles", user.uid);
-    const roleDoc = await getDoc(roleRef);
-
-    const isAdminUser = user.email === 'maurofbordon@gmail.com';
-    const role = isAdminUser ? 'admin' : 'editor';
-
-    if (!roleDoc.exists() || roleDoc.data()?.role !== role) {
-        await setDoc(roleRef, { role: role }, { merge: true });
-        // After setting a new role (especially admin), force a token refresh
-        if (isAdminUser) {
-          await user.getIdToken(true);
-        }
-    }
-  };
-
 
   const handleAuthAction = async (action: "login" | "signup") => {
     if (!email || !password) {
@@ -98,12 +63,8 @@ export default function LoginPage() {
             }
         }
         
-        // After either login or signup, ensure profile and role are set
-        await updateUserProfile(userCredential.user);
-        await updateUserRole(userCredential.user);
-
-        // This final refresh ensures we have the latest token claims before redirecting.
-        await userCredential.user.getIdToken(true);
+        // After successful auth, just redirect. Profile/role creation handled elsewhere.
+        await userCredential.user.getIdToken(true); // Force token refresh to get latest claims
         
         toast({
             title: `Éxito de ${action === 'login' ? 'inicio de sesión' : 'autenticación'}`,
@@ -123,16 +84,12 @@ export default function LoginPage() {
           description = "El email o la contraseña son incorrectos.";
           break;
         case 'auth/email-already-in-use':
-          // This case should be handled by the logic above, but we keep it as a fallback.
           description = "Este email ya está registrado. Intente iniciar sesión.";
           title = "Error de Registro";
           break;
         case 'auth/weak-password':
           description = "La contraseña debe tener al menos 6 caracteres.";
           break;
-        case 'auth/missing-or-insufficient-permissions':
-           description = "Error de permisos. Contacte al administrador.";
-           break;
         default:
             console.error("Auth Error:", error.code, error.message);
       }

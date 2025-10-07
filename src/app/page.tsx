@@ -6,7 +6,6 @@ import {
   Home,
   LineChart,
   Menu,
-  ChevronRight,
   ShoppingCart,
   Package,
   User,
@@ -14,7 +13,6 @@ import {
   Settings,
   HardDrive,
   Users,
-  ChevronDown,
 } from 'lucide-react';
 import {
   collection,
@@ -22,6 +20,8 @@ import {
   writeBatch,
   query,
   onSnapshot,
+  getDoc,
+  serverTimestamp,
 } from 'firebase/firestore';
 
 import { Badge } from '@/components/ui/badge';
@@ -147,6 +147,65 @@ function AppContent() {
   const auth = useAuth();
   const firestore = useFirestore();
   const [isSeeding, setIsSeeding] = useState(false);
+
+  // This effect handles the creation of user profile and role on first login
+  useEffect(() => {
+    const setupUser = async () => {
+      if (!user || !firestore) return;
+
+      const userRef = doc(firestore, "users", user.uid);
+      const userDoc = await getDoc(userRef);
+
+      // Create user profile if it doesn't exist
+      if (!userDoc.exists()) {
+        const userData = {
+            uid: user.uid,
+            email: user.email,
+            displayName: user.email?.split('@')[0] || 'Usuario',
+            createdAt: serverTimestamp(),
+        };
+        // Use setDocumentNonBlocking to avoid blocking UI, error is handled globally
+        setDocumentNonBlocking(userRef, userData, { merge: true });
+        toast({
+          title: "Perfil de usuario creado",
+          description: "¡Bienvenido! Su perfil ha sido guardado."
+        });
+      }
+
+      // Assign role if it doesn't exist
+      const roleRef = doc(firestore, "roles", user.uid);
+      const roleDoc = await getDoc(roleRef);
+
+      if (!roleDoc.exists()) {
+        // By default, new users are editors. Admin role must be assigned manually.
+        const isAdmin = user.email === 'maurofbordon@gmail.com';
+        const role = isAdmin ? 'admin' : 'editor';
+        setDocumentNonBlocking(roleRef, { role }, { merge: true });
+
+        // If the user is the default admin, we must trigger a server-side action
+        // to set the custom claim and then refresh the token to get it on the client.
+        if (isAdmin) {
+          try {
+             const { updateUserRoleByEmail } = await import('@/app/actions');
+             const result = await updateUserRoleByEmail(user.email!, 'admin');
+             if (result.success) {
+                await user.getIdToken(true); // Force token refresh
+                toast({
+                  title: "Rol de administrador asignado",
+                  description: "Se le han otorgado permisos de administrador."
+                });
+             } else {
+               throw new Error(result.error);
+             }
+          } catch(e: any) {
+              console.error("Failed to set admin custom claim:", e);
+              toast({ variant: 'destructive', title: "Error al asignar rol de Admin", description: e.message });
+          }
+        }
+      }
+    };
+    setupUser();
+  }, [user, firestore, toast]);
 
   const userProfileRef = useMemoFirebase(
     () => (user ? doc(firestore, 'users', user.uid) : null),
@@ -395,7 +454,6 @@ function AppContent() {
     icon,
     label,
     badgeCount,
-    isSubItem = false,
     onClick,
     disabled = false,
   }: {
@@ -403,7 +461,6 @@ function AppContent() {
     icon: React.ReactNode;
     label: string;
     badgeCount?: number;
-    isSubItem?: boolean;
     onClick: (view: View) => void;
     disabled?: boolean;
   }) => (
@@ -415,9 +472,7 @@ function AppContent() {
       }}
       className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all ${
         disabled ? 'cursor-not-allowed opacity-50' : 'hover:text-primary'
-      } ${view === targetView ? 'bg-muted text-primary' : ''} ${
-        isSubItem ? 'pl-11' : ''
-      }`}
+      } ${view === targetView ? 'bg-muted text-primary' : ''}`}
     >
       {icon}
       {label}
@@ -509,7 +564,7 @@ function AppContent() {
         });
         return <Skeleton className="h-full w-full" />;
       }
-      return <UserManagementView firestore={firestore} currentUser={user} />;
+      return <UserManagementView />;
     }
     if (view.startsWith('machine-')) {
       const machineId = view.replace('machine-', '');
