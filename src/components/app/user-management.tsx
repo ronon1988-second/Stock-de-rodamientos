@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Firestore, collection, doc } from 'firebase/firestore';
@@ -11,7 +11,6 @@ import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '../ui/skeleton';
 import { User } from 'firebase/auth';
 import { Button } from '../ui/button';
 import { Loader2 } from 'lucide-react';
@@ -25,12 +24,12 @@ export default function UserManagementView({ firestore, currentUser }: UserManag
     const { toast } = useToast();
     const [shouldLoad, setShouldLoad] = useState(false);
 
-    // Memoize references only when shouldLoad is true
-    const rolesRef = useMemoFirebase(() => shouldLoad ? collection(firestore, 'roles') : null, [firestore, shouldLoad]);
-    const { data: roles, isLoading: isLoadingRoles } = useCollection<UserRole>(rolesRef);
+    const rolesQuery = useMemoFirebase(() => shouldLoad ? collection(firestore, 'roles') : null, [firestore, shouldLoad]);
+    const { data: roles, isLoading: isLoadingRoles } = useCollection<UserRole>(rolesQuery);
 
-    const usersRef = useMemoFirebase(() => shouldLoad ? collection(firestore, 'users') : null, [firestore, shouldLoad]);
-    const { data: users, isLoading: isLoadingUsers } = useCollection<UserProfile>(usersRef);
+    const usersQuery = useMemoFirebase(() => shouldLoad ? collection(firestore, 'users') : null, [firestore, shouldLoad]);
+    const { data: users, isLoading: isLoadingUsers } = useCollection<UserProfile>(usersQuery);
+
 
     const handleLoadClick = useCallback(() => {
         setShouldLoad(true);
@@ -56,7 +55,7 @@ export default function UserManagementView({ firestore, currentUser }: UserManag
         }).sort((a,b) => (a.displayName || '').localeCompare(b.displayName || ''));
     }, [roles, users]);
     
-    const isLoading = isLoadingRoles || isLoadingUsers;
+    const isLoading = (isLoadingRoles || isLoadingUsers) && shouldLoad;
 
     return (
         <Card>
