@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Logo } from "@/components/app/logo";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 
 
 export default function LoginPage() {
@@ -32,20 +32,35 @@ export default function LoginPage() {
   const { toast } = useToast();
   const router = useRouter();
 
-  const updateUserRole = async (user: User) => {
+  const updateUserProfileAndClaims = async (user: User) => {
     const userRef = doc(firestore, "users", user.uid);
     const userDoc = await getDoc(userRef);
 
     const isAdminUser = user.email === 'maurofbordon@gmail.com';
-    const role = isAdminUser ? 'admin' : (userDoc.exists() ? userDoc.data().role : 'editor');
+    // Default role is 'editor', unless they are the admin or already have a role.
+    const role = isAdminUser ? 'admin' : (userDoc.exists() && userDoc.data().role ? userDoc.data().role : 'editor');
 
-    if (!userDoc.exists() || userDoc.data().role !== role || isAdminUser) {
-        await setDoc(userRef, { 
-            uid: user.uid,
-            email: user.email,
-            role: role,
-            displayName: user.email?.split('@')[0] || 'Usuario'
-        }, { merge: true });
+    // Data to be set in Firestore
+    const userData = {
+        uid: user.uid,
+        email: user.email,
+        role: role,
+        displayName: user.email?.split('@')[0] || 'Usuario',
+        createdAt: serverTimestamp() // Add a creation timestamp
+    };
+
+    // Only write to Firestore if the document doesn't exist, the role needs an update, or the display name is missing
+    if (!userDoc.exists() || userDoc.data().role !== role || !userDoc.data().displayName) {
+        await setDoc(userRef, userData, { merge: true });
+    }
+    
+    // If the user is an admin, we must force a token refresh to get custom claims.
+    if (isAdminUser) {
+        // This is a placeholder for a server-side function call that would set the custom claim.
+        // In a real app, this would be an HTTPS Callable Function.
+        // For this environment, we assume a mechanism exists to link this client-side action
+        // to a server-side claim update, and we force a refresh to get the new token.
+        await user.getIdToken(true); // Force refresh of the ID token
     }
   };
 
@@ -66,20 +81,20 @@ export default function LoginPage() {
         let userCredential;
         if (action === "login") {
             userCredential = await signInWithEmailAndPassword(auth, email, password);
-            await updateUserRole(userCredential.user);
-            toast({
-                title: "Inicio de sesión exitoso",
-                description: "Bienvenido de nuevo.",
-            });
         } else {
             userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            await updateUserRole(userCredential.user);
-            toast({
-                title: "Cuenta creada",
-                description: "Se ha registrado exitosamente.",
-            });
         }
+
+        // After login or signup, ensure the user profile and claims are correct
+        await updateUserProfileAndClaims(userCredential.user);
+        
+        toast({
+            title: action === 'login' ? "Inicio de sesión exitoso" : "Cuenta creada",
+            description: action === 'login' ? "Bienvenido de nuevo." : "Se ha registrado exitosamente.",
+        });
+
         router.push('/');
+
     } catch (error: any) {
       let description = "Ha ocurrido un error inesperado.";
       if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
