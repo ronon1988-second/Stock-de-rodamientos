@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Firestore, collection, doc } from 'firebase/firestore';
 import { useCollection, useMemoFirebase } from '@/firebase';
-import { UserRole } from '@/lib/types';
+import { UserRole, UserProfile } from '@/lib/types';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -22,9 +22,11 @@ type UserManagementViewProps = {
 export default function UserManagementView({ firestore, currentUser }: UserManagementViewProps) {
     const { toast } = useToast();
 
-    // Change from /users to /roles
     const rolesRef = useMemoFirebase(() => collection(firestore, 'roles'), [firestore]);
     const { data: roles, isLoading: isLoadingRoles } = useCollection<UserRole>(rolesRef);
+
+    const usersRef = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
+    const { data: users, isLoading: isLoadingUsers } = useCollection<UserProfile>(usersRef);
 
     const handleRoleChange = (userId: string, newRole: 'admin' | 'editor') => {
         const roleRef = doc(firestore, 'roles', userId);
@@ -34,8 +36,19 @@ export default function UserManagementView({ firestore, currentUser }: UserManag
             description: `El rol del usuario se ha cambiado a ${newRole}.`,
         });
     };
+
+    const combinedUsers = React.useMemo(() => {
+        if (!roles || !users) return [];
+        return users.map(user => {
+            const userRole = roles.find(r => r.id === user.uid);
+            return {
+                ...user,
+                role: userRole?.role || 'editor', // Default to editor if no role found
+            };
+        }).sort((a,b) => (a.displayName || '').localeCompare(b.displayName || ''));
+    }, [roles, users]);
     
-    if (isLoadingRoles) {
+    if (isLoadingRoles || isLoadingUsers) {
         return (
             <Card>
                 <CardHeader>
@@ -65,22 +78,24 @@ export default function UserManagementView({ firestore, currentUser }: UserManag
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>ID de Usuario</TableHead>
+                            <TableHead>Email</TableHead>
+                            <TableHead>Nombre</TableHead>
                             <TableHead>Rol</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {roles?.sort((a,b) => a.id.localeCompare(b.id)).map(role => {
+                        {combinedUsers.map(user => {
                             return (
-                                <TableRow key={role.id}>
-                                    <TableCell className="font-mono">{role.id}</TableCell>
+                                <TableRow key={user.id}>
+                                    <TableCell>{user.email}</TableCell>
+                                    <TableCell className="font-medium">{user.displayName}</TableCell>
                                     <TableCell>
-                                        {currentUser?.uid === role.id ? (
-                                            <Badge variant="secondary">{role.role}</Badge>
+                                        {currentUser?.uid === user.uid ? (
+                                            <Badge variant="secondary">{user.role}</Badge>
                                         ) : (
                                             <Select
-                                                value={role.role}
-                                                onValueChange={(newRole: 'admin' | 'editor') => handleRoleChange(role.id, newRole)}
+                                                value={user.role}
+                                                onValueChange={(newRole: 'admin' | 'editor') => handleRoleChange(user.uid, newRole)}
                                             >
                                                 <SelectTrigger className="w-[120px]">
                                                     <SelectValue placeholder="Seleccionar rol" />
