@@ -1,168 +1,150 @@
 /**
- * @fileoverview Firestore Security Rules for the Inventory Management Application.
- *
- * Core Philosophy:
- * This ruleset prioritizes secure data access based on user roles and ownership.
- * User profiles and roles are strictly controlled, while inventory and machine
- * data have more flexible access for authorized users.
- *
+ * @file Firestore Security Rules
+ * @description This ruleset enforces role-based access control, with 'admin' and 'editor' roles having elevated privileges.
  * Data Structure:
- * - /users/{userId}: User profiles, accessible only to the user themselves.
- * - /roles/{userId}: User roles, accessible only to admins.
- * - /inventory/{itemId}: Inventory items, accessible to admins and editors.
- * - /sectors/{sectorId}: Sectors, accessible to admins and editors.
- * - /sectors/{sectorId}/machines/{machineId}: Machines within sectors, accessible to admins and editors.
- * - /machineAssignments/{assignmentId}: Assignments of inventory items to machines, accessible to admins and editors.
- * - /usageLog/{logId}: Logs of item usage, accessible to admins and editors.
- *
+ * - /roles/{userId}: Stores user roles (admin, editor).
+ * - /users/{userId}: Stores user profile data; only accessible to admins.
+ * - /sectors/{sectorId}: Stores sector data; readable by all authenticated users, writable by admins/editors.
+ * - /articles/{articleId}: Stores article data; readable by all authenticated users, writable by admins/editors.
  * Key Security Decisions:
- * - User listing is disallowed to prevent unauthorized access to user data.
- * - Read-only collections are not used; all data is subject to role-based access control.
- * - The default security posture for ambiguous relationships is strict access control, requiring admin or editor roles.
+ * - Roles are stored in the /roles/{userId} collection.
+ * - User profiles (/users/{userId}) are only readable by admins.
+ * - Sectors and articles are readable by any authenticated user, but only admins/editors can write.
+ * Denormalization for Authorization: The rules rely on the `request.auth.token.role` claim to check user roles, avoiding the need for extra reads.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows a user to read and write their own profile data.
-     * @path /users/{userId}
-     * @allow (create) - User with UID 'user123' can create a profile with uid: 'user123'.
-     * @allow (get, update, delete) - User with UID 'user123' can read/update/delete their own profile.
-     * @deny (create) - User with UID 'user456' cannot create a profile with uid: 'user123'.
-     * @principle Enforces document ownership for user profiles.
-     */
-    match /users/{userId} {
-      // Only signed-in users can access user profiles.
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if false; // disable listing for security.
-
-      // Only the user themselves can create their profile.
-      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.uid == userId;
-
-      // Only the user themselves can update their profile, and the uid must remain unchanged.
-      allow update: if isSignedIn() && isOwner(userId) && resource.data.uid == request.resource.data.uid;
-
-      // Only the user themselves can delete their profile.
-      allow delete: if isSignedIn() && isExistingOwner(userId);
-    }
-
-    /**
-     * @description Restricts access to user roles to only admins.
+     * @description Allows a user to read their own role.
      * @path /roles/{userId}
-     *   @allow (create) - Admin user can create a role for any user.
-     *   @allow (get, update, delete) - Admin user can read, update, and delete any user role.
-     *   @deny (create, update, delete) - Non-admin user cannot modify any user role.
-     * @principle Enforces admin-only access for managing user roles.
+     * @allow (get) User with UID "user123" reading /roles/user123.
+     * @deny (get) User with UID "user123" reading /roles/user456.
+     * @principle Enforces user-ownership for reading role.
      */
     match /roles/{userId} {
-      allow get: if isAdmin();
+      allow get: if isSignedIn() && isOwner(userId);
       allow list: if false;
-
-      allow create: if isAdmin();
-
-      allow update: if isAdmin();
-
-      allow delete: if isAdmin();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows admins and editors to manage inventory items.
-     * @path /inventory/{itemId}
-     * @allow (get, list) - Admin or editor can read any inventory item.
-     * @allow (create, update, delete) - Admin or editor can create, update, or delete any inventory item.
-     * @deny (create, update, delete) - Non-admin/editor cannot modify inventory.
-     * @principle Enforces role-based access control for inventory management.
+     * @description Only admins can read user profiles.
+     * @path /users/{userId}
+     * @allow (get) Admin user reading any /users/{userId} document.
+     * @deny (get) Non-admin user reading any /users/{userId} document.
+     * @principle Restricts user profile access to admins only.
      */
-    match /inventory/{itemId} {
-      allow get: if isAdmin() || isEditor();
-      allow list: if isAdmin() || isEditor();
-
-      allow create: if isAdmin() || isEditor();
-
-      allow update: if isAdmin() || isEditor() && resource != null;
-
-      allow delete: if isAdmin() || isEditor() && resource != null;
+    match /users/{userId} {
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows admins and editors to manage sectors.
+     * @description Allows authenticated users to read sectors, and admins/editors to write.
      * @path /sectors/{sectorId}
-     * @allow (get, list) - Admin or editor can read any sector.
-     * @allow (create, update, delete) - Admin or editor can create, update, or delete any sector.
-     * @deny (create, update, delete) - Non-admin/editor cannot modify sectors.
-     * @principle Enforces role-based access control for sector management.
+     * @allow (get) Authenticated user reading any /sectors/{sectorId} document.
+     * @allow (create) Admin/Editor creating a new /sectors/{sectorId} document.
+     * @deny (get) Unauthenticated user reading any /sectors/{sectorId} document.
+     * @deny (create) Non-admin/editor user creating a new /sectors/{sectorId} document.
+     * @principle Enforces role-based access for sector management.
      */
     match /sectors/{sectorId} {
-      allow get: if isAdmin() || isEditor();
-      allow list: if isAdmin() || isEditor();
-
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
       allow create: if isAdmin() || isEditor();
-
-      allow update: if isAdmin() || isEditor() && resource != null;
-
-      allow delete: if isAdmin() || isEditor() && resource != null;
+      allow update: if isExistingAdmin() || isExistingEditor();
+      allow delete: if isExistingAdmin() || isExistingEditor();
     }
 
     /**
-     * @description Allows admins and editors to manage machines within sectors.
-     * @path /sectors/{sectorId}/machines/{machineId}
-     * @allow (get, list) - Admin or editor can read any machine in any sector.
-     * @allow (create, update, delete) - Admin or editor can create, update, or delete any machine in any sector.
-     * @deny (create, update, delete) - Non-admin/editor cannot modify machines.
-     * @principle Enforces role-based access control for machine management.
+     * @description Allows authenticated users to read articles, and admins/editors to write.
+     * @path /articles/{articleId}
+     * @allow (get) Authenticated user reading any /articles/{articleId} document.
+     * @allow (create) Admin/Editor creating a new /articles/{articleId} document.
+     * @deny (get) Unauthenticated user reading any /articles/{articleId} document.
+     * @deny (create) Non-admin/editor user creating a new /articles/{articleId} document.
+     * @principle Enforces role-based access for article management.
      */
-    match /sectors/{sectorId}/machines/{machineId} {
-      allow get: if isAdmin() || isEditor();
-      allow list: if isAdmin() || isEditor();
-
+    match /articles/{articleId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
       allow create: if isAdmin() || isEditor();
-
-      allow update: if isAdmin() || isEditor() && resource != null;
-
-      allow delete: if isAdmin() || isEditor() && resource != null;
+      allow update: if isExistingAdmin() || isExistingEditor();
+      allow delete: if isExistingAdmin() || isExistingEditor();
     }
 
     /**
-     * @description Allows admins and editors to manage machine assignments.
-     * @path /machineAssignments/{assignmentId}
-     * @allow (get, list) - Admin or editor can read any machine assignment.
-     * @allow (create, update, delete) - Admin or editor can create, update, or delete any machine assignment.
-     * @deny (create, update, delete) - Non-admin/editor cannot modify machine assignments.
-     * @principle Enforces role-based access control for machine assignment management.
+     * @description Allows read and write for inventory items.
+     * @path /inventory/{itemId}
+     * @allow (get) Admin user reading any /inventory/{itemId} document.
+     * @allow (create) Admin creating a new /inventory/{itemId} document.
+     * @deny (get) Non-admin user reading any /inventory/{itemId} document.
+     * @deny (create) Non-admin user creating a new /inventory/{itemId} document.
+     * @principle Enforces role-based access for inventory item management.
      */
-    match /machineAssignments/{assignmentId} {
-      allow get: if isAdmin() || isEditor();
-      allow list: if isAdmin() || isEditor();
+     match /inventory/{itemId} {
+        allow get: if isAdmin() || isEditor();
+        allow list: if isAdmin() || isEditor();
+        allow create: if isAdmin() || isEditor();
+        allow update: if isExistingAdmin() || isExistingEditor();
+        allow delete: if isExistingAdmin() || isExistingEditor();
+     }
 
-      allow create: if isAdmin() || isEditor();
+      /**
+       * @description Allows read and write for machine assignments.
+       * @path /machineAssignments/{assignmentId}
+       * @allow (get) Admin user reading any /machineAssignments/{assignmentId} document.
+       * @allow (create) Admin creating a new /machineAssignments/{assignmentId} document.
+       * @deny (get) Non-admin user reading any /machineAssignments/{assignmentId} document.
+       * @deny (create) Non-admin user creating a new /machineAssignments/{assignmentId} document.
+       * @principle Enforces role-based access for machine assignment management.
+       */
+     match /machineAssignments/{assignmentId} {
+        allow get: if isAdmin() || isEditor();
+        allow list: if isAdmin() || isEditor();
+        allow create: if isAdmin() || isEditor();
+        allow update: if isExistingAdmin() || isExistingEditor();
+        allow delete: if isExistingAdmin() || isExistingEditor();
+     }
 
-      allow update: if isAdmin() || isEditor() && resource != null;
+      /**
+       * @description Allows read and write for usage logs.
+       * @path /usageLog/{logId}
+       * @allow (get) Admin user reading any /usageLog/{logId} document.
+       * @allow (create) Admin creating a new /usageLog/{logId} document.
+       * @deny (get) Non-admin user reading any /usageLog/{logId} document.
+       * @deny (create) Non-admin user creating a new /usageLog/{logId} document.
+       * @principle Enforces role-based access for usage log management.
+       */
+       match /usageLog/{logId} {
+          allow get: if isAdmin() || isEditor();
+          allow list: if isAdmin() || isEditor();
+          allow create: if isAdmin() || isEditor();
+          allow update: if isExistingAdmin() || isExistingEditor();
+          allow delete: if isExistingAdmin() || isExistingEditor();
+       }
 
-      allow delete: if isAdmin() || isEditor() && resource != null;
-    }
-
-    /**
-     * @description Allows admins and editors to manage usage logs.
-     * @path /usageLog/{logId}
-     * @allow (get, list) - Admin or editor can read any usage log.
-     * @allow (create, update, delete) - Admin or editor can create, update, or delete any usage log.
-     * @deny (create, update, delete) - Non-admin/editor cannot modify usage logs.
-     * @principle Enforces role-based access control for usage log management.
-     */
-    match /usageLog/{logId} {
-      allow get: if isAdmin() || isEditor();
-      allow list: if isAdmin() || isEditor();
-
-      allow create: if isAdmin() || isEditor();
-
-      allow update: if isAdmin() || isEditor() && resource != null;
-
-      allow delete: if isAdmin() || isEditor() && resource != null;
-    }
+       /**
+        * @description Allows read and write for machines within a sector.
+        * @path /sectors/{sectorId}/machines/{machineId}
+        */
+       match /sectors/{sectorId}/machines/{machineId} {
+            allow get: if isAdmin() || isEditor();
+            allow list: if isAdmin() || isEditor();
+            allow create: if isAdmin() || isEditor();
+            allow update: if isExistingAdmin() || isExistingEditor();
+            allow delete: if isExistingAdmin() || isExistingEditor();
+       }
   }
 
-  // Helper Functions
+  // Helper functions
   function isSignedIn() {
     return request.auth != null;
   }
@@ -171,15 +153,19 @@ service cloud.firestore {
     return request.auth.uid == userId;
   }
 
-  function isExistingOwner(userId) {
-    return isOwner(userId) && resource != null;
-  }
-
   function isAdmin() {
-    return request.auth.token.role == 'admin';
+    return isSignedIn() && request.auth.token.role == "admin";
   }
 
   function isEditor() {
-    return request.auth.token.role == 'editor';
+    return isSignedIn() && request.auth.token.role == "editor";
   }
+
+    function isExistingAdmin() {
+        return isAdmin() && resource != null;
+    }
+
+    function isExistingEditor() {
+        return isEditor() && resource != null;
+    }
 }
