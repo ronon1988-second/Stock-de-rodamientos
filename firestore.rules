@@ -1,137 +1,145 @@
 /**
- * @file Firebase Security Rules for Firestore.
+ * @file Firestore Security Rules
+ * @description This ruleset enforces a role-based access control model.
  *
- * @core_philosophy This ruleset implements a role-based access control system with public read access to inventory data.
- *   Admin and editor roles have broad write access, while regular users can only read inventory data.
+ * Data Structure:
+ * - /users/{userId}: Stores user profile information, accessible only to the user themselves.
+ * - /roles/{userId}: Stores user roles (e.g., "admin"), accessible only to the user themselves for reading, and restricted for writing.
+ * - /sectors/{sectorId}: Stores sector information. Publicly readable.
+ * - /machines/{machineId}: Stores machine information. Publicly readable.
+ * - /inventoryItems/{itemId}: Stores inventory item information. Publicly readable.
+ * - /machineAssignments/{machineAssignmentId}: Stores assignments of inventory items to machines. Publicly readable.
  *
- * @data_structure
- * - /users/{userId}: Stores user profile data, accessible only to the user themselves.
- * - /roles/{userId}: Stores user roles, accessible only to admins.
- * - /sectors/{sectorId}: Stores sector data.
- * - /machines/{machineId}: Stores machine data.
- * - /inventory/{itemId}: Stores inventory item data.
- * - /machine_assignments/{assignmentId}: Stores machine assignment data.
+ * Key Security Decisions:
+ * - User profiles are private and only accessible to the owning user.
+ * - User roles are readable by the user.
+ * - Sectors, Machines, InventoryItems and MachineAssignments are publicly readable.
+ * - All write operations are denied to prevent unauthorized data modification.
  *
- * @key_security_decisions
- * - Public read access to the `/inventory` collection is enabled for prototyping, but write access is restricted to admins and editors.
- * - User listing is disabled for privacy.
- * - All write operations require authentication.
+ * Denormalization for Authorization:
+ * - None. This ruleset relies on path-based and role-based authorization.  If more complex access controls are needed in the future, consider denormalizing role or ownership data onto the documents themselves to avoid costly `get()` operations in the rules.
  *
- * @denormalization_for_authorization
- * - No denormalization is used in this initial prototype. All authorization is based on user roles.
- *
- * @structural_segregation
- * - User profiles and roles are stored in separate collections to manage access control effectively.
+ * Structural Segregation:
+ * - None. This ruleset does not segregate data into public and private collections.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows users to read their own profile data.
-     * @path /users/{userId}
-     * @allow (get, list) User with UID 'user123' can read their profile data.
-     * @deny (get, list) User with UID 'user456' cannot read 'user123' profile data.
-     * @principle Enforces document ownership for reads.
+     * @description Controls access to user profile information.
+     * @path /databases/{database}/documents/users/{userId}
+     * @allow (create) User with UID 'user123' can create their own profile.
+     * @allow (get) User with UID 'user123' can read their own profile.
+     * @allow (update) User with UID 'user123' can update their own profile.
+     * @allow (delete) User with UID 'user123' can delete their own profile.
+     * @deny (get) User with UID 'user456' cannot read user 'user123' profile.
+     * @deny (create) User with UID 'user456' cannot create user 'user123' profile.
+     * @deny (update) User with UID 'user456' cannot update user 'user123' profile.
+     * @deny (delete) User with UID 'user456' cannot delete user 'user123' profile.
+     * @principle Enforces document ownership for writes.
      */
     match /users/{userId} {
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
       allow get: if isOwner(userId);
       allow list: if false;
       allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
-      allow delete: if isOwner(userId);
+      allow update: if isOwner(userId) && resource != null;
+      allow delete: if isOwner(userId) && resource != null;
     }
 
     /**
-     * @description Allows admins to read and write user roles.
-     * @path /roles/{userId}
-     * @allow (get, list, create, update, delete) Admin user can manage user roles.
-     * @deny (get, list, create, update, delete) Non-admin user cannot manage user roles.
-     * @principle Restricts role management to admins.
+     * @description Controls access to user roles.
+     * @path /databases/{database}/documents/roles/{userId}
+     * @allow (get) User with UID 'user123' can read their own role.
+     * @deny (create) No one can create roles directly.
+     * @deny (update) No one can update roles directly.
+     * @deny (delete) No one can delete roles directly.
+     * @deny (list) Listing roles is not allowed.
+     * @deny (get) User with UID 'user456' cannot read user 'user123' role.
+     * @principle Restricts access to a user's own role.
      */
     match /roles/{userId} {
-      allow get, list, create, update, delete: if isAdmin();
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows anyone to read inventory data, but only admins/editors can create, update, or delete.
-     * @path /inventory/{itemId}
-     * @allow (get, list) Any user can read inventory data.
-     * @allow (create, update, delete) Admin user can manage inventory data.
-     * @deny (create, update, delete) Non-admin user cannot manage inventory data.
-     * @principle Provides public read access with owner-only writes (for admins/editors).
-     */
-    match /inventory/{itemId} {
-      allow get, list: if true;
-      allow create: if isAdmin() || isEditor();
-      allow update: if isExistingAdmin() || isExistingEditor();
-      allow delete: if isExistingAdmin() || isExistingEditor();
-    }
-
-    /**
-     * @description Allows anyone to read sector data, but only admins/editors can create, update, or delete.
-     * @path /sectors/{sectorId}
-     * @allow (get, list) Any user can read sector data.
-     * @allow (create, update, delete) Admin user can manage sector data.
-     * @deny (create, update, delete) Non-admin user cannot manage sector data.
+     * @description Controls access to sectors.
+     * @path /databases/{database}/documents/sectors/{sectorId}
+     * @allow (get) Anyone can read sector information.
+     * @allow (list) Anyone can list sectors.
+     * @deny (create) No one can create sectors through client.
+     * @deny (update) No one can update sectors through client.
+     * @deny (delete) No one can delete sectors through client.
+     * @principle Public read, owner-only writes (not implemented yet).
      */
     match /sectors/{sectorId} {
       allow get, list: if true;
-      allow create: if isAdmin() || isEditor();
-      allow update: if isExistingAdmin() || isExistingEditor();
-      allow delete: if isExistingAdmin() || isExistingEditor();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows anyone to read machine data, but only admins/editors can create, update, or delete.
-     * @path /machines/{machineId}
-     * @allow (get, list) Any user can read machine data.
-     * @allow (create, update, delete) Admin user can manage machine data.
-     * @deny (create, update, delete) Non-admin user cannot manage machine data.
+     * @description Controls access to machines.
+     * @path /databases/{database}/documents/machines/{machineId}
+     * @allow (get) Anyone can read machine information.
+     * @allow (list) Anyone can list machines.
+     * @deny (create) No one can create machines through client.
+     * @deny (update) No one can update machines through client.
+     * @deny (delete) No one can delete machines through client.
+     * @principle Public read, owner-only writes (not implemented yet).
      */
     match /machines/{machineId} {
       allow get, list: if true;
-      allow create: if isAdmin() || isEditor();
-      allow update: if isExistingAdmin() || isExistingEditor();
-      allow delete: if isExistingAdmin() || isExistingEditor();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows anyone to read machine assignment data, but only admins/editors can create, update, or delete.
-     * @path /machine_assignments/{assignmentId}
-     * @allow (get, list) Any user can read machine assignment data.
-     * @allow (create, update, delete) Admin user can manage machine assignment data.
-     * @deny (create, update, delete) Non-admin user cannot manage machine assignment data.
+     * @description Controls access to inventory items.
+     * @path /databases/{database}/documents/inventoryItems/{itemId}
+     * @allow (get) Anyone can read inventory item information.
+     * @allow (list) Anyone can list inventory items.
+     * @deny (create) No one can create inventory items through client.
+     * @deny (update) No one can update inventory items through client.
+     * @deny (delete) No one can delete inventory items through client.
+     * @principle Public read, owner-only writes (not implemented yet).
      */
-    match /machine_assignments/{assignmentId} {
+    match /inventoryItems/{itemId} {
       allow get, list: if true;
-      allow create: if isAdmin() || isEditor();
-      allow update: if isExistingAdmin() || isExistingEditor();
-      allow delete: if isExistingAdmin() || isExistingEditor();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    function isAdmin() {
-      return isSignedIn() && get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role == 'admin';
-    }
-
-    function isEditor() {
-      return isSignedIn() && (get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role == 'admin' || get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role == 'editor');
-    }
-
-    function isExistingAdmin() {
-        return isAdmin() && resource != null;
-    }
-
-    function isExistingEditor() {
-        return isEditor() && resource != null;
+    /**
+     * @description Controls access to machine assignments.
+     * @path /databases/{database}/documents/machineAssignments/{machineAssignmentId}
+     * @allow (get) Anyone can read machine assignment information.
+     * @allow (list) Anyone can list machine assignments.
+     * @deny (create) No one can create machine assignments through client.
+     * @deny (update) No one can update machine assignments through client.
+     * @deny (delete) No one can delete machine assignments through client.
+     * @principle Public read, owner-only writes (not implemented yet).
+     */
+    match /machineAssignments/{machineAssignmentId} {
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
   }
 }
