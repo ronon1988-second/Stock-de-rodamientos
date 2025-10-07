@@ -27,12 +27,14 @@ export async function updateUserRoleByEmail(email: string, role: 'admin' | 'edit
         const userRecord = await auth.getUserByEmail(email);
         const uid = userRecord.uid;
 
-        // Set the role in the /roles collection
-        const roleRef = firestore.collection('roles').doc(uid);
-        await roleRef.set({ role: role }, { merge: true });
-
-        // IMPORTANT: Set the custom claim on the user's auth token
-        await auth.setCustomUserClaims(uid, { [role]: true });
+        // Set the custom claim on the user's auth token
+        const currentClaims = userRecord.customClaims || {};
+        const newClaims = {
+            ...currentClaims, // Preserve existing claims
+            admin: role === 'admin',
+            editor: role === 'editor' || role === 'admin', // an admin is always an editor
+        };
+        await auth.setCustomUserClaims(uid, newClaims);
 
         return { success: true };
     } catch (error: any) {

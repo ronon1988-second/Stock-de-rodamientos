@@ -231,5 +231,3 @@ export default function OrganizationView({ sectors, firestore }: OrganizationVie
         </div>
     );
 }
-
-    

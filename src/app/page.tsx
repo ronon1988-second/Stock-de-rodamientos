@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -25,7 +24,7 @@ import {
   getDocs,
   addDoc,
 } from 'firebase/firestore';
-import { getIdToken } from 'firebase/auth';
+import { getIdTokenResult } from 'firebase/auth';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -157,12 +156,28 @@ function AppContent() {
   const refreshUserClaims = useCallback(async () => {
     if (!user) return;
     setAreClaimsLoading(true);
-    const tokenResult = await getIdToken(user, true); // Force refresh
-    const claims = tokenResult.claims;
-    setIsAdmin(!!claims.admin);
-    setIsEditor(!!claims.admin || !!claims.editor); // Admin is also an editor
-    setAreClaimsLoading(false);
-  }, [user]);
+    try {
+        const idTokenResult = await getIdTokenResult(user, true); // Force refresh
+        const claims = idTokenResult.claims;
+        const isAdminClaim = !!claims.admin;
+        const isEditorClaim = !!claims.editor;
+        
+        setIsAdmin(isAdminClaim);
+        setIsEditor(isAdminClaim || isEditorClaim); // Admin is also an editor
+    } catch (error) {
+        console.error("Error refreshing user claims:", error);
+        toast({
+            variant: "destructive",
+            title: "Error de permisos",
+            description: "No se pudieron verificar los roles de usuario."
+        });
+        setIsAdmin(false);
+        setIsEditor(false);
+    } finally {
+        setAreClaimsLoading(false);
+    }
+}, [user, toast]);
+
 
   useEffect(() => {
     refreshUserClaims();
@@ -317,6 +332,7 @@ function AppContent() {
   }, [machinesBySector]);
 
   const handleAddItem = (newItem: Omit<InventoryItem, 'id'>) => {
+    if (!isEditor) return;
     const invRef = collection(firestore, 'inventory');
     addDocumentNonBlocking(invRef, newItem);
     toast({
@@ -326,6 +342,7 @@ function AppContent() {
   };
 
   const handleUpdateItem = (updatedItem: InventoryItem) => {
+    if (!isEditor) return;
     const itemRef = doc(firestore, 'inventory', updatedItem.id);
     const { id, ...data } = updatedItem;
     setDocumentNonBlocking(itemRef, data, { merge: true });
@@ -341,7 +358,7 @@ function AppContent() {
     sectorId: string,
     quantity: number
   ) => {
-    if (!inventory) return;
+    if (!isEditor || !inventory) return;
     const item = inventory.find(b => b.id === itemId);
     if (!item) return;
 
@@ -364,6 +381,7 @@ function AppContent() {
   };
 
   const handleRemoveItemFromMachine = (assignmentId: string) => {
+    if (!isEditor) return;
     const assignment = machineAssignments?.find(item => item.id === assignmentId);
     if (!assignment) return;
 
@@ -382,7 +400,7 @@ function AppContent() {
     machineId: string,
     sectorId: string
   ) => {
-    if (!inventory) return;
+    if (!isEditor || !inventory) return;
     const item = inventory.find(i => i.id === itemId);
     if (!item) return;
 
@@ -531,7 +549,11 @@ function AppContent() {
         />
       );
     }
-    if (view === 'organization' && isAdmin) {
+    if (view === 'organization') {
+      if (!isAdmin) {
+        setView('dashboard');
+        return null;
+      }
       return (
         <OrganizationView
           sectors={sortedSectors}
@@ -539,7 +561,11 @@ function AppContent() {
         />
       );
     }
-    if (view === 'users' && isAdmin) {
+    if (view === 'users') {
+        if (!isAdmin) {
+            setView('dashboard');
+            return null;
+        }
       return <UserManagementView onRoleChanged={refreshUserClaims} />;
     }
     if (view.startsWith('machine-')) {
@@ -577,7 +603,14 @@ function AppContent() {
       );
     }
 
-    return null;
+    return (
+        <Dashboard
+            inventory={sortedInventory}
+            onUpdateItem={handleUpdateItem}
+            onAddItem={handleAddItem}
+            canEdit={isEditor}
+        />
+    );
   };
 
   const handleNavClick = (targetView: View) => {
@@ -597,12 +630,13 @@ function AppContent() {
         label="Panel de control"
         onClick={handleNavClick}
       />
-      {isAdmin && (
+      {isEditor && (
         <NavLink
           targetView="organization"
           icon={<Settings className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
           label="Organización"
           onClick={handleNavClick}
+          disabled={!isEditor}
         />
       )}
 
@@ -780,7 +814,3 @@ export default function Page() {
 
   return <AppContent />;
 }
-
-    
-
-    
