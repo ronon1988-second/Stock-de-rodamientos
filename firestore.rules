@@ -1,169 +1,120 @@
 /**
- * @fileoverview Firestore Security Rules for the Plant Management Application.
- *
- * Core Philosophy:
- * This ruleset implements a role-based access control (RBAC) model, with 'admin' and 'editor' roles.
- * All authenticated users can read data. Admins manage sectors, machines and user roles. Editors manage inventory and usage logs.
- *
- * Data Structure:
- * - /users/{userId}: Stores public user profile data. Accessible only by the user themselves.
- * - /roles/{userId}: Stores user roles ('admin' or 'editor'). Accessible only by admins.
- * - /sectors/{sectorId}: Stores sector information. Read-only for all, writeable by admins.
- * - /sectors/{sectorId}/machines/{machineId}: Stores machine data. Read-only for all, writeable by admins.
- * - /inventory/{inventoryId}: Stores inventory item data. Read-only for all, writeable by editors and admins.
- * - /machineAssignments/{assignmentId}: Stores machine assignment data. Read-only for all, writeable by editors and admins.
- * - /usageLog/{usageLogId}: Stores item usage history. Read-only for all, createable by editors and admins.
- *
- * Key Security Decisions:
- * - Role Assignment: User roles are stored in the `/roles/{userId}` collection and are only assignable by admins.
- * - Public Read Access:  Most collections are publicly readable to provide general visibility for all authenticated users.
- * - No User Listing: Listing of all users is not permitted via rules. The application must manage this through other means.
+ * @description This ruleset enforces a strict user-ownership model for user profiles and admin/editor roles for other collections.
+ * All write operations are guarded by authentication checks. Data shape validation is relaxed to facilitate rapid prototyping.
+ * @dataStructure
+ * - `/users/{userId}`: Stores user profile information, accessible only to the user themselves.
+ * - `/sectors/{sectorId}`: Stores sector information, accessible to admins and editors.
+ * - `/sectors/{sectorId}/machines/{machineId}`: Stores machine information, accessible to admins and editors.
+ * - `/inventory/{itemId}`: Stores inventory item information, accessible to admins and editors.
+ * - `/sectors/{sectorId}/machines/{machineId}/assignments/{assignmentId}`: Stores machine assignment information, accessible to admins and editors.
+ * @keySecurityDecisions
+ * - Users can only read and write their own profile data.
+ * - Listing of users is disallowed.
+ * - Admin and editor roles are required to modify sectors, machines, inventory, and assignments.
+ * @denormalizationForAuthorization
+ * - No denormalization is used in this ruleset.  Role checks are based on the `isAdmin()` or `isEditor()` helper functions.  For increased performance, consider denormalizing role information directly onto the documents being secured.  For example, add a `members` map on `/sectors/{sectorId}`.
+ * @structuralSegregation No structural segregation is implemented in this ruleset.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows a user to read and write their own profile data.
-     * @path /users/{userId}
-     * @allow (get, update, delete) User with UID 'user123' can read/write their profile.
-     * @allow (create) User with UID 'user123' can create their profile.
-     * @deny (get, update, delete) User with UID 'user456' cannot access 'user123' profile.
+     * @description Enforces user-ownership for profiles, ensuring users can only access their own data.
+     * @path /databases/{database}/documents/users/{userId}
+     * @allow (create) - User with UID 'user_abc' creates a profile document with ID 'user_abc'.
+     * @allow (get, update, delete) - User with UID 'user_abc' accesses their own profile document with ID 'user_abc'.
+     * @deny (create, get, update, delete) - User with UID 'user_abc' attempts to access profile document with ID 'user_xyz'.
      * @principle Enforces document ownership for writes.
      */
     match /users/{userId} {
       allow get: if isOwner(userId);
       allow list: if false;
       allow create: if isOwner(userId);
-      allow update: if isOwner(userId) && resource != null;
+      allow update: if isOwner(userId) ;
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Allows admins to manage user roles.
-     * @path /roles/{userId}
-     * @allow (create, update) Admin can create/update any user role.
-     * @allow (get) Any user can get any role.
-     * @deny (create, update) Non-admin user cannot create/update user role.
-     * @principle Restricts role management to admins.
-     */
-    match /roles/{userId} {
-       allow get: if true;
-       allow list: if false;
-       allow create, update: if isAdmin();
-       allow delete: if false;
-    }
-
-    /**
-     * @description Allows anyone to read sectors, only admins can modify.
-     * @path /sectors/{sectorId}
-     * @allow (get, list) Any authenticated user can view sector data.
-     * @allow (create, update, delete) Admin can manage sectors.
-     * @deny (create, update, delete) Non-admin user cannot manage sectors.
-     * @principle Enforces admin-only writes for sector management.
+     * @description Controls access to sectors, requiring admin or editor roles for write operations.
+     * @path /databases/{database}/documents/sectors/{sectorId}
+     * @allow (get, list) - Any signed-in user can read sector data.
+     * @allow (create, update, delete) - User with admin or editor role can modify sector data.
+     * @deny (create, update, delete) - User without admin or editor role attempts to modify sector data.
+     * @principle Restricts modification of sectors to authorized roles.
      */
     match /sectors/{sectorId} {
-      allow get, list: if true;
-      allow create, update, delete: if isAdmin();
+      allow get, list: if isSignedIn();
+      allow create: if isAdmin() || isEditor();
+      allow update: if isAdmin() || isEditor();
+      allow delete: if isAdmin() || isEditor();
     }
 
     /**
-     * @description Allows anyone to read machines, only admins can modify.
-     * @path /sectors/{sectorId}/machines/{machineId}
-     * @allow (get, list) Any authenticated user can view machine data.
-     * @allow (create, update, delete) Admin can manage machines.
-     * @deny (create, update, delete) Non-admin user cannot manage machines.
-     * @principle Enforces admin-only writes for machine management.
+     * @description Controls access to machines within a sector, requiring admin or editor roles for write operations.
+     * @path /databases/{database}/documents/sectors/{sectorId}/machines/{machineId}
+     * @allow (get, list) - Any signed-in user can read machine data within a sector.
+     * @allow (create, update, delete) - User with admin or editor role can modify machine data within a sector.
+     * @deny (create, update, delete) - User without admin or editor role attempts to modify machine data within a sector.
+     * @principle Restricts modification of machines to authorized roles.
      */
     match /sectors/{sectorId}/machines/{machineId} {
-      allow get, list: if true;
-      allow create, update, delete: if isAdmin();
-    }
-
-    /**
-     * @description Allows anyone to read inventory, only editors and admins can modify.
-     * @path /inventory/{inventoryId}
-     * @allow (get, list) Any authenticated user can view inventory data.
-     * @allow (create, update, delete) Editor or Admin can manage inventory items.
-     * @deny (create, update, delete) Non-editor/admin user cannot manage inventory items.
-     * @principle Enforces editor/admin-only writes for inventory management.
-     */
-    match /inventory/{inventoryId} {
-      allow get, list: if true;
-      allow create, update, delete: if isAdmin() || isEditor();
-    }
-
-    /**
-     * @description Allows anyone to read machine assignments, only editors and admins can modify.
-     * @path /machineAssignments/{assignmentId}
-     * @allow (get, list) Any authenticated user can view machine assignment data.
-     * @allow (create, update, delete) Editor or Admin can manage machine assignments.
-     * @deny (create, update, delete) Non-editor/admin user cannot manage machine assignments.
-     * @principle Enforces editor/admin-only writes for machine assignment management.
-     */
-    match /machineAssignments/{assignmentId} {
-      allow get, list: if true;
-      allow create, update, delete: if isAdmin() || isEditor();
-    }
-
-    /**
-     * @description Allows anyone to read usage logs, only editors and admins can create.
-     * @path /usageLog/{usageLogId}
-     * @allow (get, list) Any authenticated user can view usage log data.
-     * @allow (create) Editor or Admin can create usage logs.
-     * @deny (create) Non-editor/admin user cannot create usage logs.
-     * @principle Enforces editor/admin-only writes for usage log creation.
-     */
-    match /usageLog/{usageLogId} {
-      allow get, list: if true;
+      allow get, list: if isSignedIn();
       allow create: if isAdmin() || isEditor();
-      allow update, delete: if false;
-    }
-
-    // =================== Helper Functions ===================
-
-    /**
-     * @description Checks if the user is signed in.
-     * @return {boolean} True if the user is signed in, false otherwise.
-     */
-    function isSignedIn() {
-      return request.auth != null;
+      allow update: if isAdmin() || isEditor();
+      allow delete: if isAdmin() || isEditor();
     }
 
     /**
-     * @description Checks if the user's UID matches the requested userId.
-     * @param {string} userId The user ID to compare against the request's auth UID.
-     * @return {boolean} True if the user is the owner, false otherwise.
+     * @description Controls access to inventory items, requiring admin or editor roles for write operations.
+     * @path /databases/{database}/documents/inventory/{itemId}
+     * @allow (get, list) - Any signed-in user can read inventory item data.
+     * @allow (create, update, delete) - User with admin or editor role can modify inventory item data.
+     * @deny (create, update, delete) - User without admin or editor role attempts to modify inventory item data.
+     * @principle Restricts modification of inventory items to authorized roles.
      */
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+    match /inventory/{itemId} {
+      allow get, list: if isSignedIn();
+      allow create: if isAdmin() || isEditor();
+      allow update: if isAdmin() || isEditor();
+      allow delete: if isAdmin() || isEditor();
     }
 
-     /**
-      * @description Checks if the user's UID matches the requested userId AND the resource exists.
-      *              Useful for update/delete operations to prevent acting on non-existent documents.
-      * @param {string} userId The user ID to compare against the request's auth UID.
-      * @return {boolean} True if the user is the owner, false otherwise.
-      */
+        /**
+         * @description Controls access to machine assignments within a sector and machine, requiring admin or editor roles for write operations.
+         * @path /databases/{database}/documents/sectors/{sectorId}/machines/{machineId}/assignments/{assignmentId}
+         * @allow (get, list) - Any signed-in user can read machine assignment data within a sector and machine.
+         * @allow (create, update, delete) - User with admin or editor role can modify machine assignment data within a sector and machine.
+         * @deny (create, update, delete) - User without admin or editor role attempts to modify machine assignment data within a sector and machine.
+         * @principle Restricts modification of machine assignments to authorized roles.
+         */
+        match /sectors/{sectorId}/machines/{machineId}/assignments/{assignmentId} {
+          allow get, list: if isSignedIn();
+          allow create: if isAdmin() || isEditor();
+          allow update: if isAdmin() || isEditor();
+          allow delete: if isAdmin() || isEditor();
+        }
+
+  }
+
+  // Helper functions
+  function isSignedIn() {
+    return request.auth != null;
+  }
+
+  function isOwner(userId) {
+    return request.auth.uid == userId;
+  }
+
     function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
+        return isOwner(userId) && resource != null;
     }
 
+  function isAdmin() {
+    return request.auth.token.role == 'admin';
+  }
 
-    /**
-     * @description Checks if the user has the 'admin' role.
-     * @return {boolean} True if the user is an admin, false otherwise.
-     */
-    function isAdmin() {
-      return isSignedIn() && get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role == 'admin';
-    }
-
-    /**
-     * @description Checks if the user has the 'editor' role.
-     * @return {boolean} True if the user is an editor, false otherwise.
-     */
-    function isEditor() {
-      return isSignedIn() && get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role == 'editor';
-    }
+  function isEditor() {
+    return request.auth.token.role == 'editor';
   }
 }
