@@ -1,29 +1,146 @@
 /**
- * @fileoverview Firestore Security Rules for Prototyping.
+ * @fileoverview Firestore Security Rules
  *
  * Core Philosophy:
- * This ruleset prioritizes strict user-based authorization while relaxing data validation to enable rapid prototyping.
- * It enforces that users can only access their own data and, where applicable, allows public read access with owner-controlled writes.
+ * This ruleset enforces a tiered access control model, primarily based on user roles and ownership.
+ * User profiles and roles are strictly managed, while inventory and machine data are broadly accessible with restricted write access.
  *
  * Data Structure:
- * The Firestore database is structured with top-level collections such as 'inventory', 'sectors', 'machineAssignments', 'usageLog', 'users', and 'roles'.
- * Subcollections exist under 'sectors' (e.g., 'sectors/{sectorId}/machines/{machineId}').
+ * - /users/{userId}: Stores public user profile information, accessible only to the user themselves.
+ * - /roles/{userId}: Stores user roles (e.g., admin, editor), accessible only to admins.
+ * - /inventory/{itemId}: Global inventory of items.
+ * - /sectors/{sectorId}: Sectors in the plant.
+ * - /sectors/{sectorId}/machines/{machineId}: Machines within each sector.
+ * - /machineAssignments/{assignmentId}: Assignments of inventory items to machines.
+ * - /usageLog/{logId}: Logs of inventory item usage.
  *
  * Key Security Decisions:
- * - Users can only read and write their own user profiles and roles.
- * - Listing of users is disallowed.
- * - Public read access is granted to 'inventory', 'sectors', 'machineAssignments', and 'usageLog' collections with owner-only writes. This requires an ownerId field.
- * - Data validation is minimized to critical checks for authorization and relational integrity, such as enforcing the correct userId in user-specific documents.
+ * - User listing is explicitly denied to prevent unauthorized data scraping.
+ * - Roles are stored separately from profiles for enhanced security.
+ * - Most data is readable by all authenticated users, but write access is limited to specific roles.
  *
  * Denormalization for Authorization:
- * To avoid costly `get()` calls, authorization data (like the ownerId) should be denormalized directly onto the documents being secured.
- *
- * Structural Segregation:
- * Publicly readable data (e.g., inventory, sectors) is stored in top-level collections separate from private user data.
+ *  - While not explicitly present in this schema, consider adding fields like `ownerId` to documents if finer-grained ownership-based access control is needed in the future.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    /**
+     * @description Prevents listing all users.
+     * @path /users
+     * @allow None
+     * @deny list
+     * @principle Prevents information disclosure.
+     */
+    match /users {
+      allow list: if false;
+    }
+
+    /**
+     * @description Allows users to read and write their own profile data.
+     * @path /users/{userId}
+     * @allow (get, create, update, delete) - Authenticated user with matching userId.
+     * @deny (get, create, update, delete) - Any other user attempting to access this data.
+     * @principle Enforces user-ownership.
+     */
+    match /users/{userId} {
+      allow get: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.uid == userId;
+      allow update: if isSignedIn() && isExistingOwner(userId) && request.resource.data.uid == resource.data.uid;
+      allow delete: if isSignedIn() && isExistingOwner(userId);
+    }
+
+    /**
+     * @description Allows admins to read and manage user roles.
+     * @path /roles/{userId}
+     * @allow (get, create, update, delete) - Admin users.
+     * @deny (get, create, update, delete) - Non-admin users.
+     * @principle Enforces role-based access control.
+     */
+    match /roles/{userId} {
+      allow get: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
+    }
+
+    /**
+     * @description Allows anyone to read inventory items, but restricts creation, updates, and deletions.
+     * @path /inventory/{itemId}
+     * @allow (get, list) - Any user.
+     * @allow (create, update, delete) - Admin users only.
+     * @deny (create, update, delete) - Non-admin users.
+     * @principle Public read access with admin-restricted writes.
+     */
+    match /inventory/{itemId} {
+      allow get, list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
+    }
+
+    /**
+     * @description Allows anyone to read sectors, but restricts creation, updates, and deletions.
+     * @path /sectors/{sectorId}
+     * @allow (get, list) - Any user.
+     * @allow (create, update, delete) - Admin users only.
+     * @deny (create, update, delete) - Non-admin users.
+     * @principle Public read access with admin-restricted writes.
+     */
+    match /sectors/{sectorId} {
+      allow get, list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
+    }
+
+    /**
+     * @description Allows anyone to read machine data, but restricts creation, updates, and deletions.
+     * @path /sectors/{sectorId}/machines/{machineId}
+     * @allow (get, list) - Any user.
+     * @allow (create, update, delete) - Admin users only.
+     * @deny (create, update, delete) - Non-admin users.
+     * @principle Public read access with admin-restricted writes.
+     */
+    match /sectors/{sectorId}/machines/{machineId} {
+      allow get, list: if true;
+      allow create: if isAdmin() && request.resource.data.sectorId == sectorId;
+      allow update: if isAdmin() && resource != null && request.resource.data.sectorId == sectorId;
+      allow delete: if isAdmin() && resource != null;
+    }
+
+     /**
+      * @description Allows anyone to read machine assignments, but restricts creation, updates, and deletions.
+      * @path /machineAssignments/{assignmentId}
+      * @allow (get, list) - Any user.
+      * @allow (create, update, delete) - Admin users only.
+      * @deny (create, update, delete) - Non-admin users.
+      * @principle Public read access with admin-restricted writes.
+      */
+    match /machineAssignments/{assignmentId} {
+      allow get, list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
+    }
+
+    /**
+     * @description Allows anyone to read usage logs, but restricts creation, updates, and deletions.
+     * @path /usageLog/{logId}
+     * @allow (get, list) - Any user.
+     * @allow (create, update, delete) - Admin users only.
+     * @deny (create, update, delete) - Non-admin users.
+     * @principle Public read access with admin-restricted writes.
+     */
+    match /usageLog/{logId} {
+      allow get, list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
+    }
+
+    // --- Helper Functions ---
 
     /**
      * @description Checks if the user is signed in.
@@ -34,17 +151,17 @@ service cloud.firestore {
     }
 
     /**
-     * @description Checks if the requesting user is the owner of the resource.
-     * @param {string} userId - The user ID to compare against the request's authentication UID.
+     * @description Checks if the user is the owner of the resource.
+     * @param {string} userId The user ID to compare against the request's authentication UID.
      * @return {boolean} True if the user is the owner, false otherwise.
      */
     function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return request.auth.uid == userId;
     }
 
     /**
-     * @description Checks if the requesting user is the owner of the resource and that the resource exists.
-     * @param {string} userId - The user ID to compare against the request's authentication UID.
+     * @description Checks if the user is the owner of the resource and the resource exists.
+     * @param {string} userId The user ID to compare against the resource's UID.
      * @return {boolean} True if the user is the owner and the resource exists, false otherwise.
      */
     function isExistingOwner(userId) {
@@ -52,113 +169,11 @@ service cloud.firestore {
     }
 
     /**
-     * @description User profile information.
-     * @path /users/{userId}
-     * @allow (create) - Authenticated user with matching userId can create their profile.
-     * @allow (get, update, delete) - Authenticated user with matching userId can get, update, and delete their profile.
-     * @deny (create) - If the userId does not match the authenticated user's ID.
-     * @deny (get, update, delete) - If the userId does not match the authenticated user's ID.
-     * @principle Enforces user-ownership for profile access.
+     * @description Checks if the user has the 'admin' role.
+     * @return {boolean} True if the user has the 'admin' role, false otherwise.
      */
-    match /users/{userId} {
-      allow get, update, delete: if isExistingOwner(userId);
-      allow create: if isOwner(userId) && request.resource.data.uid == userId;
-      allow list: if false;
-    }
-
-    /**
-     * @description User role information.
-     * @path /roles/{userId}
-     * @allow (create) - Authenticated user with matching userId can create their role.
-     * @allow (get, update, delete) - Authenticated user with matching userId can get, update, and delete their role.
-     * @deny (create) - If the userId does not match the authenticated user's ID.
-     * @deny (get, update, delete) - If the userId does not match the authenticated user's ID.
-     * @principle Enforces user-ownership for role access.
-     */
-    match /roles/{userId} {
-      allow get, update, delete: if isExistingOwner(userId);
-      allow create: if isOwner(userId);
-      allow list: if false;
-    }
-
-    /**
-     * @description Global inventory of all available items.
-     * @path /inventory/{itemId}
-     * @allow (get, list) - Public read access to inventory items.
-     * @allow (create) - Only allow create if request.auth.uid matches the item's ownerId.
-     * @allow (update, delete) - Only allow update and delete if the request.auth.uid matches the item's ownerId and document exists.
-     * @deny (create) - If request.auth.uid does not match the item's ownerId.
-     * @deny (update, delete) - If request.auth.uid does not match the item's ownerId and document does not exists.
-     * @principle Provides public read access with owner-only writes.
-     */
-    match /inventory/{itemId} {
-      allow get, list: if true;
-      allow create: if request.resource.data.keys().hasAll(['name', 'stock', 'threshold']);
-      allow update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-    }
-
-    /**
-     * @description Top-level organizational units of the plant.
-     * @path /sectors/{sectorId}
-     * @allow (get, list) - Public read access to sectors.
-     * @allow (create) - Only allow create if request.auth.uid matches the sector's ownerId.
-     * @allow (update, delete) - Only allow update and delete if the request.auth.uid matches the sector's ownerId and document exists.
-     * @deny (create) - If request.auth.uid does not match the sector's ownerId.
-     * @deny (update, delete) - If request.auth.uid does not match the sector's ownerId and document does not exists.
-     * @principle Provides public read access with owner-only writes.
-     */
-    match /sectors/{sectorId} {
-      allow get, list: if true;
-      allow create: if request.resource.data.keys().hasAll(['name']);
-      allow update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-    }
-
-    /**
-     * @description Machines belonging to a specific sector.
-     * @path /sectors/{sectorId}/machines/{machineId}
-     * @allow (get, list) - Public read access to machines.
-     * @allow (create) - Only allow create if request.auth.uid matches the machine's ownerId.
-     * @allow (update, delete) - Only allow update and delete if the request.auth.uid matches the machine's ownerId and document exists.
-     * @deny (create) - If request.auth.uid does not match the machine's ownerId.
-     * @deny (update, delete) - If request.auth.uid does not match the machine's ownerId and document does not exists.
-     * @principle Provides public read access with owner-only writes.
-     */
-    match /sectors/{sectorId}/machines/{machineId} {
-      allow get, list: if true;
-      allow create: if request.resource.data.keys().hasAll(['name', 'sectorId']) && request.resource.data.sectorId == sectorId;
-      allow update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-    }
-
-    /**
-     * @description Associates inventory items with specific machines.
-     * @path /machineAssignments/{assignmentId}
-     * @allow (get, list) - Public read access to machine assignments.
-     * @allow (create) - Only allow create if request.auth.uid matches the assignment's ownerId.
-     * @allow (update, delete) - Only allow update and delete if the request.auth.uid matches the assignment's ownerId and document exists.
-     * @deny (create) - If request.auth.uid does not match the assignment's ownerId.
-     * @deny (update, delete) - If request.auth.uid does not match the assignment's ownerId and document does not exists.
-     * @principle Provides public read access with owner-only writes.
-     */
-    match /machineAssignments/{assignmentId} {
-      allow get, list: if true;
-      allow create: if request.resource.data.keys().hasAll(['sectorId', 'machineId', 'itemId', 'itemName', 'quantity']);
-      allow update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-    }
-
-    /**
-     * @description Historical log of all item usage.
-     * @path /usageLog/{logId}
-     * @allow (get, list) - Public read access to usage logs.
-     * @allow (create) - Only allow create if request.auth.uid matches the log's ownerId.
-     * @allow (update, delete) - Only allow update and delete if the request.auth.uid matches the log's ownerId and document exists.
-     * @deny (create) - If request.auth.uid does not match the log's ownerId.
-     * @deny (update, delete) - If request.auth.uid does not match the log's ownerId and document does not exists.
-     * @principle Provides public read access with owner-only writes.
-     */
-    match /usageLog/{logId} {
-      allow get, list: if true;
-      allow create: if request.resource.data.keys().hasAll(['itemId', 'itemName', 'quantity', 'date', 'sectorId', 'machineId']);
-      allow update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+    function isAdmin() {
+      return request.auth.token.admin == true;
     }
   }
 }
