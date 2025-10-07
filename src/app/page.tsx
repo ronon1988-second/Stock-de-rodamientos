@@ -14,6 +14,7 @@ import {
   Settings,
   HardDrive,
   Users,
+  ChevronDown,
 } from 'lucide-react';
 import {
   collection,
@@ -80,6 +81,7 @@ import {
 } from '@/firebase/non-blocking-updates';
 import OrganizationView from '@/components/app/organization-view';
 import UserManagementView from '@/components/app/user-management';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 type View =
   | 'dashboard'
@@ -93,9 +95,11 @@ type View =
 function MachineList({
   sector,
   onNavClick,
+  isMobile,
 }: {
   sector: Sector;
   onNavClick: (view: View) => void;
+  isMobile: boolean;
 }) {
   const firestore = useFirestore();
   const machinesRef = useMemoFirebase(
@@ -125,7 +129,7 @@ function MachineList({
               e.preventDefault();
               onNavClick(`machine-${machine.id}`);
             }}
-            className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary pl-4"
+            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary pl-4 ${isMobile ? 'text-lg' : 'text-sm'}`}
           >
             <HardDrive className="h-4 w-4" />
             {machine.name}
@@ -561,17 +565,21 @@ function AppContent() {
         Máquinas por Sector
       </div>
 
-      {sortedSectors.map(sector => (
-        <div key={sector.id} className="flex flex-col">
-           <div className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-muted-foreground">
-            <div className="flex items-center gap-3">
-              <Package className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />
-              <span className="font-semibold">{sector.name}</span>
-            </div>
-          </div>
-          <MachineList sector={sector} onNavClick={handleNavClick} />
-        </div>
-      ))}
+      <Accordion type="multiple" className="w-full">
+        {sortedSectors.map(sector => (
+          <AccordionItem key={sector.id} value={sector.id} className="border-b-0">
+            <AccordionTrigger className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-muted-foreground hover:text-primary hover:no-underline">
+              <div className="flex items-center gap-3">
+                <Package className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />
+                <span className="font-semibold">{sector.name}</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent>
+              <MachineList sector={sector} onNavClick={handleNavClick} isMobile={isMobile}/>
+            </AccordionContent>
+          </AccordionItem>
+        ))}
+      </Accordion>
 
       <div className="mt-auto border-t pt-4">
         <NavLink
@@ -662,7 +670,7 @@ function AppContent() {
                 <span className="sr-only">Alternar menú de navegación</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="flex flex-col">
+            <SheetContent side="left" className="flex flex-col overflow-auto">
               <SheetHeader>
                 <SheetTitle className="sr-only">Menú</SheetTitle>
               </SheetHeader>
