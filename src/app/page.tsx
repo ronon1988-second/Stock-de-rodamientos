@@ -94,6 +94,52 @@ type View =
   | 'users'
   | `machine-${string}`;
 
+// Helper component to fetch machines for a sector
+function MachineList({
+  sector,
+  onNavClick,
+}: {
+  sector: Sector;
+  onNavClick: (view: View) => void;
+}) {
+  const firestore = useFirestore();
+  const machinesRef = useMemoFirebase(
+    () => collection(firestore, `sectors/${sector.id}/machines`),
+    [firestore, sector.id]
+  );
+  const { data: machines, isLoading } = useCollection<Machine>(machinesRef);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-1 pt-1 pl-11">
+        <Skeleton className="h-8 w-3/4" />
+        <Skeleton className="h-8 w-1/2" />
+      </div>
+    );
+  }
+
+  return (
+    <CollapsibleContent className="space-y-1 pt-1">
+      {(machines || [])
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map(machine => (
+          <a
+            key={machine.id}
+            href="#"
+            onClick={e => {
+              e.preventDefault();
+              onNavClick(`machine-${machine.id}`);
+            }}
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary pl-11"
+          >
+            <HardDrive className="h-4 w-4" />
+            {machine.name}
+          </a>
+        ))}
+    </CollapsibleContent>
+  );
+}
+
 function AppContent() {
   const [view, setView] = useState<View>('dashboard');
   const { toast } = useToast();
@@ -104,23 +150,22 @@ function AppContent() {
   const firestore = useFirestore();
   const [isSeeding, setIsSeeding] = useState(false);
 
-  // --- User Profile and Role ---
   const userProfileRef = useMemoFirebase(
     () => (user ? doc(firestore, 'users', user.uid) : null),
     [firestore, user]
   );
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } =
+    useDoc<UserProfile>(userProfileRef);
 
   const userRoleRef = useMemoFirebase(
     () => (user ? doc(firestore, 'roles', user.uid) : null),
     [firestore, user]
   );
-  const { data: userRoleDoc, isLoading: isRoleLoading } = useDoc<UserRole>(userRoleRef);
+  const { data: userRoleDoc, isLoading: isRoleLoading } =
+    useDoc<UserRole>(userRoleRef);
   const userRole = userRoleDoc?.role;
   const isAdmin = userRole === 'admin';
 
-
-  // --- Firestore Data Hooks ---
   const inventoryRef = useMemoFirebase(
     () => collection(firestore, 'inventory'),
     [firestore]
@@ -134,63 +179,11 @@ function AppContent() {
   );
   const { data: sectors, isLoading: isSectorsLoading } =
     useCollection<Sector>(sectorsRef);
-
+    
   const [machinesBySector, setMachinesBySector] = useState<
     Record<string, Machine[]>
   >({});
-  const [areMachinesLoading, setAreMachinesLoading] = useState(true);
-
-  useEffect(() => {
-    if (!sectors) {
-      setAreMachinesLoading(isSectorsLoading); // Match loading state of sectors
-      return;
-    }
-    if (sectors.length === 0) {
-      setAreMachinesLoading(false); // No sectors to load machines from
-      return;
-    }
-
-    setAreMachinesLoading(true);
-    let loadedSectorsCount = 0;
-
-    const unsubscribes = sectors.map(sector => {
-      const machinesQuery = query(
-        collection(firestore, `sectors/${sector.id}/machines`)
-      );
-
-      return onSnapshot(
-        machinesQuery,
-        snapshot => {
-          const machines = snapshot.docs.map(d => ({
-            ...(d.data() as Omit<Machine, 'id'>),
-            id: d.id,
-          })) as Machine[];
-          setMachinesBySector(prev => ({ ...prev, [sector.id]: machines }));
-
-          // This logic now correctly waits for all listeners to report back at least once.
-          if (loadedSectorsCount < sectors.length) {
-            loadedSectorsCount++;
-            if (loadedSectorsCount === sectors.length) {
-              setAreMachinesLoading(false);
-            }
-          }
-        },
-        error => {
-          console.error(`Error fetching machines for sector ${sector.id}:`, error);
-          // Also advance the counter on error to avoid getting stuck in a loading state
-          if (loadedSectorsCount < sectors.length) {
-            loadedSectorsCount++;
-            if (loadedSectorsCount === sectors.length) {
-              setAreMachinesLoading(false);
-            }
-          }
-        }
-      );
-    });
-
-    return () => unsubscribes.forEach(unsub => unsub());
-  }, [firestore, sectors, isSectorsLoading]);
-
+  const areMachinesLoading = false; 
 
   const machineAssignmentsRef = useMemoFirebase(
     () => collection(firestore, 'machineAssignments'),
@@ -206,11 +199,9 @@ function AppContent() {
   const { data: usageLog, isLoading: isUsageLogLoading } =
     useCollection<UsageLog>(usageLogRef);
 
-  // Effect to seed initial data if collections are empty
   useEffect(() => {
     const seedData = async () => {
       if (!inventory) return;
-      // Check if inventory is loaded and is still empty
       if (inventory?.length === 0 && !isInventoryLoading) {
         setIsSeeding(true);
         toast({
@@ -271,6 +262,10 @@ function AppContent() {
         : [],
     [usageLog]
   );
+    
+  const allMachines = useMemo(() => {
+    return Object.values(machinesBySector).flat();
+  }, [machinesBySector]);
 
   const handleAddItem = (newItem: Omit<InventoryItem, 'id'>) => {
     if (!isAdmin) return;
@@ -454,13 +449,10 @@ function AppContent() {
     if (view === 'users') return 'Gestionar Usuarios';
     if (view.startsWith('machine-')) {
       const machineId = view.replace('machine-', '');
-      for (const sector of sortedSectors) {
-        const machine = machinesBySector[sector.id]?.find(
-          m => m.id === machineId
-        );
-        if (machine) {
+      const machine = allMachines.find(m => m.id === machineId);
+      const sector = sortedSectors.find(s => s.id === machine?.sectorId);
+      if (machine && sector) {
           return `${sector.name} / ${machine.name}`;
-        }
       }
     }
     return 'Panel de control';
@@ -472,9 +464,10 @@ function AppContent() {
       isAssignmentsLoading ||
       isUsageLogLoading ||
       isSectorsLoading ||
-      areMachinesLoading ||
       isSeeding ||
-      isProfileLoading || isRoleLoading;
+      isProfileLoading ||
+      isRoleLoading;
+
     if (isLoading) {
       return <Skeleton className="h-full w-full" />;
     }
@@ -507,11 +500,10 @@ function AppContent() {
       );
     }
     if (view === 'organization') {
-       if (!isAdmin) return null;
+      if (!isAdmin) return null;
       return (
         <OrganizationView
           sectors={sortedSectors}
-          machinesBySector={machinesBySector}
           firestore={firestore}
         />
       );
@@ -522,24 +514,22 @@ function AppContent() {
           <Card>
             <CardHeader>
               <CardTitle>Acceso Denegado</CardTitle>
-              <CardDescription>No tienes permisos para gestionar usuarios.</CardDescription>
+              <CardDescription>
+                No tienes permisos para gestionar usuarios.
+              </CardDescription>
             </CardHeader>
           </Card>
-        )
+        );
       }
-      return (
-        <UserManagementView firestore={firestore} currentUser={user} />
-      );
+      return <UserManagementView firestore={firestore} currentUser={user} />;
     }
     if (view.startsWith('machine-')) {
       const machineId = view.replace('machine-', '');
-      const sector = sortedSectors.find(s =>
-        machinesBySector[s.id]?.some(m => m.id === machineId)
-      );
-      if (!sector) return null;
-      const machine = machinesBySector[sector.id].find(m => m.id === machineId);
-      if (!machine) return null;
-
+      const machine = allMachines.find(m => m.id === machineId);
+      if (!machine) return <Skeleton className="h-full w-full" />
+      const sector = sortedSectors.find(s => s.id === machine.sectorId);
+      if (!sector) return <Skeleton className="h-full w-full" />
+      
       return (
         <MachineView
           sector={sector}
@@ -608,20 +598,7 @@ function AppContent() {
             </div>
             <ChevronRight className="chevron h-4 w-4 transition-transform" />
           </CollapsibleTrigger>
-          <CollapsibleContent className="space-y-1 pt-1">
-            {(machinesBySector[sector.id] || [])
-              .sort((a, b) => a.name.localeCompare(b.name))
-              .map(machine => (
-                <NavLink
-                  key={machine.id}
-                  targetView={`machine-${machine.id}`}
-                  icon={<HardDrive className="h-4 w-4" />}
-                  label={machine.name}
-                  isSubItem={true}
-                  onClick={handleNavClick}
-                />
-              ))}
-          </CollapsibleContent>
+          <MachineList sector={sector} onNavClick={handleNavClick} />
         </Collapsible>
       ))}
 
@@ -649,6 +626,26 @@ function AppContent() {
       </div>
     </nav>
   );
+
+  // This effect listens for when machines are loaded for any sector
+  // and aggregates them into the allMachines state
+  useEffect(() => {
+    if (!sectors) return;
+
+    const unsubscribes = sectors.map(sector => {
+        const machinesQuery = query(collection(firestore, `sectors/${sector.id}/machines`));
+        return onSnapshot(machinesQuery, (snapshot) => {
+            const machines = snapshot.docs.map(d => ({ ...d.data(), id: d.id })) as Machine[];
+            setMachinesBySector(prev => ({
+                ...prev,
+                [sector.id]: machines
+            }));
+        });
+    });
+
+    return () => unsubscribes.forEach(unsub => unsub());
+}, [firestore, sectors]);
+
 
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
