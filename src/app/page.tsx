@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -187,7 +188,7 @@ function AppContent() {
   const allUsersRef = useMemoFirebase(() => (firestore && isAdmin ? collection(firestore, 'users') : null), [firestore, isAdmin]);
   const { data: allUsersData, isLoading: isAllUsersLoading } = useCollection<UserProfile>(allUsersRef);
   
-  const allUsers = useMemo(() => allUsersData?.filter(u => u.uid !== user?.uid), [allUsersData, user]);
+  const allUsers = useMemo(() => allUsersData?.filter(u => user && u.uid !== user.uid), [allUsersData, user]);
 
   const inventoryRef = useMemoFirebase(() => firestore ? collection(firestore, 'inventory') : null, [firestore]);
   const { data: inventory, isLoading: isInventoryLoading } = useCollection<InventoryItem>(inventoryRef);
@@ -203,7 +204,7 @@ function AppContent() {
     
   useEffect(() => {
     const seedData = async () => {
-        if (!firestore || !user || isInventoryLoading || isSectorsLoading || isSeeding || !isAdmin) return;
+        if (!firestore || (!user && !isTestingAdmin) || isInventoryLoading || isSectorsLoading || isSeeding || !isAdmin) return;
 
         const invQuery = query(collection(firestore, 'inventory'));
         const sectorsQuery = query(collection(firestore, 'sectors'));
@@ -258,7 +259,7 @@ function AppContent() {
     };
 
     seedData();
-  }, [firestore, user, toast, isSeeding, isInventoryLoading, isSectorsLoading, isAdmin]);
+  }, [firestore, user, toast, isSeeding, isInventoryLoading, isSectorsLoading, isAdmin, isTestingAdmin]);
 
 
   const sortedInventory = useMemo(
@@ -420,11 +421,13 @@ function AppContent() {
   }, [inventory]);
 
   const handleLogout = async () => {
-    await auth.signOut();
-    toast({
-      title: 'Sesión cerrada',
-      description: 'Has cerrado sesión exitosamente.',
-    });
+    if (auth) {
+        await auth.signOut();
+        toast({
+          title: 'Sesión cerrada',
+          description: 'Has cerrado sesión exitosamente.',
+        });
+    }
   };
 
   const NavLink = ({
@@ -476,7 +479,7 @@ function AppContent() {
 
   const renderContent = () => {
     const isDataLoading =
-      isUserLoading ||
+      (isUserLoading && !isTestingAdmin) ||
       isRoleLoading ||
       isInventoryLoading ||
       isAssignmentsLoading ||
@@ -485,7 +488,7 @@ function AppContent() {
       isSeeding ||
       (isAdmin && isAllUsersLoading);
 
-    if (isDataLoading && !isTestingAdmin) {
+    if (isDataLoading) {
       return <Skeleton className="h-full w-full" />;
     }
     
@@ -634,7 +637,7 @@ function AppContent() {
     </nav>
   );
 
-  const isLoading = isUserLoading || (isRoleLoading && !isTestingAdmin);
+  const isLoading = isUserLoading && !isTestingAdmin;
   if (isLoading) {
       return (
         <div className="flex items-center justify-center min-h-screen">
@@ -704,26 +707,43 @@ function AppContent() {
               {getViewTitle()}
             </h1>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="secondary" size="icon" className="rounded-full">
-                <User className="h-5 w-4" />
-                <span className="sr-only">Perfil de usuario</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>
-                {user?.email}{' '}
-                {isAdmin && '(Admin)'}
-                {isEditor && !isAdmin && '(Editor)'}
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={handleLogout}>
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Cerrar sesión</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {!isTestingAdmin && user && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="secondary" size="icon" className="rounded-full">
+                  <User className="h-5 w-4" />
+                  <span className="sr-only">Perfil de usuario</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>
+                  {user?.email}{' '}
+                  {isAdmin && '(Admin)'}
+                  {isEditor && !isAdmin && '(Editor)'}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={handleLogout}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Cerrar sesión</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          {isTestingAdmin && (
+             <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="secondary" size="icon" className="rounded-full">
+                  <User className="h-5 w-4" />
+                  <span className="sr-only">Perfil de usuario</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>
+                  Modo Test (Admin)
+                </DropdownMenuLabel>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </header>
         <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-muted/40">
           {renderContent()}
