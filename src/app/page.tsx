@@ -173,13 +173,6 @@ function AppContent() {
   
   const usageLogRef = useMemoFirebase(() => firestore ? collection(firestore, 'usageLog') : null, [firestore]);
   const { data: usageLog, isLoading: isUsageLogLoading } = useCollection<UsageLog>(usageLogRef);
-
-  // Fetch all users only if the current user is an admin.
-  const allUsersRef = useMemoFirebase(
-    () => (firestore && userRoleDoc?.role === 'admin' ? collection(firestore, 'users') : null),
-    [firestore, userRoleDoc]
-  );
-  const { data: allUsers, isLoading: isAllUsersLoading } = useCollection<UserProfile>(allUsersRef);
   
   // PERMISSIONS
   const isMasterUser = user?.email === 'maurofbordon@gmail.com';
@@ -514,7 +507,7 @@ function AppContent() {
             toast({ title: "Acceso denegado", description: "Necesita permisos de administrador.", variant: "destructive"})
             return null;
         }
-      return <UserManagementView users={allUsers || []} />;
+      return <UserManagementView users={[]} />;
     }
     if (view.startsWith('machine-')) {
       const machineId = view.replace('machine-', '');
@@ -562,21 +555,12 @@ function AppContent() {
         onClick={handleNavClick}
       />
       {isAdmin && (
-        <>
-          <NavLink
-              targetView="organization"
-              icon={<Settings className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
-              label="Organización"
-              onClick={handleNavClick}
-          />
-          <NavLink
-            targetView="users"
-            icon={<Users className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
-            label="Gestionar Usuarios"
+        <NavLink
+            targetView="organization"
+            icon={<Settings className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
+            label="Organización"
             onClick={handleNavClick}
-            disabled={!isAdmin || isAllUsersLoading || !allUsers} // Disable if not admin or data is loading
-          />
-        </>
+        />
       )}
 
       <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
