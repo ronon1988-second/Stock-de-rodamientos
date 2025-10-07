@@ -33,7 +33,8 @@ export default function LoginPage() {
   const router = useRouter();
 
   const handleAuthenticationSuccess = async (user: User, isNewUser: boolean) => {
-    if (isNewUser) {
+    // For the master user, always ensure the role and claims are set.
+    if (isNewUser || user.email === 'maurofbordon@gmail.com') {
         await setupUserAndRole(user.uid, user.email || "");
     }
     // Force refresh of the ID token to get the latest custom claims.
