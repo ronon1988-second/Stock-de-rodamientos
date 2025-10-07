@@ -517,7 +517,16 @@ function AppContent() {
       );
     }
     if (view === 'users') {
-      // Logic changed here: No longer checking isAdmin to render the component
+      if (!isAdmin) {
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle>Acceso Denegado</CardTitle>
+              <CardDescription>No tienes permisos para gestionar usuarios.</CardDescription>
+            </CardHeader>
+          </Card>
+        )
+      }
       return (
         <UserManagementView firestore={firestore} currentUser={user} />
       );
@@ -635,6 +644,7 @@ function AppContent() {
           icon={<Users className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
           label="Gestionar Usuarios"
           onClick={handleNavClick}
+          disabled={!isAdmin}
         />
       </div>
     </nav>
@@ -753,4 +763,3 @@ export default function Page() {
 
   return <AppContent />;
 }
-

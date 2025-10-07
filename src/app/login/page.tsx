@@ -52,9 +52,10 @@ export default function LoginPage() {
     const roleDoc = await getDoc(roleRef);
 
     const isAdminUser = user.email === 'maurofbordon@gmail.com';
-    const role = isAdminUser ? 'admin' : (roleDoc.exists() && roleDoc.data().role ? roleDoc.data().role : 'editor');
+    const role = isAdminUser ? 'admin' : 'editor';
 
-    if (!roleDoc.exists() || roleDoc.data().role !== role) {
+    // Only write if the document doesn't exist or the role is different
+    if (!roleDoc.exists() || roleDoc.data()?.role !== role) {
         await setDoc(roleRef, { role: role }, { merge: true });
     }
   };
@@ -73,13 +74,10 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-        let userCredential;
         if (action === "login") {
-            userCredential = await signInWithEmailAndPassword(auth, email, password);
-            // The role is NOT updated on login to prevent permission errors.
-            // The user should get their role from the initial signup or be assigned one.
-        } else {
-            userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            await signInWithEmailAndPassword(auth, email, password);
+        } else { // signup
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             // On signup, create profile and role
             await updateUserProfile(userCredential.user);
             await updateUserRole(userCredential.user);
@@ -87,7 +85,7 @@ export default function LoginPage() {
         
         toast({
             title: action === 'login' ? "Inicio de sesión exitoso" : "Cuenta creada",
-            description: action === 'login' ? "Bienvenido de nuevo." : "Se ha registrado exitosamente.",
+            description: action === 'login' ? "Bienvenido de nuevo." : "Se ha registrado exitosamente y se le ha asignado un rol.",
         });
 
         router.push('/');
@@ -101,7 +99,7 @@ export default function LoginPage() {
       } else if (error.code === 'auth/weak-password') {
           description = "La contraseña debe tener al menos 6 caracteres."
       }
-      console.error("Auth Error:", error);
+      console.error("Auth Error:", error.code, error.message);
       toast({
         variant: "destructive",
         title: `Error de ${action === 'login' ? 'inicio de sesión' : 'registro'}`,
