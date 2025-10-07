@@ -141,7 +141,7 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, canEdit
         </CardHeader>
         <CardContent>
           <div className="max-h-[60vh] overflow-auto">
-            <Accordion type="multiple" className="w-full" defaultValue={Array.from(groupedAndFilteredItems.keys())}>
+            <Accordion type="multiple" className="w-full">
                 {Array.from(groupedAndFilteredItems.entries()).map(([series, items]) => (
                     <AccordionItem value={series} key={series}>
                         <AccordionTrigger className="text-lg font-semibold sticky top-0 bg-card z-10 px-4 py-3 border-b">

@@ -228,7 +228,7 @@ export default function ToBuyView({ inventory, machineAssignments }: ToBuyViewPr
           )}
 
           {totalItemsToReorderCount > 0 ? (
-            <Accordion type="multiple" className="w-full" defaultValue={Array.from(groupedItemsToReorder.keys())}>
+            <Accordion type="multiple" className="w-full">
               {Array.from(groupedItemsToReorder.entries()).map(([series, items]) => (
                 <AccordionItem value={series} key={series}>
                   <AccordionTrigger className="text-lg font-semibold sticky top-0 bg-card z-10 px-4 py-3 border-b">
