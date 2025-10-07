@@ -144,60 +144,24 @@ function AppContent() {
   const [view, setView] = useState<View>('dashboard');
   const { toast } = useToast();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const { user } = useUser();
+  const { user, isUserLoading } = useUser();
   const auth = useAuth();
   const firestore = useFirestore();
   const [isSeeding, setIsSeeding] = useState(false);
 
-  // Master user has all privileges, bypassing role checks.
-  const isMasterUser = user?.email === 'maurofbordon@gmail.com';
-
+  // DATA FETCHING
   const roleRef = useMemoFirebase(
     () => (user && firestore ? doc(firestore, 'roles', user.uid) : null),
     [firestore, user]
   );
   const { data: userRoleDoc, isLoading: isRoleLoading } = useDoc<UserRole>(roleRef);
   
-  const isAdmin = isMasterUser || userRoleDoc?.role === 'admin';
-  const isEditor = isAdmin || userRoleDoc?.role === 'editor';
-
-  // This effect handles the creation of user profile on first login
-  useEffect(() => {
-    const setupUser = async () => {
-      if (!user || !firestore) return;
-
-      const userRef = doc(firestore, "users", user.uid);
-      const userDoc = await getDoc(userRef);
-
-      if (!userDoc.exists()) {
-        const userData: Omit<UserProfile, 'id' | 'role'> = {
-            uid: user.uid,
-            email: user.email!,
-            displayName: user.email?.split('@')[0] || 'Usuario',
-        };
-        await setDoc(userRef, userData);
-         // Also set a default role in the 'roles' collection
-        const roleRef = doc(firestore, "roles", user.uid);
-        if (!(await getDoc(roleRef)).exists()) {
-          await setDoc(roleRef, { role: "editor" });
-        }
-        toast({
-          title: "Perfil de usuario creado",
-          description: "¡Bienvenido! Su perfil y rol predeterminado han sido guardados."
-        });
-      }
-    };
-    setupUser();
-  }, [user, firestore, toast]);
-
   const userProfileRef = useMemoFirebase(
     () => (user && firestore ? doc(firestore, 'users', user.uid) : null),
     [firestore, user]
   );
-  const { data: userProfile, isLoading: isProfileLoading } =
-    useDoc<UserProfile>(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
-  // START: DATA FETCHING
   const inventoryRef = useMemoFirebase(() => firestore ? collection(firestore, 'inventory') : null, [firestore]);
   const { data: inventory, isLoading: isInventoryLoading } = useCollection<InventoryItem>(inventoryRef);
 
@@ -210,9 +174,13 @@ function AppContent() {
   const usageLogRef = useMemoFirebase(() => firestore ? collection(firestore, 'usageLog') : null, [firestore]);
   const { data: usageLog, isLoading: isUsageLogLoading } = useCollection<UsageLog>(usageLogRef);
 
-  const allUsersRef = useMemoFirebase(() => firestore ? collection(firestore, 'users') : null, [firestore]);
+  const allUsersRef = useMemoFirebase(() => (isAdmin && firestore) ? collection(firestore, 'users') : null, [firestore, userRoleDoc]);
   const { data: allUsers, isLoading: isAllUsersLoading } = useCollection<UserProfile>(allUsersRef);
-  // END: DATA FETCHING
+  
+  // PERMISSIONS
+  const isMasterUser = user?.email === 'maurofbordon@gmail.com';
+  const isAdmin = isMasterUser || userRoleDoc?.role === 'admin';
+  const isEditor = isAdmin || userRoleDoc?.role === 'editor';
     
   useEffect(() => {
     const seedData = async () => {
@@ -485,17 +453,15 @@ function AppContent() {
   };
 
   const renderContent = () => {
-    const isLoading =
+    const isDataLoading =
       isInventoryLoading ||
       isAssignmentsLoading ||
       isUsageLogLoading ||
       isSectorsLoading ||
       isSeeding ||
-      isProfileLoading ||
-      isRoleLoading ||
       isAllUsersLoading;
 
-    if (isLoading) {
+    if (isDataLoading) {
       return <Skeleton className="h-full w-full" />;
     }
     
@@ -645,6 +611,15 @@ function AppContent() {
     </nav>
   );
 
+  // Central loading check
+  if (isUserLoading || isProfileLoading || isRoleLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Skeleton className="h-[95vh] w-[95vw] rounded-lg" />
+      </div>
+    );
+  }
+
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
       <div className="hidden border-r bg-card md:block">
@@ -755,5 +730,3 @@ export default function Page() {
 
   return <AppContent />;
 }
-
-    

@@ -6,6 +6,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   getIdToken,
+  User,
 } from "firebase/auth";
 import { useFirebase } from "@/firebase/provider";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Logo } from "@/components/app/logo";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import { setupUserAndRole } from "../actions";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -29,6 +31,21 @@ export default function LoginPage() {
   const { auth } = useFirebase();
   const { toast } = useToast();
   const router = useRouter();
+
+  const handleAuthenticationSuccess = async (user: User, isNewUser: boolean) => {
+    if (isNewUser) {
+        await setupUserAndRole(user.uid, user.email || "");
+    }
+    // Force refresh of the ID token to get the latest custom claims.
+    await getIdToken(user, true);
+    
+    toast({
+        title: `Éxito de ${isNewUser ? 'registro' : 'inicio de sesión'}`,
+        description: "¡Bienvenido!",
+    });
+
+    router.push('/');
+  }
 
   const handleAuthAction = async (action: "login" | "signup") => {
     if (!email || !password) {
@@ -43,37 +60,13 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-        let userCredential;
-        if (action === "login") {
-            userCredential = await signInWithEmailAndPassword(auth, email, password);
-        } else { // signup
-            try {
-                userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            } catch (signupError: any) {
-                // If signup fails because the email already exists, try to sign in instead.
-                if (signupError.code === 'auth/email-already-in-use') {
-                    toast({
-                        title: "El email ya existe",
-                        description: "Intentando iniciar sesión en su lugar...",
-                    });
-                    userCredential = await signInWithEmailAndPassword(auth, email, password);
-                } else {
-                    // Re-throw other signup errors
-                    throw signupError;
-                }
-            }
-        }
-        
-        // Force refresh of the ID token to get the latest custom claims.
-        await getIdToken(userCredential.user, true);
-        
-        toast({
-            title: `Éxito de ${action === 'login' ? 'inicio de sesión' : 'autenticación'}`,
-            description: "¡Bienvenido!",
-        });
-
-        router.push('/');
-
+      if (action === "signup") {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        await handleAuthenticationSuccess(userCredential.user, true);
+      } else { // login
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        await handleAuthenticationSuccess(userCredential.user, false);
+      }
     } catch (error: any) {
       let description = "Ha ocurrido un error inesperado.";
       let title = `Error de ${action === 'login' ? 'inicio de sesión' : 'registro'}`;
@@ -87,6 +80,23 @@ export default function LoginPage() {
         case 'auth/email-already-in-use':
           description = "Este email ya está registrado. Intente iniciar sesión.";
           title = "Error de Registro";
+          // Attempt to sign in if email already exists during signup
+          if (action === 'signup') {
+            try {
+              toast({
+                  title: "El email ya existe",
+                  description: "Intentando iniciar sesión en su lugar...",
+              });
+              const userCredential = await signInWithEmailAndPassword(auth, email, password);
+              await handleAuthenticationSuccess(userCredential.user, false);
+            } catch (signInError: any) {
+               toast({
+                variant: "destructive",
+                title: "Error de inicio de sesión",
+                description: "El email o la contraseña son incorrectos.",
+              });
+            }
+          }
           break;
         case 'auth/weak-password':
           description = "La contraseña debe tener al menos 6 caracteres.";
@@ -95,11 +105,14 @@ export default function LoginPage() {
             console.error("Auth Error:", error.code, error.message);
       }
       
-      toast({
-        variant: "destructive",
-        title: title,
-        description: description,
-      });
+      if (error.code !== 'auth/email-already-in-use') {
+         toast({
+            variant: "destructive",
+            title: title,
+            description: description,
+          });
+      }
+
     } finally {
         setIsLoading(false);
     }
@@ -161,5 +174,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
-    
