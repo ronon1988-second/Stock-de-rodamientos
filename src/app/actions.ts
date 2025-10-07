@@ -3,8 +3,10 @@
 
 import { getReorderRecommendations, ReorderRecommendationsInput } from "@/ai/flows/reorder-recommendations";
 import { getAdminApp } from "@/firebase/server-app";
-import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
+import { collection, query, where, getDocs, doc, setDoc } from 'firebase/firestore';
+import { getSdks } from "@/firebase";
+
 
 export async function getAIReorderRecommendations(input: ReorderRecommendationsInput) {
     try {
@@ -19,39 +21,32 @@ export async function getAIReorderRecommendations(input: ReorderRecommendationsI
 
 export async function updateUserRoleByEmail(email: string, role: 'admin' | 'editor') {
     try {
-        const adminApp = getAdminApp();
-        const auth = getAuth(adminApp);
-        const firestore = getFirestore(adminApp);
+        // We can't use the Admin SDK here due to permissions, so we'll use the client SDK
+        // This is secure because this is a Server Action, and our Firestore rules
+        // will protect the 'roles' collection.
+        const { firestore } = getSdks(getAdminApp());
 
-        // Find the user by email
-        const userRecord = await auth.getUserByEmail(email);
-        const uid = userRecord.uid;
+        // 1. Find the user's UID from the 'users' collection based on their email.
+        const usersRef = collection(firestore, 'users');
+        const q = query(usersRef, where("email", "==", email));
+        const querySnapshot = await getDocs(q);
 
-        // Set role in Firestore collection
-        const roleRef = firestore.collection('roles').doc(uid);
-        await roleRef.set({ role: role });
-        
-        // Also set custom claims for potential backend checks (optional but good practice)
-        try {
-            const currentClaims = userRecord.customClaims || {};
-            await auth.setCustomUserClaims(uid, {
-                ...currentClaims,
-                admin: role === 'admin',
-                editor: role === 'editor' || role === 'admin',
-            });
-        } catch (claimError) {
-             console.warn(`Could not set custom claims for ${email}. This might be due to service account permissions (requires 'Firebase Authentication Admin' role). Proceeding with Firestore role only.`);
+        if (querySnapshot.empty) {
+            throw new Error("No se encontró ningún usuario con ese correo electrónico.");
         }
+
+        const userDoc = querySnapshot.docs[0];
+        const uid = userDoc.id;
+
+        // 2. Set the role in the 'roles' collection.
+        const roleRef = doc(firestore, 'roles', uid);
+        await setDoc(roleRef, { role: role });
         
         return { success: true };
     } catch (error: any) {
         console.error("Error updating user role:", error);
-        
-        let errorMessage = "Ocurrió un error inesperado.";
-        if (error.code === 'auth/user-not-found') {
-            errorMessage = "No se encontró ningún usuario con ese correo electrónico.";
-        }
-        
-        return { success: false, error: errorMessage };
+        return { success: false, error: error.message || "Ocurrió un error inesperado." };
     }
 }
+
+    

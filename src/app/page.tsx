@@ -554,7 +554,7 @@ function AppContent() {
       );
     }
     if (view === 'users') {
-        if (!isEditor) { // Allow editors to see the view, backend will protect the action.
+        if (!isEditor && !isMasterUser) { 
             setView('dashboard');
             toast({ title: "Acceso denegado", description: "Necesita permisos de editor.", variant: "destructive"})
             return null;
@@ -612,9 +612,9 @@ function AppContent() {
         label="Panel de control"
         onClick={handleNavClick}
       />
-      {isEditor && (
+      {(isEditor || isMasterUser) && (
         <>
-           {isAdmin && (
+           {(isAdmin || isMasterUser) && (
             <NavLink
                 targetView="organization"
                 icon={<Settings className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
@@ -759,7 +759,7 @@ function AppContent() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>
-                {user?.email} {isMasterUser && '(Master)'} {isAdmin && !isMasterUser && '(Admin)'} {isEditor && !isAdmin && '(Editor)'}
+                {user?.email} {isMasterUser && '(Master)'} {isAdmin && !isMasterUser && '(Admin)'} {isEditor && !isAdmin && !isMasterUser && '(Editor)'}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={handleLogout}>
@@ -798,3 +798,5 @@ export default function Page() {
   return <AppContent />;
 }
 
+
+    
