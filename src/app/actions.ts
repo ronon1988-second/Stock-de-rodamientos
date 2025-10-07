@@ -4,8 +4,6 @@
 import { getReorderRecommendations, ReorderRecommendationsInput } from "@/ai/flows/reorder-recommendations";
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAdminApp } from "@/firebase/server-app";
-import { doc, setDoc } from 'firebase/firestore';
-
 
 export async function getAIReorderRecommendations(input: ReorderRecommendationsInput) {
     try {
@@ -20,7 +18,7 @@ export async function getAIReorderRecommendations(input: ReorderRecommendationsI
 /**
  * Secure server action to update a user's role in the /roles collection.
  * This function now receives a UID directly and writes to Firestore,
- * avoiding the need for the Admin Auth SDK.
+ * avoiding the need for the Admin Auth SDK for claims.
  */
 export async function updateUserRole(userId: string, role: 'admin' | 'editor'): Promise<{ success: boolean, error?: string }> {
     if (!userId || !role) {
@@ -41,3 +39,4 @@ export async function updateUserRole(userId: string, role: 'admin' | 'editor'): 
         return { success: false, error: 'Ocurrió un error inesperado al escribir el rol en la base de datos.' };
     }
 }
+

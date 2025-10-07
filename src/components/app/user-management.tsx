@@ -20,8 +20,10 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { updateUserRole } from '@/app/actions';
 import { Loader2 } from 'lucide-react';
-import { useFirestore } from '@/firebase';
-import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
+import type { UserProfile } from '@/lib/types';
+import { Skeleton } from '../ui/skeleton';
 
 export default function UserManagementView({ isAdmin }: { isAdmin: boolean }) {
   const [email, setEmail] = useState('');
@@ -29,6 +31,9 @@ export default function UserManagementView({ isAdmin }: { isAdmin: boolean }) {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const firestore = useFirestore();
+
+  const usersRef = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
+  const { data: users, isLoading: isLoadingUsers } = useCollection<UserProfile>(usersRef);
 
   const handleUpdateRole = async () => {
     if (!email || !role) {
@@ -43,12 +48,13 @@ export default function UserManagementView({ isAdmin }: { isAdmin: boolean }) {
     setIsLoading(true);
 
     try {
-      // 1. Find the user's UID from their email in the /users collection
-      const usersRef = collection(firestore, 'users');
-      const q = query(usersRef, where("email", "==", email), limit(1));
-      const querySnapshot = await getDocs(q);
+      if (!users) {
+        throw new Error("La lista de usuarios no está disponible.");
+      }
+      
+      const user = users.find(u => u.email === email);
 
-      if (querySnapshot.empty) {
+      if (!user) {
         toast({
           title: 'Usuario no encontrado',
           description: `No se encontró ningún usuario con el correo electrónico ${email}.`,
@@ -58,10 +64,8 @@ export default function UserManagementView({ isAdmin }: { isAdmin: boolean }) {
         return;
       }
 
-      const userDoc = querySnapshot.docs[0];
-      const userId = userDoc.id;
+      const userId = user.id; // The document ID is the user's UID in the /users collection
 
-      // 2. Call the server action with the UID and role
       const result = await updateUserRole(userId, role);
 
       if (result.success) {
@@ -89,7 +93,6 @@ export default function UserManagementView({ isAdmin }: { isAdmin: boolean }) {
     }
   };
   
-  // This component is now only visible to the master user, so this check is redundant but safe.
   if (!isAdmin) {
     return (
         <Card>
@@ -112,32 +115,36 @@ export default function UserManagementView({ isAdmin }: { isAdmin: boolean }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2">
-            <Input
-            placeholder="correo@ejemplo.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="flex-grow"
-            disabled={isLoading}
-            />
-            <Select 
-                value={role} 
-                onValueChange={(value) => setRole(value as 'admin' | 'editor')}
+        {isLoadingUsers ? <Skeleton className="h-20 w-full" /> : (
+          <>
+            <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2">
+                <Input
+                placeholder="correo@ejemplo.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="flex-grow"
                 disabled={isLoading}
-            >
-                <SelectTrigger className="w-full sm:w-[180px]">
-                    <SelectValue placeholder="Seleccionar Rol" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="admin">Administrador</SelectItem>
-                    <SelectItem value="editor">Editor</SelectItem>
-                </SelectContent>
-            </Select>
-        </div>
-        <Button onClick={handleUpdateRole} disabled={isLoading || !email || !role}>
-           {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-           {isLoading ? 'Asignando Rol...' : 'Asignar Rol'}
-        </Button>
+                />
+                <Select 
+                    value={role} 
+                    onValueChange={(value) => setRole(value as 'admin' | 'editor')}
+                    disabled={isLoading}
+                >
+                    <SelectTrigger className="w-full sm:w-[180px]">
+                        <SelectValue placeholder="Seleccionar Rol" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="admin">Administrador</SelectItem>
+                        <SelectItem value="editor">Editor</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+            <Button onClick={handleUpdateRole} disabled={isLoading || !email || !role}>
+              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isLoading ? 'Asignando Rol...' : 'Asignar Rol'}
+            </Button>
+          </>
+        )}
       </CardContent>
     </Card>
   );
