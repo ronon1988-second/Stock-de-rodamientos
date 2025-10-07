@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -149,12 +150,16 @@ function AppContent() {
   const firestore = useFirestore();
   const [isSeeding, setIsSeeding] = useState(false);
   
+  // Master user has all privileges, bypassing role checks.
   const isMasterUser = user?.email === 'maurofbordon@gmail.com';
-  const [userRole, setUserRole] = useState<{ role: 'admin' | 'editor' | null }>({ role: null });
-  const [isRoleLoading, setIsRoleLoading] = useState(true);
+  
+  // Role fetching from Firestore /roles/{userId}
+  const roleRef = useMemoFirebase(() => user ? doc(firestore, 'roles', user.uid) : null, [firestore, user]);
+  const { data: userRoleDoc, isLoading: isRoleLoading } = useDoc<UserRole>(roleRef);
 
-  const isAdmin = isMasterUser || userRole?.role === 'admin';
-  const isEditor = isMasterUser || isAdmin || userRole?.role === 'editor';
+  // Determine user permissions. Master user is always admin.
+  const isAdmin = isMasterUser || userRoleDoc?.role === 'admin';
+  const isEditor = isAdmin || userRoleDoc?.role === 'editor';
 
   // This effect handles the creation of user profile on first login
   useEffect(() => {
@@ -180,26 +185,6 @@ function AppContent() {
     };
     setupUser();
   }, [user, firestore, toast]);
-
-   // Effect to get user role from custom claims
-   useEffect(() => {
-    if (user) {
-        setIsRoleLoading(true);
-        user.getIdTokenResult(true).then((idTokenResult) => {
-            const claims = idTokenResult.claims;
-            if (claims.admin) {
-                setUserRole({ role: 'admin' });
-            } else if (claims.editor) {
-                setUserRole({ role: 'editor' });
-            } else {
-                setUserRole({ role: null });
-            }
-            setIsRoleLoading(false);
-        });
-    } else {
-        setIsRoleLoading(false);
-    }
-  }, [user]);
 
   const userProfileRef = useMemoFirebase(
     () => (user ? doc(firestore, 'users', user.uid) : null),
@@ -323,7 +308,10 @@ function AppContent() {
   }, [machinesBySector]);
 
   const handleAddItem = (newItem: Omit<InventoryItem, 'id'>) => {
-    if (!isEditor) return;
+    if (!isEditor) {
+        toast({ title: "Acceso denegado", variant: "destructive" });
+        return;
+    }
     const invRef = collection(firestore, 'inventory');
     addDocumentNonBlocking(invRef, newItem);
     toast({
@@ -333,7 +321,10 @@ function AppContent() {
   };
 
   const handleUpdateItem = (updatedItem: InventoryItem) => {
-    if (!isEditor) return;
+    if (!isEditor) {
+        toast({ title: "Acceso denegado", variant: "destructive" });
+        return;
+    }
     const itemRef = doc(firestore, 'inventory', updatedItem.id);
     const { id, ...data } = updatedItem;
     setDocumentNonBlocking(itemRef, data, { merge: true });
@@ -349,7 +340,10 @@ function AppContent() {
     sectorId: string,
     quantity: number
   ) => {
-    if (!isEditor || !inventory) return;
+    if (!isEditor || !inventory) {
+        toast({ title: "Acceso denegado", variant: "destructive" });
+        return;
+    }
     const item = inventory.find(b => b.id === itemId);
     if (!item) return;
 
@@ -372,7 +366,10 @@ function AppContent() {
   };
 
   const handleRemoveItemFromMachine = (assignmentId: string) => {
-    if (!isEditor) return;
+    if (!isEditor) {
+        toast({ title: "Acceso denegado", variant: "destructive" });
+        return;
+    }
     const assignment = machineAssignments?.find(item => item.id === assignmentId);
     if (!assignment) return;
 
@@ -391,7 +388,10 @@ function AppContent() {
     machineId: string,
     sectorId: string
   ) => {
-    if (!isEditor || !inventory) return;
+    if (!isEditor || !inventory) {
+      toast({ title: "Acceso denegado", variant: "destructive" });
+      return;
+    }
     const item = inventory.find(i => i.id === itemId);
     if (!item) return;
 
@@ -554,12 +554,12 @@ function AppContent() {
       );
     }
     if (view === 'users') {
-        if (!isAdmin) {
+        if (!isEditor) { // Allow editors to see the view, backend will protect the action.
             setView('dashboard');
-            toast({ title: "Acceso denegado", description: "Necesita permisos de administrador.", variant: "destructive"})
+            toast({ title: "Acceso denegado", description: "Necesita permisos de editor.", variant: "destructive"})
             return null;
         }
-      return <UserManagementView />;
+      return <UserManagementView isAdmin={isAdmin}/>;
     }
     if (view.startsWith('machine-')) {
       const machineId = view.replace('machine-', '');
@@ -612,14 +612,16 @@ function AppContent() {
         label="Panel de control"
         onClick={handleNavClick}
       />
-      {isAdmin && (
+      {isEditor && (
         <>
-          <NavLink
-            targetView="organization"
-            icon={<Settings className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
-            label="Organización"
-            onClick={handleNavClick}
-          />
+           {isAdmin && (
+            <NavLink
+                targetView="organization"
+                icon={<Settings className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
+                label="Organización"
+                onClick={handleNavClick}
+            />
+          )}
           <NavLink
             targetView="users"
             icon={<Users className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
@@ -796,4 +798,3 @@ export default function Page() {
   return <AppContent />;
 }
 
-    

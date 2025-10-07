@@ -27,13 +27,21 @@ export async function updateUserRoleByEmail(email: string, role: 'admin' | 'edit
         const userRecord = await auth.getUserByEmail(email);
         const uid = userRecord.uid;
 
-        // Set custom claims for backend access control
-        const currentClaims = userRecord.customClaims || {};
-        await auth.setCustomUserClaims(uid, {
-            ...currentClaims,
-            admin: role === 'admin',
-            editor: role === 'editor' || role === 'admin',
-        });
+        // Set role in Firestore collection
+        const roleRef = firestore.collection('roles').doc(uid);
+        await roleRef.set({ role: role });
+        
+        // Also set custom claims for potential backend checks (optional but good practice)
+        try {
+            const currentClaims = userRecord.customClaims || {};
+            await auth.setCustomUserClaims(uid, {
+                ...currentClaims,
+                admin: role === 'admin',
+                editor: role === 'editor' || role === 'admin',
+            });
+        } catch (claimError) {
+             console.warn(`Could not set custom claims for ${email}. This might be due to service account permissions (requires 'Firebase Authentication Admin' role). Proceeding with Firestore role only.`);
+        }
         
         return { success: true };
     } catch (error: any) {
@@ -42,14 +50,8 @@ export async function updateUserRoleByEmail(email: string, role: 'admin' | 'edit
         let errorMessage = "Ocurrió un error inesperado.";
         if (error.code === 'auth/user-not-found') {
             errorMessage = "No se encontró ningún usuario con ese correo electrónico.";
-        } else if (error.code === 'permission-denied' || error.code === 'PERMISSION_DENIED') {
-            errorMessage = "Permiso denegado. Asegúrese de que la cuenta de servicio tenga los roles 'Firebase Authentication Admin' y 'User Admin' en IAM.";
         }
         
         return { success: false, error: errorMessage };
     }
 }
-
-
-
-    

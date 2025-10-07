@@ -32,6 +32,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { updateUserRoleByEmail } from '@/app/actions';
 import { Loader2 } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 
 const UserRoleSchema = z.object({
@@ -43,7 +44,7 @@ const UserRoleSchema = z.object({
 
 type UserRoleFormValues = z.infer<typeof UserRoleSchema>;
 
-export default function UserManagementView() {
+export default function UserManagementView({ isAdmin }: { isAdmin: boolean }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
@@ -89,6 +90,14 @@ export default function UserManagementView() {
         </CardDescription>
       </CardHeader>
       <CardContent>
+            {!isAdmin && (
+                <Alert variant="destructive" className="mb-6">
+                    <AlertTitle>Acceso de solo lectura</AlertTitle>
+                    <AlertDescription>
+                        Como editor, puede ver esta página, pero solo un administrador puede asignar o cambiar roles.
+                    </AlertDescription>
+                </Alert>
+            )}
             <Form {...form}>
               <form
                 onSubmit={form.handleSubmit(onSubmit)}
@@ -131,7 +140,7 @@ export default function UserManagementView() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" disabled={isSubmitting}>
+                <Button type="submit" disabled={isSubmitting || !isAdmin}>
                   {isSubmitting && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}
