@@ -57,7 +57,9 @@ export default function LoginPage() {
     if (!roleDoc.exists() || roleDoc.data()?.role !== role) {
         await setDoc(roleRef, { role: role }, { merge: true });
         // After setting a new role (especially admin), force a token refresh
-        await user.getIdToken(true);
+        if (isAdminUser) {
+          await user.getIdToken(true);
+        }
     }
   };
 
@@ -113,15 +115,27 @@ export default function LoginPage() {
     } catch (error: any) {
       let description = "Ha ocurrido un error inesperado.";
       let title = `Error de ${action === 'login' ? 'inicio de sesión' : 'registro'}`;
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-          description = "El email o la contraseña son incorrectos."
-      } else if (error.code === 'auth/email-already-in-use') {
-          description = "Este email ya está registrado. Intente iniciar sesión."
+      
+      switch (error.code) {
+        case 'auth/user-not-found':
+        case 'auth/wrong-password':
+        case 'auth/invalid-credential':
+          description = "El email o la contraseña son incorrectos.";
+          break;
+        case 'auth/email-already-in-use':
+          description = "Este email ya está registrado. Intente iniciar sesión.";
           title = "Error de Registro";
-      } else if (error.code === 'auth/weak-password') {
-          description = "La contraseña debe tener al menos 6 caracteres."
+          break;
+        case 'auth/weak-password':
+          description = "La contraseña debe tener al menos 6 caracteres.";
+          break;
+        case 'auth/missing-or-insufficient-permissions':
+           description = "Error de permisos. Contacte al administrador.";
+           break;
+        default:
+            console.error("Auth Error:", error.code, error.message);
       }
-      console.error("Auth Error:", error.code, error.message);
+      
       toast({
         variant: "destructive",
         title: title,
