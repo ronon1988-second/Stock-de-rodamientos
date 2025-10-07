@@ -123,6 +123,7 @@ export default function LoginPage() {
           description = "El email o la contraseña son incorrectos.";
           break;
         case 'auth/email-already-in-use':
+          // This case should be handled by the logic above, but we keep it as a fallback.
           description = "Este email ya está registrado. Intente iniciar sesión.";
           title = "Error de Registro";
           break;
