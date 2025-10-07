@@ -54,13 +54,10 @@ export default function LoginPage() {
         await setDoc(userRef, userData, { merge: true });
     }
     
-    // If the user is an admin, we must force a token refresh to get custom claims.
+    // If the user's role was determined to be admin, we must force a token refresh to get custom claims.
     if (isAdminUser) {
-        // This is a placeholder for a server-side function call that would set the custom claim.
-        // In a real app, this would be an HTTPS Callable Function.
-        // For this environment, we assume a mechanism exists to link this client-side action
-        // to a server-side claim update, and we force a refresh to get the new token.
-        await user.getIdToken(true); // Force refresh of the ID token
+        // Force refresh of the ID token to get custom claims from the backend trigger.
+        await user.getIdToken(true); 
     }
   };
 
