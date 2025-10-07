@@ -202,8 +202,13 @@ function AppContent() {
   const assignmentsRef = useMemoFirebase(() => firestore ? collection(firestore, 'machineAssignments') : null, [firestore]);
   const { data: machineAssignments, isLoading: isAssignmentsLoading } = useCollection<MachineAssignment>(assignmentsRef);
   
-  const usageLogRef = useMemoFirebase(() => firestore ? collection(firestore, 'usageLog') : null, [firestore]);
-  const { data: usageLog, isLoading: isUsageLogLoading } = useCollection<UsageLog>(usageLogRef);
+  const usageLogRef = useMemoFirebase(() => (firestore && !isTestingAdmin ? collection(firestore, 'usageLog') : null), [firestore, isTestingAdmin]);
+  const { data: usageLogData, isLoading: isUsageLogLoading } = useCollection<UsageLog>(usageLogRef);
+
+  const usageLog = useMemo(() => {
+      if (isTestingAdmin) return []; // Don't fetch usageLog in test mode
+      return usageLogData;
+  }, [usageLogData, isTestingAdmin]);
     
   useEffect(() => {
     const seedData = async () => {
