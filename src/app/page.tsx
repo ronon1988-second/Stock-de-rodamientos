@@ -249,12 +249,19 @@ function AppContent() {
   const { data: userProfile, isLoading: isProfileLoading } =
     useDoc<UserProfile>(userProfileRef);
 
-  // START: DATA FETCHING DISABLED
-  const { data: inventory, isLoading: isInventoryLoading } = { data: [], isLoading: false };
-  const { data: sectors, isLoading: isSectorsLoading } = { data: [], isLoading: false };
-  const { data: machineAssignments, isLoading: isAssignmentsLoading } = { data: [], isLoading: false };
-  const { data: usageLog, isLoading: isUsageLogLoading } = { data: [], isLoading: false };
-  // END: DATA FETCHING DISABLED
+  // START: DATA FETCHING
+  const inventoryRef = useMemoFirebase(() => collection(firestore, 'inventory'), [firestore]);
+  const { data: inventory, isLoading: isInventoryLoading } = useCollection<InventoryItem>(inventoryRef);
+
+  const sectorsRef = useMemoFirebase(() => collection(firestore, 'sectors'), [firestore]);
+  const { data: sectors, isLoading: isSectorsLoading } = useCollection<Sector>(sectorsRef);
+  
+  const assignmentsRef = useMemoFirebase(() => collection(firestore, 'machineAssignments'), [firestore]);
+  const { data: machineAssignments, isLoading: isAssignmentsLoading } = useCollection<MachineAssignment>(assignmentsRef);
+  
+  const usageLogRef = useMemoFirebase(() => collection(firestore, 'usageLog'), [firestore]);
+  const { data: usageLog, isLoading: isUsageLogLoading } = useCollection<UsageLog>(usageLogRef);
+  // END: DATA FETCHING
     
   const [machinesBySector, setMachinesBySector] = useState<
     Record<string, Machine[]>
@@ -262,8 +269,9 @@ function AppContent() {
 
   useEffect(() => {
     const seedData = async () => {
-      if (!inventory) return;
-      if (inventory?.length === 0 && !isInventoryLoading) {
+      if (!firestore || !user || isInventoryLoading || isSeeding) return;
+
+      if (inventory && inventory.length === 0) {
         setIsSeeding(true);
         toast({
           title: 'Cargando datos iniciales...',
@@ -295,9 +303,8 @@ function AppContent() {
       }
     };
 
-    // Temporarily disable seeding to prevent writes
-    // seedData();
-  }, [inventory, isInventoryLoading, firestore, toast]);
+    seedData();
+  }, [inventory, isInventoryLoading, firestore, user, toast, isSeeding]);
 
   const sortedInventory = useMemo(
     () =>
@@ -799,5 +806,7 @@ export default function Page() {
 
   return <AppContent />;
 }
+
+    
 
     
