@@ -249,37 +249,16 @@ function AppContent() {
   const { data: userProfile, isLoading: isProfileLoading } =
     useDoc<UserProfile>(userProfileRef);
 
-  const inventoryRef = useMemoFirebase(
-    () => collection(firestore, 'inventory'),
-    [firestore]
-  );
-  const { data: inventory, isLoading: isInventoryLoading } =
-    useCollection<InventoryItem>(inventoryRef);
-
-  const sectorsRef = useMemoFirebase(
-    () => collection(firestore, 'sectors'),
-    [firestore]
-  );
-  const { data: sectors, isLoading: isSectorsLoading } =
-    useCollection<Sector>(sectorsRef);
+  // START: DATA FETCHING DISABLED
+  const { data: inventory, isLoading: isInventoryLoading } = { data: [], isLoading: false };
+  const { data: sectors, isLoading: isSectorsLoading } = { data: [], isLoading: false };
+  const { data: machineAssignments, isLoading: isAssignmentsLoading } = { data: [], isLoading: false };
+  const { data: usageLog, isLoading: isUsageLogLoading } = { data: [], isLoading: false };
+  // END: DATA FETCHING DISABLED
     
   const [machinesBySector, setMachinesBySector] = useState<
     Record<string, Machine[]>
   >({});
-
-  const machineAssignmentsRef = useMemoFirebase(
-    () => collection(firestore, 'machineAssignments'),
-    [firestore]
-  );
-  const { data: machineAssignments, isLoading: isAssignmentsLoading } =
-    useCollection<MachineAssignment>(machineAssignmentsRef);
-
-  const usageLogRef = useMemoFirebase(
-    () => collection(firestore, 'usageLog'),
-    [firestore]
-  );
-  const { data: usageLog, isLoading: isUsageLogLoading } =
-    useCollection<UsageLog>(usageLogRef);
 
   useEffect(() => {
     const seedData = async () => {
@@ -316,7 +295,8 @@ function AppContent() {
       }
     };
 
-    seedData();
+    // Temporarily disable seeding to prevent writes
+    // seedData();
   }, [inventory, isInventoryLoading, firestore, toast]);
 
   const sortedInventory = useMemo(
@@ -819,3 +799,5 @@ export default function Page() {
 
   return <AppContent />;
 }
+
+    
