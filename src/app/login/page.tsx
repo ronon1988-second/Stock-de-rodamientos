@@ -56,6 +56,8 @@ export default function LoginPage() {
 
     if (!roleDoc.exists() || roleDoc.data()?.role !== role) {
         await setDoc(roleRef, { role: role }, { merge: true });
+        // After setting a new role (especially admin), force a token refresh
+        await user.getIdToken(true);
     }
   };
 
@@ -77,19 +79,33 @@ export default function LoginPage() {
         if (action === "login") {
             userCredential = await signInWithEmailAndPassword(auth, email, password);
         } else { // signup
-            userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            try {
+                userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            } catch (signupError: any) {
+                // If signup fails because the email already exists, try to sign in instead.
+                if (signupError.code === 'auth/email-already-in-use') {
+                    toast({
+                        title: "El email ya existe",
+                        description: "Intentando iniciar sesión en su lugar...",
+                    });
+                    userCredential = await signInWithEmailAndPassword(auth, email, password);
+                } else {
+                    // Re-throw other signup errors
+                    throw signupError;
+                }
+            }
         }
         
         // After either login or signup, ensure profile and role are set
         await updateUserProfile(userCredential.user);
         await updateUserRole(userCredential.user);
 
-        // Force token refresh to pick up custom claims if they were just set.
+        // This final refresh ensures we have the latest token claims before redirecting.
         await userCredential.user.getIdToken(true);
         
         toast({
-            title: action === 'login' ? "Inicio de sesión exitoso" : "Cuenta creada",
-            description: action === 'login' ? "Bienvenido de nuevo." : "Se ha registrado exitosamente.",
+            title: action === 'login' ? "Inicio de sesión exitoso" : "Autenticación exitosa",
+            description: "¡Bienvenido!",
         });
 
         router.push('/');
@@ -106,7 +122,7 @@ export default function LoginPage() {
       console.error("Auth Error:", error.code, error.message);
       toast({
         variant: "destructive",
-        title: `Error de ${action === 'login' ? 'inicio de sesión' : 'registro'}`,
+        title: `Error de autenticación`,
         description: description,
       });
     } finally {
