@@ -104,7 +104,7 @@ export default function LoginPage() {
         await userCredential.user.getIdToken(true);
         
         toast({
-            title: action === 'login' ? "Inicio de sesión exitoso" : "Autenticación exitosa",
+            title: `Éxito de ${action === 'login' ? 'inicio de sesión' : 'autenticación'}`,
             description: "¡Bienvenido!",
         });
 
@@ -112,17 +112,19 @@ export default function LoginPage() {
 
     } catch (error: any) {
       let description = "Ha ocurrido un error inesperado.";
+      let title = `Error de ${action === 'login' ? 'inicio de sesión' : 'registro'}`;
       if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
           description = "El email o la contraseña son incorrectos."
       } else if (error.code === 'auth/email-already-in-use') {
           description = "Este email ya está registrado. Intente iniciar sesión."
+          title = "Error de Registro";
       } else if (error.code === 'auth/weak-password') {
           description = "La contraseña debe tener al menos 6 caracteres."
       }
       console.error("Auth Error:", error.code, error.message);
       toast({
         variant: "destructive",
-        title: `Error de autenticación`,
+        title: title,
         description: description,
       });
     } finally {
