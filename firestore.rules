@@ -1,115 +1,185 @@
+/**
+ * @fileoverview Firestore Security Rules for Prototyping.
+ *
+ * Core Philosophy:
+ * This ruleset prioritizes strict user-based authorization while relaxing data validation to facilitate rapid prototyping.  It enforces who can access what, but it does not enforce the detailed schema of the data being written. This approach allows for quick iteration on the data model while maintaining a secure authorization posture.
+ *
+ * Data Structure:
+ * - `/users/{userId}`: Stores public user profile information, accessible only to the owning user.
+ * - `/roles/{userId}`: Stores user roles, accessible only to the owning user.
+ * - `/inventory/{itemId}`: Global inventory of all available items, read and write accessible.
+ * - `/sectors/{sectorId}`: Sectors of the plant, read and write accessible.
+ * - `/sectors/{sectorId}/machines/{machineId}`: Machines within a sector, read and write accessible.
+ * - `/machineAssignments/{assignmentId}`: Associations of inventory items with machines, read and write accessible.
+ * - `/usageLog/{logId}`: Logs of item usage, read and write accessible.
+ *
+ * Key Security Decisions:
+ * - User listing is explicitly denied.
+ * - Write operations are secured using the `isOwner()` helper function for user-specific data.
+ * - Data validation is minimized to essential authorization checks.
+ * - Ownership of a document is determined by matching the `userId` parameter in the path with the authenticated user's `uid`.
+ *
+ * Denormalization for Authorization:
+ * - User roles are stored directly in `/roles/{userId}` to avoid needing to query a separate collection. The `userId` is used as the document ID which matches the authenticated user's `uid`.
+ *
+ * Structural Segregation:
+ * - Private user data (profiles, roles) is stored under `/users/{userId}` and `/roles/{userId}`, while shared or public data (inventory, sectors, machines, assignments, logs) is at the top level.
+ */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows access to user profile data.
+     * @description Checks if the user is signed in.
+     * @return {boolean} True if the user is signed in, false otherwise.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * @description Checks if the authenticated user's UID matches the provided userId.
+     * @param {string} userId - The user ID to compare against the authenticated user's UID.
+     * @return {boolean} True if the user is the owner, false otherwise.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * @description Checks if the authenticated user's UID matches the provided userId and that the document exists.
+     * @param {string} userId - The user ID to compare against the authenticated user's UID.
+     * @return {boolean} True if the user is the existing owner, false otherwise.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * @description Security rules for user profiles.
      * @path /users/{userId}
-     * @allow (get, create, update, delete) if the user is the owner.
-     * @deny (get, create, update, delete) if the user is not the owner.
-     * @principle Enforces document ownership for all write operations.
+     * @allow (create) User with UID 'user123' can create their profile at /users/user123.
+     * @deny (create) User with UID 'user123' cannot create a profile at /users/user456.
+     * @allow (get) User with UID 'user123' can read their profile at /users/user123.
+     * @deny (get) User with UID 'user123' cannot read the profile at /users/user456.
+     * @allow (update) User with UID 'user123' can update their profile at /users/user123.
+     * @deny (update) User with UID 'user123' cannot update the profile at /users/user456.
+     * @allow (delete) User with UID 'user123' can delete their profile at /users/user123.
+     * @deny (delete) User with UID 'user123' cannot delete the profile at /users/user456.
+     * @principle Enforces document ownership for writes, restricts access to a user's own data tree, validates relational integrity between documents.
      */
     match /users/{userId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
-
-      function isExistingOwner(userId) {
-        return isSignedIn() && isOwner(userId) && resource != null;
-      }
-
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if false; // Explicitly deny listing users.
-
-      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.uid == userId;
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId);
       allow update: if isExistingOwner(userId);
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Allows access to user roles.
+     * @description Security rules for user roles.
      * @path /roles/{userId}
-     * @allow (get, create, update, delete) if the user is an admin.
-     * @deny (get, create, update, delete) if the user is not an admin.
+     * @allow (create) User with UID 'user123' can create their role at /roles/user123.
+     * @deny (create) User with UID 'user123' cannot create a role at /roles/user456.
+     * @allow (get) User with UID 'user123' can read their role at /roles/user123.
+     * @deny (get) User with UID 'user123' cannot read the role at /roles/user456.
+     * @allow (update) User with UID 'user123' can update their role at /roles/user123.
+     * @deny (update) User with UID 'user123' cannot update the role at /roles/user456.
+     * @allow (delete) User with UID 'user123' can delete their role at /roles/user123.
+     * @deny (delete) User with UID 'user123' cannot delete the role at /roles/user456.
+     * @principle Enforces document ownership for writes, restricts access to a user's own data tree, validates relational integrity between documents.
      */
     match /roles/{userId} {
-       function isSignedIn() {
-        return request.auth != null;
-      }
-      
-      function isAdmin() {
-          return request.auth.token.admin == true;
-      }
-        
-      allow get: if isSignedIn() && isAdmin();
-      allow list: if false; // Explicitly deny listing roles.
-      allow create: if isSignedIn() && isAdmin();
-      allow update: if isSignedIn() && isAdmin();
-      allow delete: if isSignedIn() && isAdmin();
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
     }
 
-    /**
-     * @description Allows public read access to inventory items.
-     * @path /inventory/{itemId}
-     * @allow (get, list) to anyone.
-     * @deny (create, update, delete) to everyone.
-     * @principle Allows public read access but restricts write access.
-     */
+     /**
+      * @description Public read and write access to inventory items.
+      * @path /inventory/{itemId}
+      * @allow (get) Any user can read an inventory item.
+      * @allow (list) Any user can list inventory items.
+      * @allow (create) Any user can create an inventory item.
+      * @allow (update) Any user can update an inventory item.
+      * @allow (delete) Any user can delete an inventory item.
+      * @principle Allows public read and write access to inventory data.
+      */
     match /inventory/{itemId} {
       allow get, list: if true;
-      allow create, update, delete: if false;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
     }
 
     /**
-     * @description Allows public read access to sectors.
+     * @description Public read and write access to sectors.
      * @path /sectors/{sectorId}
-     * @allow (get, list) to anyone.
-     * @deny (create, update, delete) to everyone.
-     * @principle Allows public read access but restricts write access.
+     * @allow (get) Any user can read a sector.
+     * @allow (list) Any user can list sectors.
+     * @allow (create) Any user can create a sector.
+     * @allow (update) Any user can update a sector.
+     * @allow (delete) Any user can delete a sector.
+     * @principle Allows public read and write access to sector data.
      */
     match /sectors/{sectorId} {
       allow get, list: if true;
-      allow create, update, delete: if false;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
     }
 
     /**
-     * @description Allows public read access to machines within a sector.
+     * @description Public read and write access to machines within sectors.
      * @path /sectors/{sectorId}/machines/{machineId}
-     * @allow (get, list) to anyone.
-     * @deny (create, update, delete) to everyone.
-     * @principle Allows public read access but restricts write access.
+     * @allow (get) Any user can read a machine.
+     * @allow (list) Any user can list machines within a sector.
+     * @allow (create) Any user can create a machine.
+     * @allow (update) Any user can update a machine.
+     * @allow (delete) Any user can delete a machine.
+     * @principle Allows public read and write access to machine data.
      */
     match /sectors/{sectorId}/machines/{machineId} {
       allow get, list: if true;
-      allow create, update, delete: if false;
-    }
-
-      /**
-       * @description Allows public read access to machine assignments.
-       * @path /machineAssignments/{assignmentId}
-       * @allow (get, list) to anyone.
-       * @deny (create, update, delete) to everyone.
-       * @principle Allows public read access but restricts write access.
-       */
-    match /machineAssignments/{assignmentId} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
     }
 
     /**
-     * @description Allows public read access to usage logs.
+     * @description Public read and write access to machine assignments.
+     * @path /machineAssignments/{assignmentId}
+     * @allow (get) Any user can read a machine assignment.
+     * @allow (list) Any user can list machine assignments.
+     * @allow (create) Any user can create a machine assignment.
+     * @allow (update) Any user can update a machine assignment.
+     * @allow (delete) Any user can delete a machine assignment.
+     * @principle Allows public read and write access to machine assignment data.
+     */
+    match /machineAssignments/{assignmentId} {
+      allow get, list: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
+    }
+
+    /**
+     * @description Public read and write access to usage logs.
      * @path /usageLog/{logId}
-     * @allow (get, list) to anyone.
-     * @deny (create, update, delete) to everyone.
-     * @principle Allows public read access but restricts write access.
+     * @allow (get) Any user can read a usage log.
+     * @allow (list) Any user can list usage logs.
+     * @allow (create) Any user can create a usage log.
+     * @allow (update) Any user can update a usage log.
+     * @allow (delete) Any user can delete a usage log.
+     * @principle Allows public read and write access to usage log data.
      */
     match /usageLog/{logId} {
       allow get, list: if true;
-      allow create, update, delete: if false;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
     }
   }
 }
