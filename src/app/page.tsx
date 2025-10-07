@@ -147,8 +147,13 @@ function AppContent() {
   const auth = useAuth();
   const firestore = useFirestore();
   const [isSeeding, setIsSeeding] = useState(false);
+  
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isEditor, setIsEditor] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [isRoleLoading, setIsRoleLoading] = useState(true);
 
-  // This effect handles the creation of user profile and role on first login
+  // This effect handles the creation of user profile on first login
   useEffect(() => {
     const setupUser = async () => {
       if (!user || !firestore) return;
@@ -171,41 +176,71 @@ function AppContent() {
           description: "¡Bienvenido! Su perfil ha sido guardado."
         });
       }
-
-      // Assign role if it doesn't exist
-      const roleRef = doc(firestore, "roles", user.uid);
+      
+      const roleRef = doc(firestore, 'roles', user.uid);
       const roleDoc = await getDoc(roleRef);
-
       if (!roleDoc.exists()) {
-        // By default, new users are editors. Admin role must be assigned manually.
-        const isAdmin = user.email === 'maurofbordon@gmail.com';
-        const role = isAdmin ? 'admin' : 'editor';
-        setDocumentNonBlocking(roleRef, { role }, { merge: true });
+          const isDefaultAdmin = user.email === 'maurofbordon@gmail.com';
+          const defaultRole = isDefaultAdmin ? 'admin' : 'editor';
+          setDocumentNonBlocking(roleRef, { role: defaultRole }, { merge: true });
 
-        // If the user is the default admin, we must trigger a server-side action
-        // to set the custom claim and then refresh the token to get it on the client.
-        if (isAdmin) {
-          try {
-             const { updateUserRoleByEmail } = await import('@/app/actions');
-             const result = await updateUserRoleByEmail(user.email!, 'admin');
-             if (result.success) {
-                await user.getIdToken(true); // Force token refresh
-                toast({
-                  title: "Rol de administrador asignado",
-                  description: "Se le han otorgado permisos de administrador."
-                });
-             } else {
-               throw new Error(result.error);
-             }
-          } catch(e: any) {
-              console.error("Failed to set admin custom claim:", e);
-              toast({ variant: 'destructive', title: "Error al asignar rol de Admin", description: e.message });
+          if (isDefaultAdmin) {
+              try {
+                  const { updateUserRoleByEmail } = await import('@/app/actions');
+                  const result = await updateUserRoleByEmail(user.email!, 'admin');
+                  if (result.success) {
+                      await user.getIdToken(true); // Force token refresh
+                      toast({
+                          title: 'Rol de Administrador Asignado',
+                          description: 'Se le han otorgado permisos de administrador. Puede que necesite refrescar la página.',
+                      });
+                  } else {
+                      throw new Error(result.error);
+                  }
+              } catch (e: any) {
+                  console.error('Failed to set admin custom claim:', e);
+                  toast({ variant: 'destructive', title: 'Error al asignar rol de Admin', description: e.message });
+              }
           }
-        }
       }
     };
     setupUser();
   }, [user, firestore, toast]);
+
+  // Effect to get user role from custom claims
+  useEffect(() => {
+      if (!user) {
+        setIsRoleLoading(false);
+        return;
+      };
+
+      setIsRoleLoading(true);
+      user.getIdTokenResult(true) // Force refresh to get latest claims
+        .then((idTokenResult) => {
+            const claims = idTokenResult.claims;
+            const isAdminClaim = !!claims.admin;
+            const isEditorClaim = !!claims.editor;
+            
+            setIsAdmin(isAdminClaim);
+            setIsEditor(isEditorClaim);
+            
+            if (isAdminClaim) setUserRole('admin');
+            else if (isEditorClaim) setUserRole('editor');
+            else setUserRole('editor'); // Default to editor if no specific role claim
+
+            setIsRoleLoading(false);
+        })
+        .catch(error => {
+            console.error("Error getting user role from claims:", error);
+            setIsRoleLoading(false);
+            // Default to non-admin, non-editor roles on error
+            setIsAdmin(false);
+            setIsEditor(false);
+            setUserRole(null);
+        });
+
+  }, [user]);
+
 
   const userProfileRef = useMemoFirebase(
     () => (user ? doc(firestore, 'users', user.uid) : null),
@@ -213,16 +248,6 @@ function AppContent() {
   );
   const { data: userProfile, isLoading: isProfileLoading } =
     useDoc<UserProfile>(userProfileRef);
-
-  const userRoleRef = useMemoFirebase(
-    () => (user ? doc(firestore, 'roles', user.uid) : null),
-    [firestore, user]
-  );
-  const { data: userRoleDoc, isLoading: isRoleLoading } =
-    useDoc<UserRole>(userRoleRef);
-  const userRole = userRoleDoc?.role;
-  const isAdmin = userRole === 'admin';
-  const isEditor = userRole === 'editor';
 
   const inventoryRef = useMemoFirebase(
     () => collection(firestore, 'inventory'),
@@ -753,7 +778,7 @@ function AppContent() {
               <DropdownMenuLabel>
                 {user?.email}
                 {userRole && (
-                  <Badge variant="secondary" className="ml-2">
+                  <Badge variant="secondary" className="ml-2 capitalize">
                     {userRole}
                   </Badge>
                 )}
