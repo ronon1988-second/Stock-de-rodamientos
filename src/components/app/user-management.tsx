@@ -22,7 +22,8 @@ export default function UserManagementView({ firestore, currentUser }: UserManag
     const { toast } = useToast();
 
     const usersRef = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
-    const { data: users, isLoading } = useCollection<Omit<UserProfile, 'id'>>(usersRef);
+    // Correctly type the collection to expect UserProfile, the hook will add the `id`.
+    const { data: users, isLoading } = useCollection<UserProfile>(usersRef);
 
     const handleRoleChange = (user: UserProfile, newRole: 'admin' | 'editor') => {
         if (!user.id) return;
