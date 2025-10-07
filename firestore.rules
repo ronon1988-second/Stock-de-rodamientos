@@ -1,118 +1,139 @@
 /**
- * @fileoverview Firestore Security Rules for the application.
+ * @fileoverview Firestore Security Rules for Prototyping.
  *
  * Core Philosophy:
- * This ruleset enforces role-based access control, with 'admin' and 'editor' roles having broad write access,
- * and users being able to read their own roles.  Read access is generally open to authenticated users.
+ * This ruleset prioritizes secure authorization based on user roles and ownership, while relaxing data validation to facilitate rapid prototyping.
  *
  * Data Structure:
- * - /roles/{userId}: Stores user roles (admin, editor). Only readable by the user themselves.
- * - /users/{userId}: Stores user profiles. Only readable by admins.
- * - /articles/{articleId}: Stores articles. Readable by all authenticated users, writable by admins/editors.
- * - /sectors/{sectorId}: Stores sector information. Readable by all authenticated users, writable by admins/editors.
- * - /inventory/{itemId}: Stores inventory information. Readable by all authenticated users, writable by admins/editors.
+ * - User profiles and roles are stored under `/users/{userId}` and `/roles/{userId}` respectively.
+ * - Sectors, machines, inventory, machine assignments, and usage logs are stored in top-level collections.
  *
  * Key Security Decisions:
- * - User listing is explicitly disallowed to protect user privacy.
- * - The rules explicitly deny any write operations that are not explicitly allowed.
+ * - Listing of users and roles is denied to prevent information disclosure.
+ * - Write access to `usageLog` is restricted to users with the 'admin' or 'editor' role.
+ * - Read access to `usageLog` is allowed for authenticated users.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows a user to read their own role.
-     * @path /roles/{userId}
-     * @allow (read) User with UID 'user123' reads their own role document.
-     *   - Request: { auth: { uid: 'user123' } }
-     * @deny (read) User with UID 'user123' tries to read the role document of 'user456'.
-     *   - Request: { auth: { uid: 'user123' } }
-     * @principle Enforces user-ownership for reading roles.
+     * @description Allows authenticated users to read usage logs, and 'admin' or 'editor' roles to write them.
+     * @path /usageLog/{logId}
+     * @allow (read) User with any auth state can read a usage log.
+     * @allow (create) User with 'admin' role can create a usage log.
+     * @deny (create) User without 'admin' or 'editor' role cannot create a usage log.
+     * @principle Enforces role-based access control for writing usage logs.
      */
-    match /roles/{userId} {
-      allow get: if isSignedIn() && request.auth.uid == userId;
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+    match /usageLog/{logId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if hasRole(['admin', 'editor']);
+      allow update: if hasRole(['admin', 'editor']);
+      allow delete: if hasRole(['admin', 'editor']);
     }
 
     /**
-     * @description Only allows admins to read user profiles.
+     * @description Allows only the owner to read and write their user profile.
      * @path /users/{userId}
-     * @allow (read) Admin user reads a user profile.
-     *   - Request: { auth: { uid: 'admin123', token: { role: 'admin' } } }
-     * @deny (read) Non-admin user tries to read a user profile.
-     *   - Request: { auth: { uid: 'user123' } }
-     * @principle Restricts user profile access to admins.
+     * @allow (create) User can create their own profile if the UID matches.
+     * @allow (get) User can read their own profile.
+     * @deny (create) User cannot create a profile with a mismatched UID.
+     * @deny (get) User cannot read another user's profile.
+     * @principle Enforces document ownership for user profiles.
      */
     match /users/{userId} {
-      allow get: if isSignedIn() && request.auth.token.role == "admin";
-      allow list: if isSignedIn() && request.auth.token.role == "admin";
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Allows any authenticated user to read articles, and admins/editors to write.
-     * @path /articles/{articleId}
-     * @allow (read) Authenticated user reads an article.
-     *   - Request: { auth: { uid: 'user123' } }
-     * @allow (write) Admin user creates an article.
-     *   - Request: { auth: { uid: 'admin123', token: { role: 'admin' } } }
-     * @deny (write) Non-admin/editor user tries to create an article.
-     *   - Request: { auth: { uid: 'user123' } }
-     * @principle Allows public read access with restricted write access.
+     * @description Allows only the owner to read and write their user role.
+     * @path /roles/{userId}
+     * @allow (create) User can create their own role if the UID matches.
+     * @allow (get) User can read their own role.
+     * @deny (create) User cannot create a role with a mismatched UID.
+     * @deny (get) User cannot read another user's role.
+     * @principle Enforces document ownership for user roles.
      */
-    match /articles/{articleId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn() && (request.auth.token.role == "admin" || request.auth.token.role == "editor");
-      allow update: if isSignedIn() && (request.auth.token.role == "admin" || request.auth.token.role == "editor");
-      allow delete: if isSignedIn() && (request.auth.token.role == "admin" || request.auth.token.role == "editor");
+    match /roles/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Allows any authenticated user to read sectors, and admins/editors to write.
+     * @description Allows public read access to sectors, but restricts writes.
      * @path /sectors/{sectorId}
-     * @allow (read) Authenticated user reads a sector.
-     *   - Request: { auth: { uid: 'user123' } }
-     * @allow (write) Editor user creates a sector.
-     *   - Request: { auth: { uid: 'editor456', token: { role: 'editor' } } }
-     * @deny (write) Non-admin/editor user tries to create a sector.
-     *   - Request: { auth: { uid: 'user123' } }
-     * @principle Allows public read access with restricted write access.
+     * @allow (get) Any user can read sector data.
+     * @allow (list) Any user can list sector data.
+     * // CRITICAL: Cannot implement owner-only writes. The 'Sector' entity is missing an 'ownerId' or 'authorId' field.
      */
     match /sectors/{sectorId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn() && (request.auth.token.role == "admin" || request.auth.token.role == "editor");
-      allow update: if isSignedIn() && (request.auth.token.role == "admin" || request.auth.token.role == "editor");
-      allow delete: if isSignedIn() && (request.auth.token.role == "admin" || request.auth.token.role == "editor");
+      allow get: if true;
+      allow list: if true;
+      allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
-     /**
-      * @description Allows any authenticated user to read inventory, and admins/editors to write.
-      * @path /inventory/{itemId}
-      * @allow (read) Authenticated user reads an inventory item.
-      *   - Request: { auth: { uid: 'user123' } }
-      * @allow (write) Admin user creates an inventory item.
-      *   - Request: { auth: { uid: 'admin123', token: { role: 'admin' } } }
-      * @deny (write) Non-admin/editor user tries to create an inventory item.
-      *   - Request: { auth: { uid: 'user123' } }
-      * @principle Allows public read access with restricted write access.
-      */
+    /**
+     * @description Allows public read access to machines, but restricts writes.
+     * @path /sectors/{sectorId}/machines/{machineId}
+     * @allow (get) Any user can read machine data.
+     * @allow (list) Any user can list machine data.
+     * // CRITICAL: Cannot implement owner-only writes. The 'Machine' entity is missing an 'ownerId' or 'authorId' field.
+     */
+    match /sectors/{sectorId}/machines/{machineId} {
+      allow get: if true;
+      allow list: if true;
+      allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+    }
+
+    /**
+     * @description Allows public read access to inventory items, but restricts writes.
+     * @path /inventory/{itemId}
+     * @allow (get) Any user can read inventory item data.
+     * @allow (list) Any user can list inventory item data.
+     * // CRITICAL: Cannot implement owner-only writes. The 'InventoryItem' entity is missing an 'ownerId' or 'authorId' field.
+     */
     match /inventory/{itemId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn() && (request.auth.token.role == "admin" || request.auth.token.role == "editor");
-      allow update: if isSignedIn() && (request.auth.token.role == "admin" || request.auth.token.role == "editor");
-      allow delete: if isSignedIn() && (request.auth.token.role == "admin" || request.auth.token.role == "editor");
+      allow get: if true;
+      allow list: if true;
+      allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+    }
+
+    /**
+     * @description Allows public read access to machine assignments, but restricts writes.
+     * @path /machineAssignments/{assignmentId}
+     * @allow (get) Any user can read machine assignment data.
+     * @allow (list) Any user can list machine assignment data.
+     * // CRITICAL: Cannot implement owner-only writes. The 'MachineAssignment' entity is missing an 'ownerId' or 'authorId' field.
+     */
+    match /machineAssignments/{assignmentId} {
+      allow get: if true;
+      allow list: if true;
+      allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
     }
   }
-}
 
-function isSignedIn() {
-  return request.auth != null;
+  // Helper functions
+  function isSignedIn() {
+    return request.auth != null;
+  }
+
+  function isOwner(userId) {
+    return request.auth.uid == userId;
+  }
+
+  function isExistingOwner(userId) {
+    return isOwner(userId) && resource != null;
+  }
+
+  function hasRole(roles) {
+    return isSignedIn() && roles.hasAny(request.auth.token.role);
+  }
 }
