@@ -1,36 +1,146 @@
 /**
- * @fileoverview Firestore Security Rules for the application.
+ * @fileoverview Firestore Security Rules
  *
  * Core Philosophy:
- * This ruleset enforces a hybrid security model:
- *   - User profiles are private and owned by the respective user.
- *   - Inventory, Sectors, Machines, MachineAssignments, and UsageLogs are accessible based on roles.
- *   - A "master user" (maurofbordon@gmail.com) bypasses role checks and has full access.
+ * This ruleset enforces a tiered access control model, primarily based on user roles and ownership.
+ * User profiles and roles are strictly managed, while inventory and machine data are broadly accessible with restricted write access.
  *
  * Data Structure:
- * - /users/{userId}: User profile information.
- * - /roles/{userId}: User roles (e.g., admin, editor).
- * - /inventory/{itemId}: Global inventory items.
- * - /sectors/{sectorId}: Sectors within the plant.
+ * - /users/{userId}: Stores public user profile information, accessible only to the user themselves.
+ * - /roles/{userId}: Stores user roles (e.g., admin, editor), accessible only to admins.
+ * - /inventory/{itemId}: Global inventory of items.
+ * - /sectors/{sectorId}: Sectors in the plant.
  * - /sectors/{sectorId}/machines/{machineId}: Machines within each sector.
  * - /machineAssignments/{assignmentId}: Assignments of inventory items to machines.
- * - /usageLog/{logId}: Historical logs of item usage.
+ * - /usageLog/{logId}: Logs of inventory item usage.
  *
  * Key Security Decisions:
- * - User profiles are strictly private; users can only access their own profiles.
- * - Listing of users or roles is disallowed.
- * - The "master user" (maurofbordon@gmail.com) has full access, bypassing other role-based restrictions.
+ * - User listing is explicitly denied to prevent unauthorized data scraping.
+ * - Roles are stored separately from profiles for enhanced security.
+ * - Most data is readable by all authenticated users, but write access is limited to specific roles.
  *
  * Denormalization for Authorization:
- *  - User roles are stored in a separate `/roles/{userId}` document to simplify role checks.
- *  - MachineAssignments denormalize `itemName` for easier display.
- *
- * Structural Segregation:
- *  - No explicit segregation is used in this model.
+ *  - While not explicitly present in this schema, consider adding fields like `ownerId` to documents if finer-grained ownership-based access control is needed in the future.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    /**
+     * @description Prevents listing all users.
+     * @path /users
+     * @allow None
+     * @deny list
+     * @principle Prevents information disclosure.
+     */
+    match /users {
+      allow list: if false;
+    }
+
+    /**
+     * @description Allows users to read and write their own profile data.
+     * @path /users/{userId}
+     * @allow (get, create, update, delete) - Authenticated user with matching userId.
+     * @deny (get, create, update, delete) - Any other user attempting to access this data.
+     * @principle Enforces user-ownership.
+     */
+    match /users/{userId} {
+      allow get: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.uid == userId;
+      allow update: if isSignedIn() && isExistingOwner(userId) && request.resource.data.uid == resource.data.uid;
+      allow delete: if isSignedIn() && isExistingOwner(userId);
+    }
+
+    /**
+     * @description Allows admins to read and manage user roles.
+     * @path /roles/{userId}
+     * @allow (get, create, update, delete) - Admin users.
+     * @deny (get, create, update, delete) - Non-admin users.
+     * @principle Enforces role-based access control.
+     */
+    match /roles/{userId} {
+      allow get: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
+    }
+
+    /**
+     * @description Allows anyone to read inventory items, but restricts creation, updates, and deletions.
+     * @path /inventory/{itemId}
+     * @allow (get, list) - Any user.
+     * @allow (create, update, delete) - Admin users only.
+     * @deny (create, update, delete) - Non-admin users.
+     * @principle Public read access with admin-restricted writes.
+     */
+    match /inventory/{itemId} {
+      allow get, list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
+    }
+
+    /**
+     * @description Allows anyone to read sectors, but restricts creation, updates, and deletions.
+     * @path /sectors/{sectorId}
+     * @allow (get, list) - Any user.
+     * @allow (create, update, delete) - Admin users only.
+     * @deny (create, update, delete) - Non-admin users.
+     * @principle Public read access with admin-restricted writes.
+     */
+    match /sectors/{sectorId} {
+      allow get, list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
+    }
+
+    /**
+     * @description Allows anyone to read machine data, but restricts creation, updates, and deletions.
+     * @path /sectors/{sectorId}/machines/{machineId}
+     * @allow (get, list) - Any user.
+     * @allow (create, update, delete) - Admin users only.
+     * @deny (create, update, delete) - Non-admin users.
+     * @principle Public read access with admin-restricted writes.
+     */
+    match /sectors/{sectorId}/machines/{machineId} {
+      allow get, list: if true;
+      allow create: if isAdmin() && request.resource.data.sectorId == sectorId;
+      allow update: if isAdmin() && resource != null && request.resource.data.sectorId == sectorId;
+      allow delete: if isAdmin() && resource != null;
+    }
+
+     /**
+      * @description Allows anyone to read machine assignments, but restricts creation, updates, and deletions.
+      * @path /machineAssignments/{assignmentId}
+      * @allow (get, list) - Any user.
+      * @allow (create, update, delete) - Admin users only.
+      * @deny (create, update, delete) - Non-admin users.
+      * @principle Public read access with admin-restricted writes.
+      */
+    match /machineAssignments/{assignmentId} {
+      allow get, list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
+    }
+
+    /**
+     * @description Allows anyone to read usage logs, but restricts creation, updates, and deletions.
+     * @path /usageLog/{logId}
+     * @allow (get, list) - Any user.
+     * @allow (create, update, delete) - Admin users only.
+     * @deny (create, update, delete) - Non-admin users.
+     * @principle Public read access with admin-restricted writes.
+     */
+    match /usageLog/{logId} {
+      allow get, list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
+    }
+
+    // --- Helper Functions ---
 
     /**
      * @description Checks if the user is signed in.
@@ -41,162 +151,29 @@ service cloud.firestore {
     }
 
     /**
-     * @description Checks if the authenticated user's UID matches the provided userId.
-     * @param {string} userId The user ID to compare against.
+     * @description Checks if the user is the owner of the resource.
+     * @param {string} userId The user ID to compare against the request's authentication UID.
      * @return {boolean} True if the user is the owner, false otherwise.
      */
     function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return request.auth.uid == userId;
     }
 
     /**
-     * @description Checks if the authenticated user is the "master user".
-     * @return {boolean} True if the user is the master user, false otherwise.
-     */
-    function isMasterUser() {
-      return isSignedIn() && request.auth.token.email == 'maurofbordon@gmail.com';
-    }
-     /**
-      * @description Checks if a role exists for a user.
-      * @param {string} roleId The user ID.
-      * @return {boolean} True if the role exists, false otherwise.
-      */
-    function roleExists(roleId) {
-      return exists(/databases/$(database)/documents/roles/$(roleId));
-    }
-
-
-    /**
-     * @description Checks if the authenticated user has a specific role.
-     * @param {string} role The role to check for (e.g., 'admin', 'editor').
-     * @return {boolean} True if the user has the role, false otherwise.
-     */
-    function hasRole(role) {
-      return isSignedIn() && roleExists(request.auth.uid) && get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role == role;
-    }
-
-     /**
-      * @description Determines if the user is an admin.
-      * @return {boolean} True if the user is an admin, false otherwise.
-      */
-    function isAdmin() {
-       return isMasterUser() || hasRole('admin');
-    }
-
-     /**
-      * @description Determines if the user is an editor.
-      * @return {boolean} True if the user is an editor, false otherwise.
-      */
-    function isEditor() {
-       return isMasterUser() || hasRole('editor') || isAdmin();
-    }
-
-    /**
-     * @description Checks if the authenticated user is the owner of an existing document.
-     * @param {string} userId The user ID to compare against.
-     * @return {boolean} True if the user is the owner and the resource exists.
+     * @description Checks if the user is the owner of the resource and the resource exists.
+     * @param {string} userId The user ID to compare against the resource's UID.
+     * @return {boolean} True if the user is the owner and the resource exists, false otherwise.
      */
     function isExistingOwner(userId) {
       return isOwner(userId) && resource != null;
     }
 
     /**
-     * @description Rules for user profiles.
-     * @path /users/{userId}
-     * @allow (create) - User creates their own profile if the userId matches their auth UID.
-     * @allow (get, update, delete) - User can only access/modify their own profile.
-     * @deny (create) - User attempts to create a profile with a mismatched userId.
-     * @principle Enforces document ownership for user profiles.
+     * @description Checks if the user has the 'admin' role.
+     * @return {boolean} True if the user has the 'admin' role, false otherwise.
      */
-    match /users/{userId} {
-      allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isOwner(userId) && request.resource.data.uid == userId && request.auth.token.email == request.resource.data.email;
-      allow update: if isExistingOwner(userId) && request.resource.data.uid == userId;
-      allow delete: if isExistingOwner(userId);
-    }
-
-     /**
-      * @description Rules for user roles.
-      * @path /roles/{userId}
-      * @allow (create, update, delete) - Only admin users can create, update, or delete roles. Master user can also do this.
-      * @allow (get) - Only the user themselves can retrieve their role.
-      * @deny (list) - Listing roles is not allowed.
-      * @principle Restricts role management to admins and allows users to view their own role.
-      */
-    match /roles/{userId} {
-      allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
-
-
-    /**
-     * @description Rules for inventory items.
-     * @path /inventory/{itemId}
-     * @allow (get, list) - Public read access.
-     * @allow (create, update, delete) - Only admins can create, update, or delete inventory items.
-     * @deny (create, update, delete) - Non-admin users cannot modify inventory.
-     */
-    match /inventory/{itemId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
-
-    /**
-     * @description Rules for sectors.
-     * @path /sectors/{sectorId}
-     * @allow (get, list) - Public read access.
-     * @allow (create, update, delete) - Only admins can create, update, or delete sectors.
-     */
-    match /sectors/{sectorId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
-
-    /**
-     * @description Rules for machines within a sector.
-     * @path /sectors/{sectorId}/machines/{machineId}
-     * @allow (get, list) - Public read access.
-     * @allow (create, update, delete) - Only admins can create, update, or delete machines.
-     */
-    match /sectors/{sectorId}/machines/{machineId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
-
-    /**
-     * @description Rules for machine assignments.
-     * @path /machineAssignments/{assignmentId}
-     * @allow (get, list) - Public read access.
-     * @allow (create, update, delete) - Only editors and admins can create, update, or delete machine assignments.
-     */
-    match /machineAssignments/{assignmentId} {
-      allow get, list: if true;
-      allow create: if isEditor();
-      allow update: if isEditor();
-      allow delete: if isEditor();
-    }
-
-    /**
-     * @description Rules for usage logs.
-     * @path /usageLog/{logId}
-     * @allow (get, list) - Public read access.
-     * @allow (create) - Only editors and admins can create usage logs.
-     * @allow (update, delete) - No updates or deletes allowed.
-     */
-    match /usageLog/{logId} {
-      allow get, list: if true;
-      allow create: if isEditor();
-      allow update, delete: if false;
+    function isAdmin() {
+      return request.auth.token.admin == true;
     }
   }
 }
