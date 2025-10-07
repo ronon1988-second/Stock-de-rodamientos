@@ -54,7 +54,6 @@ export default function LoginPage() {
     const isAdminUser = user.email === 'maurofbordon@gmail.com';
     const role = isAdminUser ? 'admin' : 'editor';
 
-    // Only write if the document doesn't exist or the role is different
     if (!roleDoc.exists() || roleDoc.data()?.role !== role) {
         await setDoc(roleRef, { role: role }, { merge: true });
     }
@@ -74,18 +73,23 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
+        let userCredential;
         if (action === "login") {
-            await signInWithEmailAndPassword(auth, email, password);
+            userCredential = await signInWithEmailAndPassword(auth, email, password);
         } else { // signup
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            // On signup, create profile and role
-            await updateUserProfile(userCredential.user);
-            await updateUserRole(userCredential.user);
+            userCredential = await createUserWithEmailAndPassword(auth, email, password);
         }
+        
+        // After either login or signup, ensure profile and role are set
+        await updateUserProfile(userCredential.user);
+        await updateUserRole(userCredential.user);
+
+        // Force token refresh to pick up custom claims if they were just set.
+        await userCredential.user.getIdToken(true);
         
         toast({
             title: action === 'login' ? "Inicio de sesión exitoso" : "Cuenta creada",
-            description: action === 'login' ? "Bienvenido de nuevo." : "Se ha registrado exitosamente y se le ha asignado un rol.",
+            description: action === 'login' ? "Bienvenido de nuevo." : "Se ha registrado exitosamente.",
         });
 
         router.push('/');
