@@ -32,10 +32,20 @@ export default function LoginPage() {
   const { toast } = useToast();
   const router = useRouter();
 
-  const ensureAdminRole = async (user: User) => {
-    if (user.email === 'maurofbordon@gmail.com') {
-      const userRef = doc(firestore, "users", user.uid);
-      await setDoc(userRef, { role: 'admin' }, { merge: true });
+  const updateUserRole = async (user: User) => {
+    const userRef = doc(firestore, "users", user.uid);
+    const userDoc = await getDoc(userRef);
+
+    const isAdminUser = user.email === 'maurofbordon@gmail.com';
+    const role = isAdminUser ? 'admin' : (userDoc.exists() ? userDoc.data().role : 'editor');
+
+    if (!userDoc.exists() || userDoc.data().role !== role || isAdminUser) {
+        await setDoc(userRef, { 
+            uid: user.uid,
+            email: user.email,
+            role: role,
+            displayName: user.email?.split('@')[0] || 'Usuario'
+        }, { merge: true });
     }
   };
 
@@ -56,27 +66,14 @@ export default function LoginPage() {
         let userCredential;
         if (action === "login") {
             userCredential = await signInWithEmailAndPassword(auth, email, password);
-            await ensureAdminRole(userCredential.user); // Check for admin role on login
+            await updateUserRole(userCredential.user);
             toast({
                 title: "Inicio de sesión exitoso",
                 description: "Bienvenido de nuevo.",
             });
         } else {
             userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            const user = userCredential.user;
-            
-            const userRef = doc(firestore, "users", user.uid);
-            
-            const isAdminUser = user.email === 'maurofbordon@gmail.com';
-            const role = isAdminUser ? 'admin' : 'editor';
-
-            await setDoc(userRef, { 
-              uid: user.uid,
-              email: user.email,
-              role: role,
-              displayName: user.email?.split('@')[0] || 'Usuario'
-            });
-
+            await updateUserRole(userCredential.user);
             toast({
                 title: "Cuenta creada",
                 description: "Se ha registrado exitosamente.",
