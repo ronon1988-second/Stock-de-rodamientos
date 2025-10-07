@@ -1,9 +1,6 @@
-
 'use server';
 
 import { getReorderRecommendations, ReorderRecommendationsInput } from "@/ai/flows/reorder-recommendations";
-import { getFirestore } from 'firebase-admin/firestore';
-import { getAdminApp } from "@/firebase/server-app";
 import { doc, setDoc } from 'firebase/firestore';
 import { getSdks } from "@/firebase";
 
@@ -19,28 +16,24 @@ export async function getAIReorderRecommendations(input: ReorderRecommendationsI
 
 /**
  * Secure server action to update a user's role in the /roles collection.
- * This function now receives a UID directly and writes to Firestore.
+ * This function receives a UID and writes the role to Firestore.
+ * It no longer uses firebase-admin to avoid permission issues.
  */
-export async function updateUserRole(userId: string, role: 'admin' | 'editor'): Promise<{ success: boolean, error?: string }> {
-    if (!userId || !role) {
-        return { success: false, error: 'Se requieren el ID de usuario y el rol.' };
+export async function updateUserRole(uid: string, role: 'admin' | 'editor'): Promise<{ success: boolean; error?: string }> {
+    if (!uid || !role) {
+        return { success: false, error: 'User ID and role are required.' };
     }
+
     try {
-        // We can't use the Admin SDK, so we use the regular server-side SDK.
-        // This relies on the security rules allowing the write.
-        // The rule is "allow write: if request.auth != null;", so this will work.
+        // This uses the standard server-side SDK, relying on security rules.
+        // Since rules are 'allow write: if request.auth != null;', this will succeed.
         const { firestore } = getSdks();
-        const roleRef = doc(firestore, 'roles', userId);
-        
+        const roleRef = doc(firestore, 'roles', uid);
         await setDoc(roleRef, { role: role });
 
         return { success: true };
-
     } catch (error: any) {
-        console.error(`Error updating role in Firestore:`, error);
-        // Do not expose detailed internal errors to the client
-        return { success: false, error: 'Ocurrió un error inesperado al escribir el rol en la base de datos.' };
+        console.error('Error writing role to Firestore:', error);
+        return { success: false, error: 'An unexpected error occurred while writing the role to the database.' };
     }
 }
-
-

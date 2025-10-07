@@ -48,6 +48,7 @@ import {
   Machine,
   MachineAssignment,
   UserProfile,
+  UserRole,
 } from '@/lib/types';
 import { initialInventory, initialSectors, initialMachines } from '@/lib/data';
 import Dashboard from '@/components/app/dashboard';
@@ -150,8 +151,15 @@ function AppContent() {
   
   // Master user has all privileges, bypassing role checks.
   const isMasterUser = user?.email === 'maurofbordon@gmail.com';
-  const isAdmin = isMasterUser; // Simplified admin logic
-  const isEditor = isMasterUser || false; // Only master user can edit initially
+
+  const roleRef = useMemoFirebase(
+    () => (user ? doc(firestore, 'roles', user.uid) : null),
+    [firestore, user]
+  );
+  const { data: userRoleDoc, isLoading: isRoleLoading } = useDoc<UserRole>(roleRef);
+
+  const isAdmin = isMasterUser || userRoleDoc?.role === 'admin';
+  const isEditor = isAdmin || userRoleDoc?.role === 'editor';
 
   // This effect handles the creation of user profile on first login
   useEffect(() => {
@@ -498,7 +506,8 @@ function AppContent() {
       isUsageLogLoading ||
       isSectorsLoading ||
       isSeeding ||
-      isProfileLoading;
+      isProfileLoading ||
+      isRoleLoading;
 
     if (isLoading) {
       return <Skeleton className="h-full w-full" />;
@@ -748,7 +757,9 @@ function AppContent() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>
-                {user?.email} {isMasterUser && '(Master)'}
+                {user?.email}{' '}
+                {isMasterUser && '(Master)'}
+                {userRoleDoc?.role && ` - ${userRoleDoc.role}`}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={handleLogout}>
