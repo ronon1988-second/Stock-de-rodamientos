@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Home,
   LineChart,
@@ -25,6 +25,7 @@ import {
   getDocs,
   addDoc,
 } from 'firebase/firestore';
+import { getIdToken } from 'firebase/auth';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -154,9 +155,21 @@ function AppContent() {
   const roleRef = useMemoFirebase(() => user ? doc(firestore, 'roles', user.uid) : null, [firestore, user]);
   const { data: userRole, isLoading: isRoleLoading } = useDoc<UserRole>(roleRef);
   
-  const isAdmin = useMemo(() => userRole?.role === 'admin', [userRole]);
-  const isEditor = useMemo(() => userRole?.role === 'admin' || userRole?.role === 'editor', [userRole]);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isEditor, setIsEditor] = useState(false);
 
+  const refreshUserClaims = useCallback(async () => {
+    if (!user) return;
+    const tokenResult = await getIdToken(user, true); // Force refresh
+    const claims = tokenResult.claims;
+    setIsAdmin(!!claims.admin);
+    setIsEditor(!!claims.admin || !!claims.editor);
+  }, [user]);
+
+  useEffect(() => {
+    refreshUserClaims();
+  }, [refreshUserClaims]);
+  
 
   // This effect handles the creation of user profile on first login
   useEffect(() => {
@@ -529,7 +542,7 @@ function AppContent() {
       );
     }
     if (view === 'users' && isAdmin) {
-      return <UserManagementView />;
+      return <UserManagementView onRoleChanged={refreshUserClaims} />;
     }
     if (view.startsWith('machine-')) {
       const machineId = view.replace('machine-', '');
@@ -553,6 +566,19 @@ function AppContent() {
         />
       );
     }
+    // Fallback for non-admin/editor users trying to access restricted views
+    if ((view === 'organization' && !isAdmin) || (view === 'users' && !isAdmin)) {
+      setView('dashboard');
+      return (
+        <Dashboard
+          inventory={sortedInventory}
+          onUpdateItem={handleUpdateItem}
+          onAddItem={handleAddItem}
+          canEdit={isEditor}
+        />
+      );
+    }
+
     return null;
   };
 
@@ -586,7 +612,7 @@ function AppContent() {
         Máquinas por Sector
       </div>
 
-      <Accordion type="multiple" className="w-full">
+      <Accordion type="single" collapsible className="w-full">
         {sortedSectors.map(sector => (
           <AccordionItem key={sector.id} value={sector.id} className="border-b-0">
             <AccordionTrigger className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-muted-foreground hover:text-primary hover:no-underline">
@@ -756,5 +782,7 @@ export default function Page() {
 
   return <AppContent />;
 }
+
+    
 
     

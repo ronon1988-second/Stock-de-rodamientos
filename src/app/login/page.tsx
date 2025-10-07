@@ -5,6 +5,7 @@ import { useState } from "react";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  getIdToken,
 } from "firebase/auth";
 import { useFirebase } from "@/firebase/provider";
 import { Button } from "@/components/ui/button";
@@ -63,8 +64,8 @@ export default function LoginPage() {
             }
         }
         
-        // After successful auth, just redirect. Profile/role creation handled elsewhere.
-        await userCredential.user.getIdToken(true); // Force token refresh to get latest claims
+        // Force refresh of the ID token to get the latest custom claims.
+        await getIdToken(userCredential.user, true);
         
         toast({
             title: `Éxito de ${action === 'login' ? 'inicio de sesión' : 'autenticación'}`,
@@ -160,3 +161,5 @@ export default function LoginPage() {
     </div>
   );
 }
+
+    

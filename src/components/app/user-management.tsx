@@ -32,6 +32,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { updateUserRoleByEmail } from '@/app/actions';
 import { Loader2 } from 'lucide-react';
+import { useUser } from '@/firebase';
+import { getIdToken } from 'firebase/auth';
 
 const UserRoleSchema = z.object({
   email: z.string().email({ message: 'Por favor ingrese un email válido.' }),
@@ -42,9 +44,15 @@ const UserRoleSchema = z.object({
 
 type UserRoleFormValues = z.infer<typeof UserRoleSchema>;
 
-export default function UserManagementView() {
+type UserManagementViewProps = {
+  onRoleChanged: () => void;
+};
+
+
+export default function UserManagementView({ onRoleChanged }: UserManagementViewProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const { user } = useUser();
 
   const form = useForm<UserRoleFormValues>({
     resolver: zodResolver(UserRoleSchema),
@@ -60,8 +68,14 @@ export default function UserManagementView() {
       if (result.success) {
         toast({
           title: 'Rol Actualizado',
-          description: `El usuario ${data.email} ahora tiene el rol de ${data.role}.`,
+          description: `El usuario ${data.email} ahora tiene el rol de ${data.role}. Los cambios se reflejarán en breve.`,
         });
+        
+        // If the admin is changing their own role, force a token refresh
+        if (user && user.email === data.email) {
+            onRoleChanged();
+        }
+
         form.reset();
       } else {
         throw new Error(result.error);
@@ -142,3 +156,5 @@ export default function UserManagementView() {
     </Card>
   );
 }
+
+    
