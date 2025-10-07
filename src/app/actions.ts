@@ -5,6 +5,8 @@ import { getReorderRecommendations, ReorderRecommendationsInput } from "@/ai/flo
 import { doc, setDoc } from 'firebase/firestore';
 import { getSdks } from "@/firebase";
 import { UserProfile } from "@/lib/types";
+import { getAdminApp } from "@/firebase/server-app";
+import { getAuth } from "firebase-admin/auth";
 
 export async function getAIReorderRecommendations(input: ReorderRecommendationsInput) {
     try {
@@ -26,8 +28,7 @@ export async function setupUserAndRole(uid: string, email: string): Promise<{ su
         
         // 1. Create user profile document
         const userRef = doc(firestore, 'users', uid);
-        const userData: Omit<UserProfile, 'id'> = {
-            uid: uid,
+        const userData: Omit<UserProfile, 'id'|'uid'> = {
             email: email,
             displayName: email.split('@')[0] || 'Usuario',
         };
@@ -38,6 +39,11 @@ export async function setupUserAndRole(uid: string, email: string): Promise<{ su
         // Special case for master user
         if (email === 'maurofbordon@gmail.com') {
             await setDoc(roleRef, { role: 'admin' });
+            // Also set custom claim for immediate admin access
+            const adminApp = getAdminApp();
+            const auth = getAuth(adminApp);
+            await auth.setCustomUserClaims(uid, { admin: true });
+
         } else {
             await setDoc(roleRef, { role: 'editor' });
         }
@@ -57,11 +63,20 @@ export async function updateUserRole(uid: string, role: 'admin' | 'editor'): Pro
 
     try {
         const { firestore } = getSdks();
+        const adminApp = getAdminApp();
+        const auth = getAuth(adminApp);
+
+        // Update the role in the /roles collection
         const roleRef = doc(firestore, 'roles', uid);
         await setDoc(roleRef, { role: role });
 
+        // Set custom claims for the user
+        const claims = role === 'admin' ? { admin: true, editor: true } : { editor: true };
+        await auth.setCustomUserClaims(uid, claims);
+
         return { success: true };
-    } catch (error: any) {
+    } catch (error: any)
+     {
         console.error('Error writing role to Firestore:', error);
         return { success: false, error: error.message || 'An unexpected error occurred while writing the role to the database.' };
     }

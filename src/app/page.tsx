@@ -161,6 +161,10 @@ function AppContent() {
     [firestore, user]
   );
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
+  
+  const allUsersRef = useMemoFirebase(() => (firestore ? collection(firestore, 'users') : null), [firestore]);
+  const { data: allUsers, isLoading: isAllUsersLoading } = useCollection<UserProfile>(allUsersRef);
+
 
   const inventoryRef = useMemoFirebase(() => firestore ? collection(firestore, 'inventory') : null, [firestore]);
   const { data: inventory, isLoading: isInventoryLoading } = useCollection<InventoryItem>(inventoryRef);
@@ -457,7 +461,8 @@ function AppContent() {
       isSectorsLoading ||
       isSeeding ||
       isProfileLoading ||
-      isRoleLoading;
+      isRoleLoading ||
+      isAllUsersLoading;
 
     if (isDataLoading) {
       return <Skeleton className="h-full w-full" />;
@@ -507,7 +512,7 @@ function AppContent() {
             toast({ title: "Acceso denegado", description: "Necesita permisos de administrador.", variant: "destructive"})
             return null;
         }
-      return <UserManagementView users={[]} />;
+      return <UserManagementView users={allUsers || []} />;
     }
     if (view.startsWith('machine-')) {
       const machineId = view.replace('machine-', '');
@@ -555,12 +560,20 @@ function AppContent() {
         onClick={handleNavClick}
       />
       {isAdmin && (
-        <NavLink
-            targetView="organization"
-            icon={<Settings className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
-            label="Organización"
-            onClick={handleNavClick}
-        />
+        <>
+          <NavLink
+              targetView="organization"
+              icon={<Settings className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
+              label="Organización"
+              onClick={handleNavClick}
+          />
+          <NavLink
+              targetView="users"
+              icon={<Users className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
+              label="Gestionar Usuarios"
+              onClick={handleNavClick}
+          />
+        </>
       )}
 
       <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
