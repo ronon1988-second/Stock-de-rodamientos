@@ -2,13 +2,10 @@
 'use server';
 
 import { getReorderRecommendations, ReorderRecommendationsInput } from "@/ai/flows/reorder-recommendations";
+import { getFirestore } from 'firebase-admin/firestore';
 import { getAdminApp } from "@/firebase/server-app";
-import { getFirestore as getAdminFirestore } from 'firebase-admin/firestore';
-import { getAuth as getAdminAuth } from 'firebase-admin/auth';
-import { collection, query, where, getDocs, doc, setDoc } from 'firebase/firestore';
-import { getSdks } from "@/firebase";
+import { doc, setDoc } from 'firebase/firestore';
 
-// This file no longer uses firebase-admin for role management.
 
 export async function getAIReorderRecommendations(input: ReorderRecommendationsInput) {
     try {
@@ -20,28 +17,18 @@ export async function getAIReorderRecommendations(input: ReorderRecommendationsI
     }
 }
 
-// Secure server action to update a user's role in the /roles collection
-export async function updateUserRole(email: string, role: 'admin' | 'editor'): Promise<{ success: boolean, error?: string }> {
+/**
+ * Secure server action to update a user's role in the /roles collection.
+ * This function now receives a UID directly and writes to Firestore,
+ * avoiding the need for the Admin Auth SDK.
+ */
+export async function updateUserRole(userId: string, role: 'admin' | 'editor'): Promise<{ success: boolean, error?: string }> {
+    if (!userId || !role) {
+        return { success: false, error: 'Se requieren el ID de usuario y el rol.' };
+    }
     try {
-        // We use the client SDK on the server here to find the user's profile.
-        // This is safe because this is a server action.
-        const { firestore } = getSdks();
-        
-        const usersRef = collection(firestore, 'users');
-        const q = query(usersRef, where("email", "==", email));
-        
-        const querySnapshot = await getDocs(q);
-        
-        if (querySnapshot.empty) {
-            return { success: false, error: `No se encontró ningún usuario con el correo electrónico ${email}.` };
-        }
-        
-        const userDoc = querySnapshot.docs[0];
-        const userId = userDoc.id;
-        
-        // Now, write the role to the /roles collection using the Admin SDK to bypass security rules if needed,
-        // although our current rules are open for authenticated users.
-        const adminDb = getAdminFirestore(getAdminApp());
+        // Use the Admin SDK for Firestore to bypass security rules for this trusted server action.
+        const adminDb = getFirestore(getAdminApp());
         const roleRef = adminDb.collection('roles').doc(userId);
         
         await roleRef.set({ role: role });
@@ -49,8 +36,8 @@ export async function updateUserRole(email: string, role: 'admin' | 'editor'): P
         return { success: true };
 
     } catch (error: any) {
-        console.error(`Error updating role:`, error);
-        // Don't expose detailed internal errors to the client
-        return { success: false, error: 'Ocurrió un error inesperado al actualizar el rol.' };
+        console.error(`Error updating role in Firestore:`, error);
+        // Do not expose detailed internal errors to the client
+        return { success: false, error: 'Ocurrió un error inesperado al escribir el rol en la base de datos.' };
     }
 }
