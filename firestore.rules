@@ -2,79 +2,99 @@
  * @fileoverview Firestore Security Rules for Prototyping.
  *
  * Core Philosophy:
- * This ruleset is designed for the rapid prototyping phase of development. It prioritizes ease of access and
- * modification for developers while maintaining a baseline level of security. It assumes a shared inventory model where any authenticated user can view and modify the same dataset.
+ * This ruleset allows any authenticated user to read and write to all collections.
+ * This facilitates rapid prototyping by removing authorization barriers, but it
+ * should be replaced with a more restrictive ruleset for production use.
  *
  * Data Structure:
- * - /inventory/{inventoryId}: Stores inventory items. Accessible by any authenticated user.
- * - /sectorAssignments/{assignmentId}: Stores sector assignments. Accessible by any authenticated user.
- * - /usageLog/{usageLogId}: Stores usage logs. Accessible by any authenticated user.
+ * All data is stored in root-level collections: /sectors, /inventory, etc.
+ * There are subcollections under /sectors: /sectors/{sectorId}/machines/{machineId}.
  *
  * Key Security Decisions:
- * - All authenticated users can read and write all collections.
- * - The rules explicitly deny unauthenticated access.
- * - No data validation is enforced beyond requiring user authentication for all operations.
+ * - Any signed-in user can read and write any document.
+ * - This is NOT SECURE and should only be used for prototyping.
  *
- * Denormalization for Authorization: N/A (All authenticated users have access)
- * Structural Segregation: N/A (All data is shared)
+ * Denormalization for Authorization: N/A (authorization is open to any signed-in user)
+ * Structural Segregation: N/A (all data is globally accessible to signed-in users)
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Defines whether a user is signed in.
+     * @description Allows any authenticated user to read and write sectors.
+     * @path /databases/{database}/documents/sectors/{sectorId}
+     * @allow (get, list) Any signed-in user can read sector data.
+     * @allow (create, update, delete) Any signed-in user can modify sector data.
+     * @deny If the user is not signed in.
+     * @principle Allows open access for any authenticated user.
+     */
+    match /sectors/{sectorId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    /**
+     * @description Allows any authenticated user to read and write machines within a sector.
+     * @path /databases/{database}/documents/sectors/{sectorId}/machines/{machineId}
+     * @allow (get, list) Any signed-in user can read machine data.
+     * @allow (create, update, delete) Any signed-in user can modify machine data.
+     * @deny If the user is not signed in.
+     * @principle Allows open access for any authenticated user.
+     */
+    match /sectors/{sectorId}/machines/{machineId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    /**
+     * @description Allows any authenticated user to read and write inventory items.
+     * @path /databases/{database}/documents/inventory/{inventoryId}
+     * @allow (get, list) Any signed-in user can read inventory data.
+     * @allow (create, update, delete) Any signed-in user can modify inventory data.
+     * @deny If the user is not signed in.
+     * @principle Allows open access for any authenticated user.
+     */
+    match /inventory/{inventoryId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    /**
+     * @description Allows any authenticated user to read and write machine assignments.
+     * @path /databases/{database}/documents/machineAssignments/{assignmentId}
+     * @allow (get, list) Any signed-in user can read assignment data.
+     * @allow (create, update, delete) Any signed-in user can modify assignment data.
+     * @deny If the user is not signed in.
+     * @principle Allows open access for any authenticated user.
+     */
+    match /machineAssignments/{assignmentId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    /**
+     * @description Allows any authenticated user to read and write usage logs.
+     * @path /databases/{database}/documents/usageLog/{usageLogId}
+     * @allow (get, list) Any signed-in user can read usage log data.
+     * @allow (create, update, delete) Any signed-in user can modify usage log data.
+     * @deny If the user is not signed in.
+     * @principle Allows open access for any authenticated user.
+     */
+    match /usageLog/{usageLogId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    //-------------------  Helper functions  -------------------
+
+    /**
+     * @description Checks if the user is signed in.
+     * @return {boolean} True if the user is signed in, false otherwise.
      */
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /**
-     * @description Rules for the 'inventory' collection. Allows any authenticated user to read and write inventory items.
-     * @path /databases/{database}/documents/inventory/{inventoryId}
-     * @allow (get, list) Any authenticated user can read.
-     * @allow (create, update, delete) Any authenticated user can write.
-     * @deny If the user is not authenticated.
-     * @principle Allows full access to inventory for all authenticated users during prototyping.
-     */
-    match /inventory/{inventoryId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource.data != null;
-      allow delete: if isSignedIn() && resource.data != null;
-    }
-
-    /**
-     * @description Rules for the 'sectorAssignments' collection. Allows any authenticated user to read and write sector assignments.
-     * @path /databases/{database}/documents/sectorAssignments/{assignmentId}
-     * @allow (get, list) Any authenticated user can read.
-     * @allow (create, update, delete) Any authenticated user can write.
-     * @deny If the user is not authenticated.
-     * @principle Allows full access to sector assignments for all authenticated users during prototyping.
-     */
-    match /sectorAssignments/{assignmentId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource.data != null;
-      allow delete: if isSignedIn() && resource.data != null;
-    }
-
-    /**
-     * @description Rules for the 'usageLog' collection. Allows any authenticated user to read and write usage logs.
-     * @path /databases/{database}/documents/usageLog/{usageLogId}
-     * @allow (get, list) Any authenticated user can read.
-     * @allow (create, update, delete) Any authenticated user can write.
-     * @deny If the user is not authenticated.
-     * @principle Allows full access to usage logs for all authenticated users during prototyping.
-     */
-    match /usageLog/{usageLogId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource.data != null;
-      allow delete: if isSignedIn() && resource.data != null;
-    }
   }
 }
