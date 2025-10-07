@@ -165,6 +165,7 @@ function AppContent() {
     useDoc<UserRole>(userRoleRef);
   const userRole = userRoleDoc?.role;
   const isAdmin = userRole === 'admin';
+  const isEditor = userRole === 'editor';
 
   const inventoryRef = useMemoFirebase(
     () => collection(firestore, 'inventory'),
@@ -183,7 +184,6 @@ function AppContent() {
   const [machinesBySector, setMachinesBySector] = useState<
     Record<string, Machine[]>
   >({});
-  const areMachinesLoading = false; 
 
   const machineAssignmentsRef = useMemoFirebase(
     () => collection(firestore, 'machineAssignments'),
@@ -268,7 +268,7 @@ function AppContent() {
   }, [machinesBySector]);
 
   const handleAddItem = (newItem: Omit<InventoryItem, 'id'>) => {
-    if (!isAdmin) return;
+    if (!isAdmin && !isEditor) return;
     const invRef = collection(firestore, 'inventory');
     addDocumentNonBlocking(invRef, newItem);
     toast({
@@ -278,6 +278,7 @@ function AppContent() {
   };
 
   const handleUpdateItem = (updatedItem: InventoryItem) => {
+    if (!isAdmin && !isEditor) return;
     const itemRef = doc(firestore, 'inventory', updatedItem.id);
     const { id, ...data } = updatedItem;
     setDocumentNonBlocking(itemRef, data, { merge: true });
@@ -293,7 +294,7 @@ function AppContent() {
     sectorId: string,
     quantity: number
   ) => {
-    if (!inventory) return;
+    if (!inventory || (!isAdmin && !isEditor)) return;
     const item = inventory.find(b => b.id === itemId);
     if (!item) return;
 
@@ -316,6 +317,7 @@ function AppContent() {
   };
 
   const handleRemoveItemFromMachine = (assignmentId: string) => {
+    if (!isAdmin && !isEditor) return;
     const assignment = machineAssignments?.find(item => item.id === assignmentId);
     if (!assignment) return;
 
@@ -334,7 +336,7 @@ function AppContent() {
     machineId: string,
     sectorId: string
   ) => {
-    if (!inventory) return;
+    if (!inventory || (!isAdmin && !isEditor)) return;
     const item = inventory.find(i => i.id === itemId);
     if (!item) return;
 
@@ -377,22 +379,10 @@ function AppContent() {
   };
 
   const lowStockCount = useMemo(() => {
-    if (!inventory || !machineAssignments) return 0;
-    const requiredByItem: { [itemId: string]: number } = {};
-    machineAssignments.forEach(item => {
-      if (!requiredByItem[item.itemId]) {
-        requiredByItem[item.itemId] = 0;
-      }
-      requiredByItem[item.itemId] += item.quantity;
-    });
+    if (!inventory) return 0;
 
-    return inventory.filter(b => {
-      const totalRequired = requiredByItem[b.id] || 0;
-      const safetyStock = b.threshold;
-      const totalDemand = totalRequired + safetyStock;
-      return b.stock < totalDemand;
-    }).length;
-  }, [inventory, machineAssignments]);
+    return inventory.filter(b => b.stock < b.threshold).length;
+  }, [inventory]);
 
   const handleLogout = async () => {
     await auth.signOut();
@@ -471,6 +461,9 @@ function AppContent() {
     if (isLoading) {
       return <Skeleton className="h-full w-full" />;
     }
+    
+    const canEditInventory = isAdmin || isEditor;
+    const canEditOrganization = isAdmin;
 
     if (view === 'dashboard') {
       return (
@@ -478,7 +471,7 @@ function AppContent() {
           inventory={sortedInventory}
           onUpdateItem={handleUpdateItem}
           onAddItem={handleAddItem}
-          canEdit={isAdmin}
+          canEdit={canEditInventory}
         />
       );
     }
@@ -500,7 +493,7 @@ function AppContent() {
       );
     }
     if (view === 'organization') {
-      if (!isAdmin) return null;
+      if (!canEditOrganization) return null;
       return (
         <OrganizationView
           sectors={sortedSectors}
@@ -541,7 +534,7 @@ function AppContent() {
           onAssignItem={handleAssignItemToMachine}
           onRemoveItem={handleRemoveItemFromMachine}
           onLogUsage={handleLogUsage}
-          canEdit={isAdmin}
+          canEdit={canEditInventory}
         />
       );
     }

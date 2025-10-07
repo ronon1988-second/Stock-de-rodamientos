@@ -75,7 +75,7 @@ export default function MachineView({ sector, machine, allInventory, machineAssi
                                                     <Button 
                                                         variant="outline" 
                                                         size="sm" 
-                                                        disabled={item.inventoryItem?.stock === 0}
+                                                        disabled={(item.inventoryItem?.stock ?? 0) === 0}
                                                         onClick={() => item.inventoryItem && setLogUsageItem(item.inventoryItem)}
                                                     >
                                                         Registrar Uso
