@@ -160,10 +160,11 @@ function AppContent() {
         const idTokenResult = await getIdTokenResult(user, true); // Force refresh
         const claims = idTokenResult.claims;
         const isAdminClaim = !!claims.admin;
-        const isEditorClaim = !!claims.editor;
+        // An admin is always an editor
+        const isEditorClaim = isAdminClaim || !!claims.editor;
         
         setIsAdmin(isAdminClaim);
-        setIsEditor(isAdminClaim || isEditorClaim); 
+        setIsEditor(isEditorClaim); 
     } catch (error) {
         console.error("Error refreshing user claims:", error);
         toast({
@@ -562,10 +563,6 @@ function AppContent() {
       );
     }
     if (view === 'users') {
-        if (!isEditor) { // Show to editors, but action is protected by admin
-            setView('dashboard');
-            return null;
-        }
       return <UserManagementView onRoleChanged={refreshUserClaims} />;
     }
     if (view.startsWith('machine-')) {
@@ -619,13 +616,12 @@ function AppContent() {
         label="Panel de control"
         onClick={handleNavClick}
       />
-      {isEditor && (
+      {isAdmin && (
         <NavLink
           targetView="organization"
           icon={<Settings className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
           label="Organización"
           onClick={handleNavClick}
-          disabled={!isEditor}
         />
       )}
 
@@ -663,14 +659,12 @@ function AppContent() {
           label="Reportes"
           onClick={handleNavClick}
         />
-        {isEditor && (
-           <NavLink
-            targetView="users"
-            icon={<Users className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
-            label="Gestionar Usuarios"
-            onClick={handleNavClick}
-           />
-        )}
+        <NavLink
+         targetView="users"
+         icon={<Users className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
+         label="Gestionar Usuarios"
+         onClick={handleNavClick}
+        />
       </div>
     </nav>
   );
