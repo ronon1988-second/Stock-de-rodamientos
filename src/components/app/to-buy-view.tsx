@@ -60,8 +60,8 @@ const getItemSeries = (name: string): string => {
   }
   if (normalizedName.startsWith('NK') || normalizedName.startsWith('RNA') || normalizedName.startsWith('HK')) return 'Rodamientos de Agujas';
   if (normalizedName.startsWith('PHS') || normalizedName.startsWith('POS')) return 'Terminales de Rótula';
-  if (normalizedName.startsWith('H')) return 'Manguitos de Montaje';
   if (normalizedName.startsWith('HTD')) return 'Correas';
+  if (normalizedName.startsWith('H')) return 'Manguitos de Montaje';
   if (normalizedName.startsWith('AEVU')) return 'Pistones';
   
   return 'Otros';
@@ -316,5 +316,7 @@ export default function ToBuyView({ inventory, sectorAssignments }: ToBuyViewPro
     </div>
   );
 }
+
+    
 
     
