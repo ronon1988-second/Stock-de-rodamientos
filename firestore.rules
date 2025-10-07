@@ -1,135 +1,103 @@
 /**
- * @fileoverview Firestore Security Rules for Prototyping.
- *
- * Core Philosophy: This ruleset prioritizes a secure, owner-centric model for user data while allowing public read access where appropriate. It avoids complex data validation in favor of rapid development.
- *
- * Data Structure:
- * - User profiles are stored under `/users/{userId}` and are accessible only to the owning user.
- * - Sectors, Machines, InventoryItems and MachineAssignments are publicly readable.
- * - Usage Logs are restricted to authenticated users.
+ * @file Firestore Security Rules
+ * @description This ruleset enforces a role-based access control model with `admin` privileges.
+ * All data is stored in top-level collections.
  *
  * Key Security Decisions:
- * - User listing is disabled for privacy.
- * - All write operations require authentication.
- * - Data validation is minimal, focusing on ownership and relationship integrity.
- *
- * Denormalization for Authorization:  Ownership is enforced by matching the `request.auth.uid` against document IDs in user-owned collections and fields in public collections.
+ * - Only authenticated users can access the data.
+ * - The ruleset enforces role based access control for the inventory collection. Only `admin` roles can list items.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the request is authenticated.
+     * @description Checks if the user is signed in.
      */
     function isSignedIn() {
       return request.auth != null;
     }
 
     /**
-     * @description Checks if the authenticated user is the owner of the document.
+     * @description Checks if the user has the 'admin' role.
      */
-    function isOwner(userId) {
-      return request.auth.uid == userId;
+    function isAdmin() {
+        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
     /**
-     * @description Checks if the authenticated user is the owner of the document and the document exists.
-     */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
-
-    /**
-     * @description Enforces user-specific data access for profiles.
-     * @path /databases/{database}/documents/users/{userId}
-     * @allow (create) User with UID 'user123' can create their profile.
-     * @deny (create) User with UID 'user456' cannot create profile for 'user123'.
-     * @allow (get) User with UID 'user123' can read their profile.
-     * @deny (get) User with UID 'user456' cannot read profile of 'user123'.
+     * @description User profiles are publicly readable, but only the owner can modify their own profile.
+     * @path /users/{userId}
+     * @allow (get) Authenticated user can read any profile.
+     * @allow (create) Authenticated user can create their own profile.
+     * @allow (update) Authenticated user can update their own profile.
+     * @allow (delete) Authenticated user can delete their own profile.
+     * @deny (create) Non-authenticated user attempts to create a profile.
+     * @deny (update) User attempts to update another user's profile.
+     * @deny (delete) User attempts to delete another user's profile.
      * @principle Enforces document ownership for writes.
      */
     match /users/{userId} {
-      allow create: if isOwner(userId);
-      allow get: if isOwner(userId);
+      allow get: if isSignedIn();
       allow list: if false;
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn() && request.auth.uid == userId;
+      allow delete: if isSignedIn() && request.auth.uid == userId;
     }
 
     /**
-     * @description Allows public read access to sectors, with owner-only writes.
-     * @path /databases/{database}/documents/sectors/{sectorId}
-     * @allow (get, list) Any user can read sectors.
-     * @deny (create, update, delete) Only the owner (creator) can modify sectors.
-     * @principle Public read access with owner-only writes.
+     * @description Sectors can be read by all authenticated users. Only admins can create, update, or delete sectors.
+     * @path /sectors/{sectorId}
      */
     match /sectors/{sectorId} {
-      allow get, list: if true;
-      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      // CRITICAL: Cannot implement owner-only writes. The 'Sector' entity is missing an 'ownerId' or 'authorId' field.
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && isAdmin();
+      allow update: if isSignedIn() && isAdmin();
+      allow delete: if isSignedIn() && isAdmin();
     }
 
     /**
-     * @description Allows public read access to machines, with owner-only writes.
-     * @path /databases/{database}/documents/machines/{machineId}
-     * @allow (get, list) Any user can read machines.
-     * @deny (create, update, delete) Only the owner (creator) can modify machines.
-     * @principle Public read access with owner-only writes.
+     * @description Machines can be read by all authenticated users. Only admins can create, update, or delete machines.
+     * @path /machines/{machineId}
      */
     match /machines/{machineId} {
-      allow get, list: if true;
-      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      // CRITICAL: Cannot implement owner-only writes. The 'Machine' entity is missing an 'ownerId' or 'authorId' field.
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && isAdmin();
+      allow update: if isSignedIn() && isAdmin();
+      allow delete: if isSignedIn() && isAdmin();
+    }
+
+     /**
+      * @description Inventory items can be read by all authenticated users. Only admins can create, update, or delete items.
+      * @path /inventory/{inventoryId}
+      * @allow (get) Any authenticated user can read an inventory item.
+      * @allow (list) Only users with the 'admin' role can list inventory items.
+      * @allow (create) Only users with the 'admin' role can create inventory items.
+      * @allow (update) Only users with the 'admin' role can update inventory items.
+      * @allow (delete) Only users with the 'admin' role can delete inventory items.
+      * @deny (list) Non-admin user attempts to list inventory items.
+      * @principle Role-based access control for inventory management.
+      */
+    match /inventory/{inventoryId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && isAdmin();
+      allow create: if isSignedIn() && isAdmin();
+      allow update: if isSignedIn() && isAdmin();
+      allow delete: if isSignedIn() && isAdmin();
     }
 
     /**
-     * @description Allows public read access to inventory items, with owner-only writes.
-     * @path /databases/{database}/documents/inventoryItems/{itemId}
-     * @allow (get, list) Any user can read inventory items.
-     * @deny (create, update, delete) Only the owner (creator) can modify inventory items.
-     * @principle Public read access with owner-only writes.
-     */
-    match /inventoryItems/{itemId} {
-      allow get, list: if true;
-      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      // CRITICAL: Cannot implement owner-only writes. The 'InventoryItem' entity is missing an 'ownerId' or 'authorId' field.
-    }
-
-    /**
-     * @description Allows public read access to machine assignments, with owner-only writes.
-     * @path /databases/{database}/documents/machineAssignments/{assignmentId}
-     * @allow (get, list) Any user can read machine assignments.
-     * @deny (create, update, delete) Only the owner (creator) can modify machine assignments.
-     * @principle Public read access with owner-only writes.
+     * @description Machine assignments can be read by all authenticated users. Only admins can create, update, or delete assignments.
+     * @path /machineAssignments/{assignmentId}
      */
     match /machineAssignments/{assignmentId} {
-      allow get, list: if true;
-      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      // CRITICAL: Cannot implement owner-only writes. The 'MachineAssignment' entity is missing an 'ownerId' or 'authorId' field.
-    }
-
-        /**
-     * @description Allows authenticated users to list usage logs.
-     * @path /databases/{database}/documents/usageLog
-     * @allow (list) Any authenticated user can list usage logs.
-     * @deny (create, get, update, delete) No one can create, get, update or delete usage logs.
-     * @principle Authenticated users can list usage logs.
-     */
-    match /usageLog {
+      allow get: if isSignedIn();
       allow list: if isSignedIn();
-      allow get: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create: if isSignedIn() && isAdmin();
+      allow update: if isSignedIn() && isAdmin();
+      allow delete: if isSignedIn() && isAdmin();
     }
   }
 }
