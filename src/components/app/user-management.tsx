@@ -22,18 +22,12 @@ type UserManagementViewProps = {
 export default function UserManagementView({ firestore, currentUser }: UserManagementViewProps) {
     const { toast } = useToast();
 
-    // TEMPORARILY DISABLED TO PREVENT CRASH
-    // const rolesRef = useMemoFirebase(() => collection(firestore, 'roles'), [firestore]);
-    // const { data: roles, isLoading: isLoadingRoles } = useCollection<UserRole>(rolesRef);
+    const rolesRef = useMemoFirebase(() => collection(firestore, 'roles'), [firestore]);
+    const { data: roles, isLoading: isLoadingRoles } = useCollection<UserRole>(rolesRef);
 
-    // const usersRef = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
-    // const { data: users, isLoading: isLoadingUsers } = useCollection<UserProfile>(usersRef);
-    const roles: UserRole[] = [];
-    const users: UserProfile[] = [];
-    const isLoadingRoles = false;
-    const isLoadingUsers = false;
-
-
+    const usersRef = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
+    const { data: users, isLoading: isLoadingUsers } = useCollection<UserProfile>(usersRef);
+    
     const handleRoleChange = (userId: string, newRole: 'admin' | 'editor') => {
         const roleRef = doc(firestore, 'roles', userId);
         setDocumentNonBlocking(roleRef, { role: newRole }, { merge: true });
