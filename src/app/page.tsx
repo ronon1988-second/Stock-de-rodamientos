@@ -20,7 +20,6 @@ import {
   query,
   getDocs,
   addDoc,
-  setDoc,
   deleteDoc,
   updateDoc,
 } from 'firebase/firestore';
@@ -48,7 +47,6 @@ import {
   Machine,
   MachineAssignment,
   UserProfile,
-  UserRole,
 } from '@/lib/types';
 import { initialInventory, initialSectors, initialMachines } from '@/lib/data';
 import Dashboard from '@/components/app/dashboard';
@@ -63,7 +61,6 @@ import {
   useFirestore,
   useCollection,
   useMemoFirebase,
-  useDoc,
 } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -78,6 +75,8 @@ import {
 import OrganizationView from '@/components/app/organization-view';
 import UserManagementView from '@/components/app/user-management';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { setDocumentNonBlocking, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+
 
 type View =
   | 'dashboard'
@@ -154,7 +153,7 @@ function AppContent() {
           const claims = idTokenResult.claims;
           setUserRoles({
             isAdmin: !!claims.admin,
-            isEditor: !!claims.editor,
+            isEditor: !!claims.editor || !!claims.admin, // Admins are also editors
           });
         } catch (error) {
           console.error("Error fetching user claims:", error);
@@ -171,8 +170,10 @@ function AppContent() {
 
   // DATA FETCHING
   const allUsersRef = useMemoFirebase(() => (firestore && isAdmin ? collection(firestore, 'users') : null), [firestore, isAdmin]);
-  const { data: allUsers, isLoading: isAllUsersLoading } = useCollection<UserProfile>(allUsersRef);
+  const { data: allUsersData, isLoading: isAllUsersLoading } = useCollection<UserProfile>(allUsersRef);
   
+  const allUsers = useMemo(() => allUsersData?.filter(u => u.uid !== user?.uid), [allUsersData, user]);
+
   const inventoryRef = useMemoFirebase(() => firestore ? collection(firestore, 'inventory') : null, [firestore]);
   const { data: inventory, isLoading: isInventoryLoading } = useCollection<InventoryItem>(inventoryRef);
 
@@ -188,6 +189,9 @@ function AppContent() {
   useEffect(() => {
     const seedData = async () => {
         if (!firestore || !user || isInventoryLoading || isSectorsLoading || isSeeding) return;
+
+        // Only seed if the user is an admin to avoid multiple seedings from different users
+        if (!isAdmin) return;
 
         const invQuery = query(collection(firestore, 'inventory'));
         const sectorsQuery = query(collection(firestore, 'sectors'));
@@ -244,7 +248,7 @@ function AppContent() {
     };
 
     seedData();
-  }, [firestore, user, toast, isSeeding, isInventoryLoading, isSectorsLoading]);
+  }, [firestore, user, toast, isSeeding, isInventoryLoading, isSectorsLoading, isAdmin]);
 
 
   const sortedInventory = useMemo(
@@ -273,33 +277,33 @@ function AppContent() {
     [usageLog]
   );
 
-  const handleAddItem = async (newItem: Omit<InventoryItem, 'id'>) => {
+  const handleAddItem = (newItem: Omit<InventoryItem, 'id'>) => {
     if (!isEditor || !firestore) {
         toast({ title: "Acceso denegado", variant: "destructive" });
         return;
     }
-    await addDoc(collection(firestore, 'inventory'), newItem);
+    addDocumentNonBlocking(collection(firestore, 'inventory'), newItem);
     toast({
       title: 'Artículo Agregado',
       description: `Se ha agregado ${newItem.name} al inventario.`,
     });
   };
 
-  const handleUpdateItem = async (updatedItem: InventoryItem) => {
+  const handleUpdateItem = (updatedItem: InventoryItem) => {
     if (!isEditor || !firestore) {
         toast({ title: "Acceso denegado", variant: "destructive" });
         return;
     }
     const itemRef = doc(firestore, 'inventory', updatedItem.id);
     const { id, ...data } = updatedItem;
-    await setDoc(itemRef, data, { merge: true });
+    setDocumentNonBlocking(itemRef, data, { merge: true });
     toast({
       title: 'Artículo Actualizado',
       description: `Se ha actualizado el stock de ${updatedItem.name}.`,
     });
   };
 
-  const handleAssignItemToMachine = async (
+  const handleAssignItemToMachine = (
     itemId: string,
     machineId: string,
     sectorId: string,
@@ -320,7 +324,7 @@ function AppContent() {
       quantity: quantity,
     };
 
-    await addDoc(collection(firestore, 'machineAssignments'), newAssignment);
+    addDocumentNonBlocking(collection(firestore, 'machineAssignments'), newAssignment);
 
     toast({
       title: 'Artículo Asignado',
@@ -328,7 +332,8 @@ function AppContent() {
     });
   };
 
-  const handleRemoveItemFromMachine = async (assignmentId: string) => {
+
+  const handleRemoveItemFromMachine = (assignmentId: string) => {
     if (!isEditor || !firestore) {
         toast({ title: "Acceso denegado", variant: "destructive" });
         return;
@@ -336,7 +341,7 @@ function AppContent() {
     const assignment = machineAssignments?.find(item => item.id === assignmentId);
     if (!assignment) return;
 
-    await deleteDoc(doc(firestore, 'machineAssignments', assignmentId));
+    deleteDocumentNonBlocking(doc(firestore, 'machineAssignments', assignmentId));
 
     toast({
       title: 'Asignación Eliminada',
@@ -368,8 +373,7 @@ function AppContent() {
 
     const updatedStock = item.stock - quantity;
     const itemRef = doc(firestore, 'inventory', itemId);
-    await setDoc(itemRef, { stock: updatedStock }, { merge: true });
-
+    
     const newLog: Omit<UsageLog, 'id'> = {
       itemId,
       itemName: item.name,
@@ -378,7 +382,12 @@ function AppContent() {
       sectorId,
       machineId,
     };
-    await addDoc(collection(firestore, 'usageLog'), newLog);
+
+    const batch = writeBatch(firestore);
+    batch.set(itemRef, { stock: updatedStock }, { merge: true });
+    batch.set(doc(collection(firestore, 'usageLog')), newLog);
+
+    await batch.commit();
 
     toast({
       title: 'Uso Registrado',
@@ -495,9 +504,9 @@ function AppContent() {
       );
     }
     if (view === 'organization') {
-      if (!isAdmin) {
+      if (!isEditor) { // Changed from isAdmin to isEditor
         setView('dashboard');
-        toast({ title: "Acceso denegado", description: "Necesita permisos de administrador.", variant: "destructive"})
+        toast({ title: "Acceso denegado", description: "Necesita permisos de editor o administrador.", variant: "destructive"})
         return null;
       }
       return (
@@ -559,21 +568,21 @@ function AppContent() {
         label="Panel de control"
         onClick={handleNavClick}
       />
-      {isAdmin && (
-        <>
-          <NavLink
-              targetView="organization"
-              icon={<Settings className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
-              label="Organización"
-              onClick={handleNavClick}
-          />
-          <NavLink
-              targetView="users"
-              icon={<Users className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
-              label="Gestionar Usuarios"
-              onClick={handleNavClick}
-          />
-        </>
+      {isEditor && (
+        <NavLink
+            targetView="organization"
+            icon={<Settings className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
+            label="Organización"
+            onClick={handleNavClick}
+        />
+      )}
+       {isAdmin && (
+        <NavLink
+            targetView="users"
+            icon={<Users className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
+            label="Gestionar Usuarios"
+            onClick={handleNavClick}
+        />
       )}
 
       <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
@@ -615,12 +624,12 @@ function AppContent() {
   );
 
   // Central loading check
-  if (isUserLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Skeleton className="h-[95vh] w-[95vw] rounded-lg" />
-      </div>
-    );
+  if (isUserLoading || (user && !userRoles.isEditor && !userRoles.isAdmin && user.email !== 'maurofbordon@gmail.com' && !isSeeding && !isSectorsLoading && !isInventoryLoading)) {
+      return (
+        <div className="flex items-center justify-center min-h-screen">
+          <Skeleton className="h-[95vh] w-[95vw] rounded-lg" />
+        </div>
+      );
   }
 
   return (
