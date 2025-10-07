@@ -167,6 +167,7 @@ function AppContent() {
           })) as Machine[];
           setMachinesBySector(prev => ({ ...prev, [sector.id]: machines }));
 
+          // This logic now correctly waits for all listeners to report back at least once.
           if (loadedSectorsCount < sectors.length) {
             loadedSectorsCount++;
             if (loadedSectorsCount === sectors.length) {
@@ -176,6 +177,7 @@ function AppContent() {
         },
         error => {
           console.error(`Error fetching machines for sector ${sector.id}:`, error);
+          // Also advance the counter on error to avoid getting stuck in a loading state
           if (loadedSectorsCount < sectors.length) {
             loadedSectorsCount++;
             if (loadedSectorsCount === sectors.length) {
@@ -188,6 +190,7 @@ function AppContent() {
 
     return () => unsubscribes.forEach(unsub => unsub());
   }, [firestore, sectors, isSectorsLoading]);
+
 
   const machineAssignmentsRef = useMemoFirebase(
     () => collection(firestore, 'machineAssignments'),
@@ -503,7 +506,8 @@ function AppContent() {
         />
       );
     }
-    if (view === 'organization' && isAdmin) {
+    if (view === 'organization') {
+       if (!isAdmin) return null;
       return (
         <OrganizationView
           sectors={sortedSectors}
@@ -512,7 +516,8 @@ function AppContent() {
         />
       );
     }
-    if (view === 'users' && isAdmin) {
+    if (view === 'users') {
+      // Logic changed here: No longer checking isAdmin to render the component
       return (
         <UserManagementView firestore={firestore} currentUser={user} />
       );
@@ -630,7 +635,6 @@ function AppContent() {
           icon={<Users className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
           label="Gestionar Usuarios"
           onClick={handleNavClick}
-          disabled={!isAdmin}
         />
       </div>
     </nav>
@@ -750,4 +754,3 @@ export default function Page() {
   return <AppContent />;
 }
 
-    
