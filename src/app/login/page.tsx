@@ -78,16 +78,18 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
+        let userCredential;
         if (action === "login") {
-            const userCredential = await signInWithEmailAndPassword(auth, email, password);
-            // On login, just force a token refresh to get latest claims
-            await userCredential.user.getIdToken(true);
+            userCredential = await signInWithEmailAndPassword(auth, email, password);
         } else {
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            // On signup, create the user profile and role
+            userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            // On signup, also create the user profile
             await updateUserProfile(userCredential.user);
-            await updateUserRole(userCredential.user);
         }
+
+        // For both login and signup, ensure the role is correct.
+        // This will grant admin rights on login if the email matches.
+        await updateUserRole(userCredential.user);
         
         toast({
             title: action === 'login' ? "Inicio de sesión exitoso" : "Cuenta creada",
