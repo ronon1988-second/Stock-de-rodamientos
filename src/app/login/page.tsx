@@ -5,6 +5,7 @@ import { useState } from "react";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  User,
 } from "firebase/auth";
 import { useFirebase } from "@/firebase/provider";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,14 @@ export default function LoginPage() {
   const { toast } = useToast();
   const router = useRouter();
 
+  const ensureAdminRole = async (user: User) => {
+    if (user.email === 'maurofbordon@gmail.com') {
+      const userRef = doc(firestore, "users", user.uid);
+      await setDoc(userRef, { role: 'admin' }, { merge: true });
+    }
+  };
+
+
   const handleAuthAction = async (action: "login" | "signup") => {
     if (!email || !password) {
       toast({
@@ -47,6 +56,7 @@ export default function LoginPage() {
         let userCredential;
         if (action === "login") {
             userCredential = await signInWithEmailAndPassword(auth, email, password);
+            await ensureAdminRole(userCredential.user); // Check for admin role on login
             toast({
                 title: "Inicio de sesión exitoso",
                 description: "Bienvenido de nuevo.",
@@ -55,10 +65,8 @@ export default function LoginPage() {
             userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
             
-            // Create user profile in Firestore
             const userRef = doc(firestore, "users", user.uid);
             
-            // Special case for first admin user
             const isAdminUser = user.email === 'maurofbordon@gmail.com';
             const role = isAdminUser ? 'admin' : 'editor';
 
@@ -77,7 +85,7 @@ export default function LoginPage() {
         router.push('/');
     } catch (error: any) {
       let description = "Ha ocurrido un error inesperado.";
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
           description = "El email o la contraseña son incorrectos."
       } else if (error.code === 'auth/email-already-in-use') {
           description = "Este email ya está registrado. Intente iniciar sesión."
