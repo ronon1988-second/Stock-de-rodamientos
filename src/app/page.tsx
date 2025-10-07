@@ -21,7 +21,6 @@ import {
   writeBatch,
   query,
   onSnapshot,
-  getDocs,
 } from "firebase/firestore";
 
 import { Badge } from "@/components/ui/badge";
@@ -80,26 +79,49 @@ function AppContent() {
   const [areMachinesLoading, setAreMachinesLoading] = useState(true);
 
   useEffect(() => {
-    if (!sectors) return;
+    if (!sectors) {
+      setAreMachinesLoading(isSectorsLoading); // Match loading state of sectors
+      return;
+    }
+    if (sectors.length === 0) {
+      setAreMachinesLoading(false); // No sectors to load machines from
+      return;
+    }
+
     setAreMachinesLoading(true);
-    const machineQueries = sectors.map(sector => 
-        query(collection(firestore, `sectors/${sector.id}/machines`))
-    );
+    let loadedSectorsCount = 0;
 
-    const unsubscribes = machineQueries.map((q, index) => {
-        return onSnapshot(q, (snapshot) => {
-            const sectorId = sectors[index].id;
-            const machines = snapshot.docs.map(d => ({ ...d.data(), id: d.id })) as Machine[];
-            setMachinesBySector(prev => ({ ...prev, [sectorId]: machines }));
-        });
+    const unsubscribes = sectors.map(sector => {
+      const machinesQuery = query(collection(firestore, `sectors/${sector.id}/machines`));
+      
+      return onSnapshot(machinesQuery, (snapshot) => {
+        const machines = snapshot.docs.map(d => ({ ...d.data(), id: d.id })) as Machine[];
+        setMachinesBySector(prev => ({ ...prev, [sector.id]: machines }));
+
+        // This part handles the initial loading state.
+        // It assumes that each onSnapshot will fire at least once on setup.
+        if (loadedSectorsCount < sectors.length) {
+            loadedSectorsCount++;
+            if (loadedSectorsCount === sectors.length) {
+                setAreMachinesLoading(false);
+            }
+        }
+      }, (error) => {
+        console.error(`Error fetching machines for sector ${sector.id}:`, error);
+        // Also count errors as a "loaded" attempt to not block the UI forever
+        if (loadedSectorsCount < sectors.length) {
+            loadedSectorsCount++;
+            if (loadedSectorsCount === sectors.length) {
+                setAreMachinesLoading(false);
+            }
+        }
+      });
     });
-    
-    // A simple way to determine loading state.
-    Promise.all(machineQueries.map(q => getDocs(q))).then(() => setAreMachinesLoading(false));
-
+  
+    // Cleanup function
     return () => unsubscribes.forEach(unsub => unsub());
 
-  }, [firestore, sectors]);
+  }, [firestore, sectors, isSectorsLoading]);
 
 
   const machineAssignmentsRef = useMemoFirebase(() => collection(firestore, "machineAssignments"), [firestore]);
@@ -111,6 +133,7 @@ function AppContent() {
   // Effect to seed initial data if collections are empty
   useEffect(() => {
     const seedData = async () => {
+        // Check if inventory is loaded and is still empty
         if (inventory?.length === 0 && !isInventoryLoading) {
             setIsSeeding(true);
             toast({
@@ -119,24 +142,36 @@ function AppContent() {
             });
             const batch = writeBatch(firestore);
             const invRef = collection(firestore, "inventory");
-            initialInventory.forEach(item => {
-                const { id, ...data } = item;
-                const docRef = doc(invRef, id);
-                batch.set(docRef, data);
-            });
+
+            // We need to force an update if items exist but stock is not 0
+            const existingDocsSnap = await getDocs(invRef);
+
+            if (existingDocsSnap.size > 0) {
+                 // If docs exist, update them to have 0 stock
+                 existingDocsSnap.forEach(docSnap => {
+                     batch.update(docSnap.ref, { stock: 0 });
+                 });
+            } else {
+                // If no docs, seed them from initialInventory
+                initialInventory.forEach(item => {
+                    const { id, ...data } = item;
+                    const docRef = doc(invRef, id);
+                    batch.set(docRef, data);
+                });
+            }
             
             try {
                 await batch.commit();
                 toast({
-                    title: "Datos cargados",
-                    description: "El inventario inicial se ha cargado correctamente.",
+                    title: "Datos de inventario listos",
+                    description: "El inventario ha sido inicializado correctamente.",
                 });
             } catch (error) {
-                console.error("Error seeding data: ", error);
+                console.error("Error seeding/updating data: ", error);
                 toast({
                     variant: "destructive",
-                    title: "Error al cargar datos",
-                    description: "No se pudo cargar el inventario inicial.",
+                    title: "Error al preparar datos",
+                    description: "No se pudo inicializar el inventario.",
                 });
             } finally {
                 setIsSeeding(false);
@@ -571,3 +606,4 @@ export default function Page() {
   return <AppContent />;
 }
 
+    
