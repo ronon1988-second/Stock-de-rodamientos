@@ -20,6 +20,7 @@ import {
   writeBatch,
   query,
   onSnapshot,
+  getDocs,
 } from "firebase/firestore";
 
 import { Badge } from "@/components/ui/badge";
@@ -86,7 +87,7 @@ function AppContent() {
     });
     
     // A simple way to determine loading state.
-    Promise.all(machineQueries.map(q => q.get())).then(() => setAreMachinesLoading(false));
+    Promise.all(machineQueries.map(q => getDocs(q))).then(() => setAreMachinesLoading(false));
 
     return () => unsubscribes.forEach(unsub => unsub());
 
