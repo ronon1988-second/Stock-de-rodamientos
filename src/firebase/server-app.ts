@@ -1,19 +1,28 @@
 
-import { initializeApp, getApps, App, cert } from 'firebase-admin/app';
-
-const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
-  ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
-  : undefined;
+import { initializeApp, getApps, App, cert, applicationDefault } from 'firebase-admin/app';
 
 const appName = 'firebase-admin-app';
 
 function createAdminApp(): App {
-  if (!serviceAccount) {
-    throw new Error('FIREBASE_SERVICE_ACCOUNT environment variable is not set.');
-  }
+  const serviceAccountEnv = process.env.FIREBASE_SERVICE_ACCOUNT;
 
+  // Use service account from environment variable if available
+  if (serviceAccountEnv) {
+    try {
+      const serviceAccount = JSON.parse(serviceAccountEnv);
+      return initializeApp({
+        credential: cert(serviceAccount),
+      }, appName);
+    } catch (e) {
+      console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT. Falling back to default credentials.", e);
+    }
+  }
+  
+  // Otherwise, fall back to Application Default Credentials
+  // This works in many GCP environments, including Firebase Studio (Workstations)
+  console.log("FIREBASE_SERVICE_ACCOUNT not set. Attempting to use Application Default Credentials.");
   return initializeApp({
-    credential: cert(serviceAccount),
+    credential: applicationDefault(),
   }, appName);
 }
 
