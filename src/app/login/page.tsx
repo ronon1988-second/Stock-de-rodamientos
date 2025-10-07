@@ -59,6 +59,7 @@ export default function LoginPage() {
     }
 
     if (isAdminUser) {
+        // Force refresh of the token to get custom claims
         await user.getIdToken(true); 
     }
   };
