@@ -5,12 +5,11 @@ import {
   ChartContainer,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import type { Sector, Machine, UsageLog } from "@/lib/types";
+import type { Sector, UsageLog } from "@/lib/types";
 
 type UsageChartProps = {
   usageData: UsageLog[];
   sectors: Sector[];
-  machinesBySector: Record<string, Machine[]>;
 };
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#FF1919', '#4CAF50', '#F44336', '#9C27B0', '#3F51B5'];
@@ -74,3 +73,5 @@ export default function UsageChart({ usageData, sectors }: UsageChartProps) {
     </div>
   );
 }
+
+    

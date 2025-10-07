@@ -25,7 +25,9 @@ import {
   getDocs,
   addDoc,
   setDoc,
-  where
+  where,
+  deleteDoc,
+  updateDoc
 } from 'firebase/firestore';
 
 import { Badge } from '@/components/ui/badge';
@@ -78,9 +80,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  setDocumentNonBlocking,
-} from '@/firebase/non-blocking-updates';
 import OrganizationView from '@/components/app/organization-view';
 import UserManagementView from '@/components/app/user-management';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -104,11 +103,11 @@ function MachineList({
   isMobile: boolean;
 }) {
   const firestore = useFirestore();
-  const machinesRef = useMemoFirebase(
-    () => (firestore && sector.id ? collection(firestore, `sectors/${sector.id}/machines`) : null),
+  const machinesQuery = useMemoFirebase(
+    () => (firestore ? query(collection(firestore, `sectors/${sector.id}/machines`)) : null),
     [firestore, sector.id]
   );
-  const { data: machines, isLoading } = useCollection<Machine>(machinesRef);
+  const { data: machines, isLoading } = useCollection<Machine>(machinesQuery);
 
   if (isLoading) {
     return (
@@ -149,7 +148,7 @@ function AppContent() {
   const auth = useAuth();
   const firestore = useFirestore();
   const [isSeeding, setIsSeeding] = useState(false);
-  
+
   // Master user has all privileges, bypassing role checks.
   const isMasterUser = user?.email === 'maurofbordon@gmail.com';
 
@@ -158,7 +157,7 @@ function AppContent() {
     [firestore, user]
   );
   const { data: userRoleDoc, isLoading: isRoleLoading } = useDoc<UserRole>(roleRef);
-
+  
   const isAdmin = isMasterUser || userRoleDoc?.role === 'admin';
   const isEditor = isAdmin || userRoleDoc?.role === 'editor';
 
@@ -171,15 +170,20 @@ function AppContent() {
       const userDoc = await getDoc(userRef);
 
       if (!userDoc.exists()) {
-        const userData: Omit<UserProfile, 'id'> = {
+        const userData: Omit<UserProfile, 'id' | 'role'> = {
             uid: user.uid,
             email: user.email!,
             displayName: user.email?.split('@')[0] || 'Usuario',
         };
         await setDoc(userRef, userData);
+         // Also set a default role in the 'roles' collection
+        const roleRef = doc(firestore, "roles", user.uid);
+        if (!(await getDoc(roleRef)).exists()) {
+          await setDoc(roleRef, { role: "editor" });
+        }
         toast({
           title: "Perfil de usuario creado",
-          description: "¡Bienvenido! Su perfil ha sido guardado."
+          description: "¡Bienvenido! Su perfil y rol predeterminado han sido guardados."
         });
       }
     };
@@ -205,12 +209,11 @@ function AppContent() {
   
   const usageLogRef = useMemoFirebase(() => firestore ? collection(firestore, 'usageLog') : null, [firestore]);
   const { data: usageLog, isLoading: isUsageLogLoading } = useCollection<UsageLog>(usageLogRef);
+
+  const allUsersRef = useMemoFirebase(() => firestore ? collection(firestore, 'users') : null, [firestore]);
+  const { data: allUsers, isLoading: isAllUsersLoading } = useCollection<UserProfile>(allUsersRef);
   // END: DATA FETCHING
     
-  const [machinesBySector, setMachinesBySector] = useState<
-    Record<string, Machine[]>
-  >({});
-
   useEffect(() => {
     const seedData = async () => {
         if (!firestore || !user || isInventoryLoading || isSectorsLoading || isSeeding) return;
@@ -239,27 +242,18 @@ function AppContent() {
                 });
 
                 // Seed sectors and get their new IDs
-                const sectorPromises = initialSectors.map(async (sectorData) => {
+                 for (const sectorData of initialSectors) {
                     const sectorRef = doc(collection(firestore, 'sectors'));
                     batch.set(sectorRef, sectorData);
-                    return { name: sectorData.name, id: sectorRef.id };
-                });
-                const createdSectors = await Promise.all(sectorPromises);
-                const sectorIdMap = createdSectors.reduce((acc, sec) => {
-                    acc[sec.name] = sec.id;
-                    return acc;
-                }, {} as Record<string, string>);
-
-                // Seed machines with the correct sectorId
-                initialMachines.forEach(machineData => {
-                    const sectorId = sectorIdMap[machineData.sectorName];
-                    if (sectorId) {
-                        const machineRef = doc(collection(firestore, `sectors/${sectorId}/machines`));
+                    
+                    const machinesForSector = initialMachines.filter(m => m.sectorName === sectorData.name);
+                    machinesForSector.forEach(machineData => {
+                        const machineRef = doc(collection(firestore, `sectors/${sectorRef.id}/machines`));
                         const { sectorName, ...data } = machineData;
-                        batch.set(machineRef, { ...data, sectorId });
-                    }
-                });
-
+                        batch.set(machineRef, { ...data, sectorId: sectorRef.id });
+                    });
+                }
+               
                 await batch.commit();
                 toast({
                     title: 'Datos iniciales listos',
@@ -307,10 +301,6 @@ function AppContent() {
         : [],
     [usageLog]
   );
-    
-  const allMachines = useMemo(() => {
-    return Object.values(machinesBySector).flat();
-  }, [machinesBySector]);
 
   const handleAddItem = async (newItem: Omit<InventoryItem, 'id'>) => {
     if (!isEditor || !firestore) {
@@ -324,14 +314,14 @@ function AppContent() {
     });
   };
 
-  const handleUpdateItem = (updatedItem: InventoryItem) => {
+  const handleUpdateItem = async (updatedItem: InventoryItem) => {
     if (!isEditor || !firestore) {
         toast({ title: "Acceso denegado", variant: "destructive" });
         return;
     }
     const itemRef = doc(firestore, 'inventory', updatedItem.id);
     const { id, ...data } = updatedItem;
-    setDocumentNonBlocking(itemRef, data, { merge: true });
+    await setDoc(itemRef, data, { merge: true });
     toast({
       title: 'Artículo Actualizado',
       description: `Se ha actualizado el stock de ${updatedItem.name}.`,
@@ -375,7 +365,7 @@ function AppContent() {
     const assignment = machineAssignments?.find(item => item.id === assignmentId);
     if (!assignment) return;
 
-    await setDoc(doc(firestore, 'machineAssignments', assignmentId), {}, {merge: true});
+    await deleteDoc(doc(firestore, 'machineAssignments', assignmentId));
 
     toast({
       title: 'Asignación Eliminada',
@@ -489,12 +479,7 @@ function AppContent() {
     if (view === 'organization') return 'Organización de Planta';
     if (view === 'users') return 'Gestionar Usuarios';
     if (view.startsWith('machine-')) {
-      const machineId = view.replace('machine-', '');
-      const machine = allMachines.find(m => m.id === machineId);
-      const sector = sortedSectors.find(s => s.id === machine?.sectorId);
-      if (machine && sector) {
-          return `${sector.name} / ${machine.name}`;
-      }
+       return 'Máquina';
     }
     return 'Panel de control';
   };
@@ -507,7 +492,8 @@ function AppContent() {
       isSectorsLoading ||
       isSeeding ||
       isProfileLoading ||
-      isRoleLoading;
+      isRoleLoading ||
+      isAllUsersLoading;
 
     if (isLoading) {
       return <Skeleton className="h-full w-full" />;
@@ -528,7 +514,6 @@ function AppContent() {
         <Reports
           usageLog={sortedUsageLog}
           sectors={sortedSectors}
-          machinesBySector={machinesBySector}
         />
       );
     }
@@ -558,19 +543,13 @@ function AppContent() {
             toast({ title: "Acceso denegado", description: "Necesita permisos de administrador.", variant: "destructive"})
             return null;
         }
-      return <UserManagementView />;
+      return <UserManagementView users={allUsers || []} />;
     }
     if (view.startsWith('machine-')) {
       const machineId = view.replace('machine-', '');
-      const machine = allMachines.find(m => m.id === machineId);
-      if (!machine) return <Skeleton className="h-full w-full" />
-      const sector = sortedSectors.find(s => s.id === machine.sectorId);
-      if (!sector) return <Skeleton className="h-full w-full" />
-      
       return (
         <MachineView
-          sector={sector}
-          machine={machine}
+          machineId={machineId}
           allInventory={sortedInventory}
           machineAssignments={sortedAssignments.filter(
             item => item.machineId === machineId
@@ -633,7 +612,7 @@ function AppContent() {
       </div>
 
       <Accordion type="single" collapsible className="w-full">
-        {sortedSectors.map(sector => (
+        {(sortedSectors || []).map(sector => (
           <AccordionItem key={sector.id} value={sector.id} className="border-b-0">
             <AccordionTrigger className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-muted-foreground hover:text-primary hover:no-underline">
               <div className="flex items-center gap-3">
@@ -665,26 +644,6 @@ function AppContent() {
       </div>
     </nav>
   );
-
-  // This effect listens for when machines are loaded for any sector
-  // and aggregates them into the allMachines state
-  useEffect(() => {
-    if (!firestore || !sectors) return;
-
-    const unsubscribes = sectors.map(sector => {
-        const machinesQuery = query(collection(firestore, `sectors/${sector.id}/machines`));
-        return onSnapshot(machinesQuery, (snapshot) => {
-            const machines = snapshot.docs.map(d => ({ ...d.data(), id: d.id })) as Machine[];
-            setMachinesBySector(prev => ({
-                ...prev,
-                [sector.id]: machines
-            }));
-        });
-    });
-
-    return () => unsubscribes.forEach(unsub => unsub());
-}, [firestore, sectors]);
-
 
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">

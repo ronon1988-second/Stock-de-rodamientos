@@ -20,20 +20,18 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { updateUserRole } from '@/app/actions';
-import { useCollection, useFirestore } from '@/firebase';
 import type { UserProfile } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
-import { collection } from 'firebase/firestore';
 
-export default function UserManagementView() {
+type UserManagementViewProps = {
+    users: UserProfile[];
+}
+
+export default function UserManagementView({ users }: UserManagementViewProps) {
     const { toast } = useToast();
-    const firestore = useFirestore();
     const [email, setEmail] = useState('');
     const [role, setRole] = useState<'admin' | 'editor'>('editor');
     const [isLoading, setIsLoading] = useState(false);
-    
-    const usersRef = firestore ? collection(firestore, 'users') : null;
-    const { data: users, isLoading: usersLoading } = useCollection<UserProfile>(usersRef);
 
     const handleUpdateRole = async () => {
         if (!email || !role) {
@@ -47,7 +45,7 @@ export default function UserManagementView() {
         
         setIsLoading(true);
 
-        const targetUser = users?.find(user => user.email === email.trim());
+        const targetUser = users.find(user => user.email === email.trim());
 
         if (!targetUser) {
             toast({
@@ -92,9 +90,9 @@ export default function UserManagementView() {
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         className="flex-grow"
-                        disabled={isLoading || usersLoading}
+                        disabled={isLoading}
                     />
-                    <Select onValueChange={(value: 'admin' | 'editor') => setRole(value)} defaultValue={role} disabled={isLoading || usersLoading}>
+                    <Select onValueChange={(value: 'admin' | 'editor') => setRole(value)} defaultValue={role} disabled={isLoading}>
                         <SelectTrigger className="w-full sm:w-[180px]">
                             <SelectValue placeholder="Seleccione un rol" />
                         </SelectTrigger>
@@ -103,12 +101,11 @@ export default function UserManagementView() {
                             <SelectItem value="admin">Administrador</SelectItem>
                         </SelectContent>
                     </Select>
-                    <Button onClick={handleUpdateRole} disabled={isLoading || usersLoading} className="w-full sm:w-auto">
+                    <Button onClick={handleUpdateRole} disabled={isLoading} className="w-full sm:w-auto">
                         {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                         {isLoading ? 'Asignando...' : 'Asignar Rol'}
                     </Button>
                 </div>
-                {usersLoading && <p className="text-sm text-muted-foreground mt-2">Cargando lista de usuarios...</p>}
             </CardContent>
         </Card>
     );
