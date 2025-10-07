@@ -2,10 +2,9 @@
 'use server';
 
 import { getReorderRecommendations, ReorderRecommendationsInput } from "@/ai/flows/reorder-recommendations";
-import { getFirestore } from "firebase-admin/firestore";
-import { collection, query, where, getDocs, doc, setDoc } from 'firebase/firestore';
-import { getSdks } from "@/firebase";
 
+// This file no longer uses firebase-admin, so no need for that import.
+// We also remove the updateUserRole function as it's no longer needed with the Master User system.
 
 export async function getAIReorderRecommendations(input: ReorderRecommendationsInput) {
     try {
@@ -16,23 +15,3 @@ export async function getAIReorderRecommendations(input: ReorderRecommendationsI
         return { success: false, error: "Failed to get recommendations from AI." };
     }
 }
-
-
-export async function updateUserRole(uid: string, role: 'admin' | 'editor') {
-    try {
-        // We use the client SDK here because this is a Server Action and our Firestore rules
-        // will protect the 'roles' collection.
-        // This avoids using the Admin SDK which requires special permissions.
-        const { firestore } = getSdks();
-
-        const roleRef = doc(firestore, 'roles', uid);
-        await setDoc(roleRef, { role: role });
-        
-        return { success: true };
-    } catch (error: any) {
-        console.error("Error updating user role:", error);
-        return { success: false, error: error.message || "Ocurrió un error inesperado." };
-    }
-}
-
-    

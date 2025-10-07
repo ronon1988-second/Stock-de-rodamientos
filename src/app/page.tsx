@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Home,
   LineChart,
@@ -49,7 +49,6 @@ import {
   Machine,
   MachineAssignment,
   UserProfile,
-  UserRole,
 } from '@/lib/types';
 import { initialInventory, initialSectors, initialMachines } from '@/lib/data';
 import Dashboard from '@/components/app/dashboard';
@@ -152,14 +151,8 @@ function AppContent() {
   
   // Master user has all privileges, bypassing role checks.
   const isMasterUser = user?.email === 'maurofbordon@gmail.com';
-  
-  // Role fetching from Firestore /roles/{userId}
-  const roleRef = useMemoFirebase(() => user ? doc(firestore, 'roles', user.uid) : null, [firestore, user]);
-  const { data: userRoleDoc, isLoading: isRoleLoading } = useDoc<UserRole>(roleRef);
-
-  // Determine user permissions. Master user is always admin.
-  const isAdmin = isMasterUser || userRoleDoc?.role === 'admin';
-  const isEditor = isAdmin || userRoleDoc?.role === 'editor';
+  const isAdmin = isMasterUser; // Simplified admin logic
+  const isEditor = true; // All authenticated users are editors for UI purposes
 
   // This effect handles the creation of user profile on first login
   useEffect(() => {
@@ -506,8 +499,7 @@ function AppContent() {
       isUsageLogLoading ||
       isSectorsLoading ||
       isSeeding ||
-      isProfileLoading ||
-      isRoleLoading;
+      isProfileLoading;
 
     if (isLoading) {
       return <Skeleton className="h-full w-full" />;
@@ -554,9 +546,9 @@ function AppContent() {
       );
     }
     if (view === 'users') {
-        if (!isEditor && !isMasterUser) { 
+        if (!isAdmin) { 
             setView('dashboard');
-            toast({ title: "Acceso denegado", description: "Necesita permisos de editor.", variant: "destructive"})
+            toast({ title: "Acceso denegado", description: "Necesita permisos de administrador.", variant: "destructive"})
             return null;
         }
       return <UserManagementView isAdmin={isAdmin}/>;
@@ -612,16 +604,14 @@ function AppContent() {
         label="Panel de control"
         onClick={handleNavClick}
       />
-      {(isEditor || isMasterUser) && (
+      {isAdmin && (
         <>
-           {(isAdmin || isMasterUser) && (
-            <NavLink
-                targetView="organization"
-                icon={<Settings className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
-                label="Organización"
-                onClick={handleNavClick}
-            />
-          )}
+          <NavLink
+              targetView="organization"
+              icon={<Settings className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
+              label="Organización"
+              onClick={handleNavClick}
+          />
           <NavLink
             targetView="users"
             icon={<Users className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
@@ -759,7 +749,7 @@ function AppContent() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>
-                {user?.email} {isMasterUser && '(Master)'} {isAdmin && !isMasterUser && '(Admin)'} {isEditor && !isAdmin && !isMasterUser && '(Editor)'}
+                {user?.email} {isMasterUser && '(Master)'}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={handleLogout}>
@@ -797,6 +787,3 @@ export default function Page() {
 
   return <AppContent />;
 }
-
-
-    
