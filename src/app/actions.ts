@@ -27,15 +27,20 @@ export async function updateUserRoleByEmail(email: string, role: 'admin' | 'edit
         const userRecord = await auth.getUserByEmail(email);
         const uid = userRecord.uid;
 
-        // Set the custom claim on the user's auth token
-        const currentClaims = userRecord.customClaims || {};
-        const newClaims = {
-            ...currentClaims, // Preserve existing claims
-            admin: role === 'admin',
-            editor: role === 'editor' || role === 'admin', // an admin is always an editor
-        };
-        await auth.setCustomUserClaims(uid, newClaims);
+        // Set the role in the /roles/{userId} document in Firestore
+        const roleRef = firestore.collection('roles').doc(uid);
+        await roleRef.set({ role: role });
 
+        // Optional: We can still set custom claims if we want the backend (e.g. server actions)
+        // to have immediate access to the role without a DB lookup. But for client-side logic,
+        // the Firestore listener is more reliable. Let's keep it for robustness.
+        const currentClaims = userRecord.customClaims || {};
+        await auth.setCustomUserClaims(uid, {
+            ...currentClaims,
+            admin: role === 'admin',
+            editor: role === 'editor' || role === 'admin',
+        });
+        
         return { success: true };
     } catch (error: any) {
         console.error("Error updating user role:", error);
@@ -43,10 +48,11 @@ export async function updateUserRoleByEmail(email: string, role: 'admin' | 'edit
         let errorMessage = "Ocurrió un error inesperado.";
         if (error.code === 'auth/user-not-found') {
             errorMessage = "No se encontró ningún usuario con ese correo electrónico.";
-        } else if (error.code === 'permission-denied') {
-            errorMessage = "Permiso denegado. Asegúrese de que la cuenta de servicio tenga los permisos correctos.";
+        } else if (error.code === 'permission-denied' || error.code === 'PERMISSION_DENIED') {
+            errorMessage = "Permiso denegado. Asegúrese de que la cuenta de servicio tenga los roles 'Firebase Authentication Admin' y 'User Admin' en IAM.";
         }
         
         return { success: false, error: errorMessage };
     }
 }
+

@@ -24,7 +24,6 @@ import {
   getDocs,
   addDoc,
 } from 'firebase/firestore';
-import { getIdTokenResult } from 'firebase/auth';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -49,6 +48,7 @@ import {
   Machine,
   MachineAssignment,
   UserProfile,
+  UserRole,
 } from '@/lib/types';
 import { initialInventory, initialSectors, initialMachines } from '@/lib/data';
 import Dashboard from '@/components/app/dashboard';
@@ -149,41 +149,12 @@ function AppContent() {
   const firestore = useFirestore();
   const [isSeeding, setIsSeeding] = useState(false);
   
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isEditor, setIsEditor] = useState(false);
-  const [areClaimsLoading, setAreClaimsLoading] = useState(true);
+  const roleRef = useMemoFirebase(() => (user ? doc(firestore, 'roles', user.uid) : null), [user, firestore]);
+  const { data: userRole, isLoading: isRoleLoading } = useDoc<UserRole>(roleRef);
 
-  const refreshUserClaims = useCallback(async () => {
-    if (!user) return;
-    setAreClaimsLoading(true);
-    try {
-        const idTokenResult = await getIdTokenResult(user, true); // Force refresh
-        const claims = idTokenResult.claims;
-        const isAdminClaim = !!claims.admin;
-        // An admin is always an editor
-        const isEditorClaim = isAdminClaim || !!claims.editor;
-        
-        setIsAdmin(isAdminClaim);
-        setIsEditor(isEditorClaim); 
-    } catch (error) {
-        console.error("Error refreshing user claims:", error);
-        toast({
-            variant: "destructive",
-            title: "Error de permisos",
-            description: "No se pudieron verificar los roles de usuario."
-        });
-        setIsAdmin(false);
-        setIsEditor(false);
-    } finally {
-        setAreClaimsLoading(false);
-    }
-}, [user, toast]);
+  const isAdmin = userRole?.role === 'admin';
+  const isEditor = userRole?.role === 'editor' || isAdmin;
 
-
-  useEffect(() => {
-    refreshUserClaims();
-  }, [refreshUserClaims]);
-  
 
   // This effect handles the creation of user profile on first login
   useEffect(() => {
@@ -517,7 +488,7 @@ function AppContent() {
       isSectorsLoading ||
       isSeeding ||
       isProfileLoading ||
-      areClaimsLoading;
+      isRoleLoading;
 
     if (isLoading) {
       return <Skeleton className="h-full w-full" />;
@@ -553,6 +524,7 @@ function AppContent() {
     if (view === 'organization') {
       if (!isAdmin) {
         setView('dashboard');
+        toast({ title: "Acceso denegado", description: "Necesita permisos de administrador.", variant: "destructive"})
         return null;
       }
       return (
@@ -563,7 +535,12 @@ function AppContent() {
       );
     }
     if (view === 'users') {
-      return <UserManagementView onRoleChanged={refreshUserClaims} />;
+        if (!isAdmin) {
+            setView('dashboard');
+            toast({ title: "Acceso denegado", description: "Necesita permisos de administrador.", variant: "destructive"})
+            return null;
+        }
+      return <UserManagementView />;
     }
     if (view.startsWith('machine-')) {
       const machineId = view.replace('machine-', '');
@@ -617,12 +594,20 @@ function AppContent() {
         onClick={handleNavClick}
       />
       {isAdmin && (
-        <NavLink
-          targetView="organization"
-          icon={<Settings className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
-          label="Organización"
-          onClick={handleNavClick}
-        />
+        <>
+          <NavLink
+            targetView="organization"
+            icon={<Settings className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
+            label="Organización"
+            onClick={handleNavClick}
+          />
+          <NavLink
+            targetView="users"
+            icon={<Users className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
+            label="Gestionar Usuarios"
+            onClick={handleNavClick}
+          />
+        </>
       )}
 
       <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
@@ -658,12 +643,6 @@ function AppContent() {
           icon={<LineChart className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
           label="Reportes"
           onClick={handleNavClick}
-        />
-        <NavLink
-         targetView="users"
-         icon={<Users className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
-         label="Gestionar Usuarios"
-         onClick={handleNavClick}
         />
       </div>
     </nav>

@@ -32,7 +32,6 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { updateUserRoleByEmail } from '@/app/actions';
 import { Loader2 } from 'lucide-react';
-import { useUser } from '@/firebase';
 
 
 const UserRoleSchema = z.object({
@@ -44,15 +43,9 @@ const UserRoleSchema = z.object({
 
 type UserRoleFormValues = z.infer<typeof UserRoleSchema>;
 
-type UserManagementViewProps = {
-  onRoleChanged: () => void;
-};
-
-
-export default function UserManagementView({ onRoleChanged }: UserManagementViewProps) {
+export default function UserManagementView() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  const { user } = useUser();
 
   const form = useForm<UserRoleFormValues>({
     resolver: zodResolver(UserRoleSchema),
@@ -68,15 +61,8 @@ export default function UserManagementView({ onRoleChanged }: UserManagementView
       if (result.success) {
         toast({
           title: 'Rol Actualizado',
-          description: `El usuario ${data.email} ahora tiene el rol de ${data.role}. El cambio se reflejará al reiniciar la sesión.`,
+          description: `El usuario ${data.email} ahora tiene el rol de ${data.role}.`,
         });
-        
-        // If the admin is changing their own role, trigger the refresh callback
-        // which should handle token refresh logic in the parent.
-        if (user && user.email === data.email) {
-            onRoleChanged();
-        }
-
         form.reset();
       } else {
         throw new Error(result.error);
@@ -99,7 +85,7 @@ export default function UserManagementView({ onRoleChanged }: UserManagementView
       <CardHeader>
         <CardTitle>Gestionar Roles de Usuario</CardTitle>
         <CardDescription>
-          Asigne un rol a un usuario específico utilizando su dirección de correo electrónico. Los cambios pueden tardar unos momentos en reflejarse.
+          Asigne un rol a un usuario específico utilizando su dirección de correo electrónico.
         </CardDescription>
       </CardHeader>
       <CardContent>
