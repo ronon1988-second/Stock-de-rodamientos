@@ -185,10 +185,13 @@ function AppContent() {
 
 
   // DATA FETCHING
-  const allUsersRef = useMemoFirebase(() => (firestore && isAdmin ? collection(firestore, 'users') : null), [firestore, isAdmin]);
+  const allUsersRef = useMemoFirebase(() => (firestore && isAdmin && !isTestingAdmin ? collection(firestore, 'users') : null), [firestore, isAdmin, isTestingAdmin]);
   const { data: allUsersData, isLoading: isAllUsersLoading } = useCollection<UserProfile>(allUsersRef);
   
-  const allUsers = useMemo(() => allUsersData?.filter(u => user && u.uid !== user.uid), [allUsersData, user]);
+  const allUsers = useMemo(() => {
+    if (isTestingAdmin) return []; // Don't fetch users in test mode
+    return allUsersData?.filter(u => user && u.uid !== user.uid);
+  }, [allUsersData, user, isTestingAdmin]);
 
   const inventoryRef = useMemoFirebase(() => firestore ? collection(firestore, 'inventory') : null, [firestore]);
   const { data: inventory, isLoading: isInventoryLoading } = useCollection<InventoryItem>(inventoryRef);
@@ -486,7 +489,7 @@ function AppContent() {
       isUsageLogLoading ||
       isSectorsLoading ||
       isSeeding ||
-      (isAdmin && isAllUsersLoading);
+      (isAdmin && isAllUsersLoading && !isTestingAdmin);
 
     if (isDataLoading) {
       return <Skeleton className="h-full w-full" />;
