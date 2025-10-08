@@ -37,7 +37,9 @@ export default function LoginPage() {
     if (user.email === 'maurofbordon@gmail.com' || user.uid === 'zqq7dO1wxbgZVcIXSNwRU6DEXqw1') {
         await setupUserAndRole(user.uid, user.email || "");
         // Crucially, force a refresh of the ID token to get the latest custom claims from the server.
+        console.log("Login: Forcing token refresh for admin user...");
         await getIdToken(user, true);
+        console.log("Login: Token refresh complete.");
     } else {
         // For regular users, only set up their initial document on first creation.
         const isNewUser = user.metadata.creationTime === user.metadata.lastSignInTime;

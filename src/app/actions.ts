@@ -31,7 +31,6 @@ export async function setupUserAndRole(uid: string, email: string): Promise<{ su
         const userRef = doc(firestore, 'users', uid);
         const roleRef = doc(firestore, 'roles', uid);
 
-        // Check if user document already exists
         const userDoc = await getDoc(userRef);
         if (!userDoc.exists()) {
             const userData: Omit<UserProfile, 'id'|'uid'> = {
@@ -48,13 +47,16 @@ export async function setupUserAndRole(uid: string, email: string): Promise<{ su
             await setDoc(roleRef, { role: 'admin' }, { merge: true });
             await auth.setCustomUserClaims(uid, { admin: true, editor: true });
             console.log(`Force assigned admin role to UID: ${uid}`);
-        } else {
-             // For new non-admin users, check if a role already exists. If not, create an empty one.
-            const roleDoc = await getDoc(roleRef);
-            if (!roleDoc.exists()) {
-                await setDoc(roleRef, {}, { merge: true }); 
-            }
+            // Force token refresh on client side after this
+            return { success: true };
+        } 
+        
+        // For new non-admin users, check if a role already exists. If not, create an empty one.
+        const roleDoc = await getDoc(roleRef);
+        if (!roleDoc.exists()) {
+            await setDoc(roleRef, {}, { merge: true }); 
         }
+        
 
         return { success: true };
     } catch (error: any) {
@@ -64,26 +66,33 @@ export async function setupUserAndRole(uid: string, email: string): Promise<{ su
 }
 
 
+/**
+ * !! SUPER ADMIN OVERRIDE !!
+ * This function is temporarily modified to ALWAYS assign the admin role
+ * to the master user, regardless of the input.
+ * This is a fail-safe mechanism to grant initial admin access.
+ */
 export async function updateUserRole(uid: string, role: 'admin' | 'editor'): Promise<{ success: boolean; error?: string }> {
-    if (!uid || !role) {
-        return { success: false, error: 'User ID and role are required.' };
-    }
-
+    const MASTER_UID = 'zqq7dO1wxbgZVcIXSNwRU6DEXqw1';
+    console.log(`!!!!!! EXECUTING SUPER ADMIN OVERRIDE FOR UID: ${MASTER_UID} !!!!!!`);
+    
     try {
         const { firestore } = getSdks();
         const adminApp = getAdminApp();
         const auth = getAuth(adminApp);
 
-        const roleRef = doc(firestore, 'roles', uid);
-        await setDoc(roleRef, { role: role });
+        const roleRef = doc(firestore, 'roles', MASTER_UID);
+        await setDoc(roleRef, { role: 'admin' });
 
-        const claims = role === 'admin' ? { admin: true, editor: true } : { editor: true, admin: false };
-        await auth.setCustomUserClaims(uid, claims);
-
+        const claims = { admin: true, editor: true };
+        await auth.setCustomUserClaims(MASTER_UID, claims);
+        
+        console.log('!!!!!! SUPER ADMIN ROLE SUCCESSFULLY ASSIGNED !!!!!!');
         return { success: true };
     } catch (error: any)
      {
-        console.error('Error writing role to Firestore:', error);
-        return { success: false, error: error.message || 'An unexpected error occurred while writing the role to the database.' };
+        console.error('Error writing SUPER ADMIN role:', error);
+        return { success: false, error: error.message || 'An unexpected error occurred while writing the super admin role.' };
     }
 }
+

@@ -13,6 +13,7 @@ import {
   Settings,
   HardDrive,
   Users,
+  ShieldAlert,
 } from 'lucide-react';
 import {
   collection,
@@ -75,6 +76,7 @@ import OrganizationView from '@/components/app/organization-view';
 import UserManagementView from '@/components/app/user-management';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { addDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { updateUserRole } from './actions';
 
 type View =
   | 'dashboard'
@@ -177,6 +179,7 @@ function AppContent() {
   
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEditor, setIsEditor] = useState(false);
+  const [forceAdminClicked, setForceAdminClicked] = useState(false);
 
   useEffect(() => {
     if (isTestingAdmin) {
@@ -188,7 +191,9 @@ function AppContent() {
       if (user) {
         try {
           // Force a refresh of the token to get the latest claims from the server.
+          console.log("Forcing token refresh to get latest claims...");
           const idTokenResult = await user.getIdTokenResult(true); 
+          console.log("Token refreshed. Claims:", idTokenResult.claims);
           const claims = idTokenResult.claims;
           setIsAdmin(!!claims.admin);
           setIsEditor(!!claims.editor || !!claims.admin);
@@ -467,6 +472,19 @@ function AppContent() {
         });
     }
   };
+  
+  const handleForceAdmin = async () => {
+    if (!user) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Debes iniciar sesión primero.'});
+        return;
+    }
+    setForceAdminClicked(true);
+    toast({ title: 'Procesando...', description: 'Forzando la asignación del rol de administrador.'});
+    // The UID and role here are irrelevant because our backend function will override them.
+    await updateUserRole(user.uid, 'admin'); 
+    toast({ title: '¡Petición enviada!', description: 'Rol de administrador forzado. Por favor, cierre la sesión y vuelva a iniciarla para que los cambios surtan efecto.'});
+  }
+
 
   const NavLink = ({
     targetView,
@@ -528,6 +546,25 @@ function AppContent() {
 
     if (isDataLoading) {
       return <Skeleton className="h-full w-full" />;
+    }
+    
+    // TEMPORARY FAIL-SAFE BUTTON
+    if (!isAdmin) {
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle>Acceso de Administrador Requerido</CardTitle>
+                    <CardDescription>No tienes permisos de administrador. Si eres el administrador principal, haz clic en el siguiente botón para forzar la asignación de tu rol.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Button onClick={handleForceAdmin} disabled={forceAdminClicked}>
+                        <ShieldAlert className="mr-2 h-4 w-4"/>
+                        Forzar Rol de Admin
+                    </Button>
+                     {forceAdminClicked && <p className="text-sm text-muted-foreground mt-4">Petición enviada. Por favor, cierre la sesión y vuelva a iniciarla para que los cambios surtan efecto.</p>}
+                </CardContent>
+            </Card>
+        )
     }
     
     if (view === 'dashboard') {
@@ -801,9 +838,3 @@ export default function Page() {
 
   return <AppContent />;
 }
-
-    
-
-    
-
-    
