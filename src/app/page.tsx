@@ -668,36 +668,32 @@ function AppContent() {
         />
       )}
 
-      <Accordion type="single" collapsible className="w-full" defaultValue="item-1">
+      <Accordion type="single" collapsible className="w-full">
         <AccordionItem value="item-1" className="border-b-0">
-          <AccordionTrigger
-            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${
-              isMobile ? 'text-lg' : 'text-sm'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <Package className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />
-              <span>Sectores</span>
-            </div>
-          </AccordionTrigger>
-          <AccordionContent>
+            <AccordionTrigger className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${isMobile ? 'text-lg' : 'text-sm'} hover:no-underline`}>
+                <div className="flex items-center gap-3">
+                    <Package className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />
+                    <span>Sectores</span>
+                </div>
+            </AccordionTrigger>
+            <AccordionContent>
             {(sortedSectors || []).map(sector => (
-              <Accordion key={sector.id} type="single" collapsible className="w-full">
+                <Accordion key={sector.id} type="single" collapsible className="w-full">
                 <AccordionItem value={sector.id} className="border-b-0">
-                  <AccordionTrigger className="text-left hover:no-underline">
+                    <AccordionTrigger className="text-left hover:no-underline">
                     <div className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary">
-                      <span className="font-semibold">{sector.name}</span>
+                        <span className="font-semibold">{sector.name}</span>
                     </div>
-                  </AccordionTrigger>
-                  <AccordionContent>
+                    </AccordionTrigger>
+                    <AccordionContent>
                     <MachineList sector={sector} onNavClick={handleNavClick} isMobile={isMobile} />
-                  </AccordionContent>
+                    </AccordionContent>
                 </AccordionItem>
-              </Accordion>
+                </Accordion>
             ))}
-          </AccordionContent>
+            </AccordionContent>
         </AccordionItem>
-      </Accordion>
+        </Accordion>
 
 
       <div className="mt-auto border-t pt-4">
@@ -832,3 +828,5 @@ export default function Page() {
 
   return <AppContent />;
 }
+
+    

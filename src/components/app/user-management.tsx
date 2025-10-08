@@ -51,25 +51,48 @@ export default function UserManagementView({ users, allRoles }: UserManagementVi
     };
 
     const handleUpdateRole = async () => {
-        if (!selectedUser || !role || role === 'user') {
+        if (!selectedUser || !role) { // Allow assigning 'user' (which is null in db)
             toast({
-                title: 'No se puede asignar el rol',
-                description: 'Por favor, seleccione un usuario y un rol válido (Editor o Administrador).',
+                title: 'Selección inválida',
+                description: 'Por favor, seleccione un usuario y un rol.',
                 variant: 'destructive',
             });
             return;
         }
 
-        const validRole = role as 'admin' | 'editor';
+        const roleToSet = role === 'user' ? null : role;
+        const currentRole = usersWithRoles.find(u => u.uid === selectedUser.uid)?.role || null;
         
-        setIsLoading(true);
+        if (roleToSet === currentRole) {
+             toast({
+                title: 'Sin cambios',
+                description: `El usuario ya tiene el rol de ${getRoleDisplayName(roleToSet)}.`,
+            });
+            return;
+        }
 
-        const result = await updateUserRole(selectedUser.uid, validRole);
+        setIsLoading(true);
+        
+        // This is a special case to handle "demoting" to a regular user.
+        // The server action updateUserRole is designed for assigning 'admin' or 'editor'.
+        // For now, we allow assigning admin/editor. A future improvement could be a `removePrivileges` action.
+        if (roleToSet === null) {
+            toast({
+                title: 'Función no implementada',
+                description: 'La degradación a rol de "Usuario" se debe implementar en una acción de servidor separada.',
+                variant: 'destructive',
+            });
+            setIsLoading(false);
+            return;
+        }
+        
+
+        const result = await updateUserRole(selectedUser.uid, roleToSet as 'admin' | 'editor');
 
         if (result.success) {
             toast({
                 title: 'Rol Actualizado',
-                description: `El usuario ${selectedUser.email} ahora tiene el rol de ${role}.`,
+                description: `El usuario ${selectedUser.email} ahora tiene el rol de ${getRoleDisplayName(roleToSet)}.`,
             });
             setSelectedUser(null);
             // The parent component will receive the updated roles via the useCollection hook
@@ -117,12 +140,10 @@ export default function UserManagementView({ users, allRoles }: UserManagementVi
                                     <TableCell>{user.email}</TableCell>
                                     <TableCell>{user.displayName}</TableCell>
                                     <TableCell>
-                                        {user.role ? getRoleDisplayName(user.role) : (
-                                            <span className="flex items-center gap-2 text-muted-foreground">
-                                                <ShieldQuestion size={16} />
-                                                Usuario
-                                            </span>
-                                        )}
+                                        <span className="flex items-center gap-2">
+                                            {user.role === null && <ShieldQuestion size={16} className="text-muted-foreground" />}
+                                            {getRoleDisplayName(user.role)}
+                                        </span>
                                     </TableCell>
                                     <TableCell>
                                         <Button variant="outline" size="sm" onClick={() => handleSelectUser(user)}>
@@ -175,7 +196,7 @@ export default function UserManagementView({ users, allRoles }: UserManagementVi
                          </div>
                         <Button 
                             onClick={handleUpdateRole} 
-                            disabled={isLoading || !selectedUser || role === 'user'} 
+                            disabled={isLoading || !selectedUser} 
                             className="w-full"
                         >
                             {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
@@ -187,3 +208,5 @@ export default function UserManagementView({ users, allRoles }: UserManagementVi
         </div>
     );
 }
+
+    
