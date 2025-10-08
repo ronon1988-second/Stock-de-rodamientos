@@ -6,30 +6,34 @@ const appName = 'firebase-admin-app';
 
 /**
  * Creates and initializes the Firebase Admin App instance.
- * It first tries to use a service account from the `FIREBASE_SERVICE_ACCOUNT` environment variable.
- * If that's not available, it falls back to using Application Default Credentials,
- * which is common in many Google Cloud environments.
+ * It first tries to use a Base64 encoded service account from environment variables,
+ * which is safer for deployment environments like Vercel.
+ * If that's not available, it falls back to Application Default Credentials,
+ * common in Google Cloud environments like Cloud Workstations.
  * 
  * @returns The initialized Firebase Admin App.
  */
 function createAdminApp(): App {
-  const serviceAccountEnv = process.env.FIREBASE_SERVICE_ACCOUNT;
+  const serviceAccountBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
 
-  if (serviceAccountEnv) {
+  if (serviceAccountBase64) {
     try {
-      const serviceAccount = JSON.parse(serviceAccountEnv);
+      // Decode the Base64 string to a JSON string
+      const decodedServiceAccount = Buffer.from(serviceAccountBase64, 'base64').toString('utf8');
+      const serviceAccount = JSON.parse(decodedServiceAccount);
+      console.log("Initializing Firebase Admin SDK with Base64 service account...");
       return initializeApp({
         credential: cert(serviceAccount),
       }, appName);
     } catch (e) {
       console.error(
-        "Failed to parse FIREBASE_SERVICE_ACCOUNT. Falling back to default credentials.",
+        "Failed to parse Base64 encoded FIREBASE_SERVICE_ACCOUNT. Falling back to default credentials.",
         e
       );
     }
   }
   
-  console.log("FIREBASE_SERVICE_ACCOUNT not set. Attempting to use Application Default Credentials.");
+  console.log("FIREBASE_SERVICE_ACCOUNT_BASE64 not set. Attempting to use Application Default Credentials.");
   return initializeApp({
     credential: applicationDefault(),
   }, appName);
