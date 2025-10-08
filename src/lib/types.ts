@@ -13,6 +13,11 @@ export type Machine = {
   sectorId: string;
 };
 
+// Represents a dictionary of machines keyed by their sector ID.
+export type MachinesBySector = {
+  [sectorId: string]: Machine[];
+};
+
 // Represents a single item in the shared inventory. The 'id' is the Firestore document ID.
 export type InventoryItem = {
   id: string;
@@ -55,5 +60,3 @@ export type UserRole = {
     // The id of this doc is the user's UID
     role: 'admin' | 'editor';
 }
-
-    

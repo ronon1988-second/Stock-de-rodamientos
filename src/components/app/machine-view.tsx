@@ -9,8 +9,8 @@ import { InventoryItem, Sector, Machine, MachineAssignment } from '@/lib/types';
 import { PackagePlus, Trash2 } from 'lucide-react';
 import AssignItemDialog from './assign-item-dialog';
 import UpdateStockDialog from './update-stock-dialog';
-import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useDoc, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
+import { doc, collection, query, where } from 'firebase/firestore';
 import { Skeleton } from '../ui/skeleton';
 
 type MachineViewProps = {
@@ -23,19 +23,72 @@ type MachineViewProps = {
     canEdit: boolean;
 };
 
-export default function MachineView({ machineId, allInventory, machineAssignments, onAssignItem, onRemoveItem, onLogUsage, canEdit }: MachineViewProps) {
+// Helper component to find and load the machine
+function MachineLoader({ machineId, children }: { machineId: string, children: (machine: Machine) => React.ReactNode }) {
+    const firestore = useFirestore();
+    const sectorsRef = useMemoFirebase(() => firestore ? collection(firestore, 'sectors') : null, [firestore]);
+    const { data: sectors, isLoading: isLoadingSectors } = useCollection<Sector>(sectorsRef);
+    const [foundMachine, setFoundMachine] = useState<Machine | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    React.useEffect(() => {
+        if (isLoadingSectors || !sectors || !firestore) return;
+
+        let isMounted = true;
+        const findMachine = async () => {
+            setIsLoading(true);
+            for (const sector of sectors) {
+                const machineRef = doc(firestore, `sectors/${sector.id}/machines`, machineId);
+                const machineSnap = await import('firebase/firestore').then(m => m.getDoc(machineRef));
+                if (machineSnap.exists() && isMounted) {
+                    setFoundMachine({ id: machineSnap.id, ...machineSnap.data() } as Machine);
+                    break;
+                }
+            }
+             if(isMounted) setIsLoading(false);
+        };
+
+        findMachine();
+        return () => { isMounted = false; }
+    }, [machineId, sectors, firestore, isLoadingSectors]);
+
+    if (isLoading || isLoadingSectors) {
+        return (
+            <div className="grid auto-rows-max items-start gap-4 md:gap-8">
+                <Card>
+                    <CardHeader>
+                        <Skeleton className="h-8 w-3/4" />
+                        <Skeleton className="h-4 w-1/2" />
+                    </CardHeader>
+                    <CardContent>
+                        <Skeleton className="h-48 w-full" />
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
+    if (!foundMachine) {
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle>Error</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p>No se pudo encontrar la máquina con el ID: {machineId}</p>
+                </CardContent>
+            </Card>
+        );
+    }
+    
+    return <>{children(foundMachine)}</>;
+}
+
+
+function MachineDetails({ machine, allInventory, machineAssignments, onAssignItem, onRemoveItem, onLogUsage, canEdit }: { machine: Machine, allInventory: InventoryItem[], machineAssignments: MachineAssignment[], onAssignItem: (itemId: string, machineId: string, sectorId: string, quantity: number) => void, onRemoveItem: (assignmentId: string) => void, onLogUsage: (itemId: string, quantity: number, machineId: string, sectorId: string) => void, canEdit: boolean }) {
     const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
     const [logUsageItem, setLogUsageItem] = useState<InventoryItem | null>(null);
     const firestore = useFirestore();
-
-    const machineRef = useMemoFirebase(() => {
-        const assignment = machineAssignments.find(a => a.machineId === machineId);
-        if (firestore && assignment) {
-            return doc(firestore, `sectors/${assignment.sectorId}/machines`, machineId);
-        }
-        return null;
-    }, [firestore, machineId, machineAssignments]);
-    const { data: machine, isLoading: isMachineLoading } = useDoc<Machine>(machineRef);
 
     const sectorRef = useMemoFirebase(() => {
         if (firestore && machine) {
@@ -55,7 +108,7 @@ export default function MachineView({ machineId, allInventory, machineAssignment
         };
     }).sort((a, b) => a.itemName.localeCompare(b.itemName));
 
-    if (isMachineLoading || isSectorLoading || !machine || !sector) {
+    if (isSectorLoading || !sector) {
         return (
              <div className="grid auto-rows-max items-start gap-4 md:gap-8">
                 <Card>
@@ -162,4 +215,16 @@ export default function MachineView({ machineId, allInventory, machineAssignment
     );
 }
 
-    
+export default function MachineView({ machineId, ...props }: MachineViewProps) {
+    return (
+        <MachineLoader machineId={machineId}>
+            {(machine) => (
+                <MachineDetails 
+                    machine={machine} 
+                    {...props} 
+                    machineAssignments={props.machineAssignments.filter(a => a.machineId === machineId)} 
+                />
+            )}
+        </MachineLoader>
+    );
+}

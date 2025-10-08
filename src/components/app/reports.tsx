@@ -17,11 +17,45 @@ import {
 } from "@/components/ui/table";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import type { UsageLog, Sector, Machine } from "@/lib/types";
+import type { UsageLog, Sector, Machine, MachinesBySector } from "@/lib/types";
 import UsageChart from "./usage-chart";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useFirestore, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, query } from "firebase/firestore";
+
+// Component to fetch and hold machine data for all sectors
+function useAllMachines(sectors: Sector[]) {
+  const firestore = useFirestore();
+  const [machinesBySector, setMachinesBySector] = useState<MachinesBySector>({});
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!firestore || sectors.length === 0) {
+      setIsLoading(false);
+      return;
+    }
+
+    const fetchAllMachines = async () => {
+      setIsLoading(true);
+      const allMachines: MachinesBySector = {};
+      await Promise.all(
+        sectors.map(async (sector) => {
+          const machinesQuery = query(collection(firestore, `sectors/${sector.id}/machines`));
+          const machinesSnapshot = await import('firebase/firestore').then(m => m.getDocs(machinesQuery));
+          allMachines[sector.id] = machinesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Machine));
+        })
+      );
+      setMachinesBySector(allMachines);
+      setIsLoading(false);
+    };
+
+    fetchAllMachines();
+
+  }, [firestore, sectors]);
+
+  return { machinesBySector, isLoading };
+}
+
 
 type ReportsProps = {
   usageLog: UsageLog[];
@@ -29,27 +63,16 @@ type ReportsProps = {
 };
 
 export default function Reports({ usageLog, sectors }: ReportsProps) {
-  const firestore = useFirestore();
-
-  const machinesBySector = useMemo(() => {
-    const machineListeners: Record<string, Machine[]> = {};
-    sectors.forEach(sector => {
-      // This is not ideal inside useMemo, but we'll create a dedicated component for listening
-      const machinesQuery = firestore ? query(collection(firestore, `sectors/${sector.id}/machines`)) : null;
-      // In a real app you'd use a hook here, but for this structure we'll just prep the object
-      machineListeners[sector.id] = []; 
-    });
-    return machineListeners;
-  }, [sectors, firestore]);
+  const { machinesBySector, isLoading: isLoadingMachines } = useAllMachines(sectors);
 
   const getMachineAndSectorName = (machineId: string, sectorId: string) => {
     const sector = sectors.find(s => s.id === sectorId);
-    // This is inefficient; a better data structure would be a map.
-    // For now, this will work for display purposes.
-    const machineName = 'Desconocida';
+    const machines = machinesBySector[sectorId] || [];
+    const machine = machines.find(m => m.id === machineId);
+
     return {
       sectorName: sector?.name ?? 'Desconocido',
-      machineName: machineName,
+      machineName: machine?.name ?? 'Desconocida',
     }
   }
 
@@ -77,6 +100,7 @@ export default function Reports({ usageLog, sectors }: ReportsProps) {
               <TableRow>
                 <TableHead>Artículo</TableHead>
                 <TableHead>Sector</TableHead>
+                <TableHead>Máquina</TableHead>
                 <TableHead className="text-right">Cantidad</TableHead>
                 <TableHead>Fecha</TableHead>
               </TableRow>
@@ -84,13 +108,14 @@ export default function Reports({ usageLog, sectors }: ReportsProps) {
             <TableBody>
               {usageLog.length > 0 ? (
                 usageLog.map((log) => {
-                  const { sectorName } = getMachineAndSectorName(log.machineId, log.sectorId);
+                  const { sectorName, machineName } = getMachineAndSectorName(log.machineId, log.sectorId);
                   return (
                     <TableRow key={log.id}>
                       <TableCell className="font-medium">
                         {log.itemName}
                       </TableCell>
                       <TableCell>{sectorName}</TableCell>
+                       <TableCell>{machineName}</TableCell>
                       <TableCell className="text-right">{log.quantity}</TableCell>
                       <TableCell>
                         {format(new Date(log.date), "PPP p", { locale: es })}
@@ -100,7 +125,7 @@ export default function Reports({ usageLog, sectors }: ReportsProps) {
                 })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={4} className="h-24 text-center">
+                  <TableCell colSpan={5} className="h-24 text-center">
                     No hay datos de uso disponibles.
                   </TableCell>
                 </TableRow>
@@ -112,5 +137,3 @@ export default function Reports({ usageLog, sectors }: ReportsProps) {
     </div>
   );
 }
-
-    
