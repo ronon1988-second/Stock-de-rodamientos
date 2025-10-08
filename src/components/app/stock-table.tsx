@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import UpdateStockDialog from "./update-stock-dialog";
 import type { InventoryItem } from "@/lib/types";
-import { MoreHorizontal, Search, PlusCircle } from "lucide-react";
+import { MoreHorizontal, Search, PlusCircle, FileDown } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import AddItemDialog from "./add-item-dialog";
@@ -110,6 +110,22 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, canEdit
     return "default";
   };
 
+  const exportAllToCSV = () => {
+    let csvContent = "data:text/csv;charset=utf-8,Artículo,Stock Actual,Umbral de Seguridad\n";
+    
+    inventory.sort((a,b) => a.name.localeCompare(b.name)).forEach(item => {
+        csvContent += `${item.name},${item.stock},${item.threshold}\n`;
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "inventario_completo.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
   return (
     <>
       <Card>
@@ -121,12 +137,20 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, canEdit
                 {description || 'Busca, visualiza y gestiona todo tu inventario.'}
               </CardDescription>
             </div>
-            {canEdit && (
-              <Button onClick={() => setAddingItem(true)}>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Agregar Artículo
-              </Button>
-            )}
+            <div className="flex gap-2">
+              {canEdit && (
+                <>
+                  <Button variant="outline" onClick={exportAllToCSV} disabled={inventory.length === 0}>
+                    <FileDown className="mr-2 h-4 w-4" />
+                    Exportar Todo
+                  </Button>
+                  <Button onClick={() => setAddingItem(true)}>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Agregar Artículo
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
           <div className="relative mt-4">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -246,5 +270,3 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, canEdit
     </>
   );
 }
-
-    
