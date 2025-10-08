@@ -3,8 +3,9 @@
 
 import { getReorderRecommendations, ReorderRecommendationsInput } from "@/ai/flows/reorder-recommendations";
 import { doc, setDoc, getDoc, writeBatch } from 'firebase/firestore';
-import { getSdks } from "@/firebase";
+import { getAdminApp, getSdks } from "@/firebase";
 import { UserProfile } from "@/lib/types";
+import { getAuth as getAdminAuth } from 'firebase-admin/auth';
 
 export async function getAIReorderRecommendations(input: ReorderRecommendationsInput) {
     try {
@@ -19,6 +20,7 @@ export async function getAIReorderRecommendations(input: ReorderRecommendationsI
 /**
  * Ensures a user profile exists and sets up their initial role in Firestore if needed.
  * This is the primary source of truth for user and role creation.
+ * It also sets the custom claim for the admin user.
  */
 export async function setupUserAndRole(uid: string, email: string | null): Promise<{ success: boolean; error?: string }> {
     if (!uid || !email) {
@@ -40,7 +42,7 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
             batch.set(userRef, userData);
         }
 
-        // 2. Set Role in Firestore '/roles' collection ONLY if it doesn't exist
+        // 2. Set Role in Firestore '/roles' collection
         const roleRef = doc(firestore, 'roles', uid);
         const roleDoc = await getDoc(roleRef);
 
@@ -48,9 +50,19 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
             if (email === 'maurofbordon@gmail.com') {
                 console.log(`>>>>>> Matched admin user: ${email}. Setting role in Firestore. <<<<<<`);
                 batch.set(roleRef, { role: 'admin' });
+                
+                // Set custom claim for admin user
+                try {
+                    const adminApp = getAdminApp();
+                    const adminAuth = getAdminAuth(adminApp);
+                    await adminAuth.setCustomUserClaims(uid, { admin: true });
+                    console.log(`>>>>>> Successfully set custom claim 'admin:true' for UID: ${uid} <<<<<<`);
+                } catch (claimError) {
+                    console.error("Error setting custom claim:", claimError);
+                    // We don't fail the whole operation, but we log the error.
+                }
+
             } else {
-                // For other users, we can decide to set a default role or leave it empty.
-                // Leaving it empty means they won't have a role until an admin assigns one.
                 batch.set(roleRef, {}); // Creates an empty doc to signify a 'user' role without special perms
             }
         }
@@ -66,7 +78,7 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
 
 
 /**
- * Updates a user's role in the Firestore 'roles' collection.
+ * Updates a user's role in the Firestore 'roles' collection and their custom claims.
  */
 export async function updateUserRole(uid: string, role: 'admin' | 'editor'): Promise<{ success: boolean; error?: string }> {
     if (!uid || !role) {
@@ -74,18 +86,22 @@ export async function updateUserRole(uid: string, role: 'admin' | 'editor'): Pro
     }
 
     try {
+        // Step 1: Update the role in the Firestore 'roles' collection
         const { firestore } = getSdks();
         const roleRef = doc(firestore, 'roles', uid);
-        
-        // Overwrite the role in the Firestore 'roles' collection
-        await setDoc(roleRef, { role: role });
-        
+        await setDoc(roleRef, { role: role }, { merge: true });
         console.log(`Successfully assigned role '${role}' to UID: ${uid} in Firestore.`);
+
+        // Step 2: Update the custom claims in Firebase Auth
+        const adminApp = getAdminApp();
+        const adminAuth = getAdminAuth(adminApp);
+        const claims = role === 'admin' ? { admin: true } : { editor: true, admin: false };
+        await adminAuth.setCustomUserClaims(uid, claims);
+        console.log(`Successfully set custom claims for UID: ${uid}`, claims);
+
         return { success: true };
     } catch (error: any) {
-        console.error(`Error updating role for UID ${uid} in Firestore:`, error);
+        console.error(`Error updating role for UID ${uid}:`, error);
         return { success: false, error: error.message || 'An unexpected error occurred while updating the user role.' };
     }
 }
-
-    
