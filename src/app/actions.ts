@@ -67,32 +67,34 @@ export async function setupUserAndRole(uid: string, email: string): Promise<{ su
 
 
 /**
- * !! SUPER ADMIN OVERRIDE !!
- * This function is temporarily modified to ALWAYS assign the admin role
- * to the master user, regardless of the input.
- * This is a fail-safe mechanism to grant initial admin access.
+ * Updates a user's role and sets the corresponding custom claims in Firebase Auth.
+ * This is the definitive function for role management.
  */
 export async function updateUserRole(uid: string, role: 'admin' | 'editor'): Promise<{ success: boolean; error?: string }> {
-    const MASTER_UID = 'zqq7dO1wxbgZVcIXSNwRU6DEXqw1';
-    console.log(`!!!!!! EXECUTING SUPER ADMIN OVERRIDE FOR UID: ${MASTER_UID} !!!!!!`);
-    
+    if (!uid || !role) {
+        return { success: false, error: 'User ID and role are required.' };
+    }
+
     try {
         const { firestore } = getSdks();
         const adminApp = getAdminApp();
         const auth = getAuth(adminApp);
 
-        const roleRef = doc(firestore, 'roles', MASTER_UID);
-        await setDoc(roleRef, { role: 'admin' });
+        // Set the role in the Firestore 'roles' collection
+        const roleRef = doc(firestore, 'roles', uid);
+        await setDoc(roleRef, { role: role });
 
-        const claims = { admin: true, editor: true };
-        await auth.setCustomUserClaims(MASTER_UID, claims);
+        // Set the custom claims in Firebase Auth
+        const claims = {
+            admin: role === 'admin',
+            editor: role === 'admin' || role === 'editor',
+        };
+        await auth.setCustomUserClaims(uid, claims);
         
-        console.log('!!!!!! SUPER ADMIN ROLE SUCCESSFULLY ASSIGNED !!!!!!');
+        console.log(`Successfully assigned role '${role}' to UID: ${uid}`);
         return { success: true };
-    } catch (error: any)
-     {
-        console.error('Error writing SUPER ADMIN role:', error);
-        return { success: false, error: error.message || 'An unexpected error occurred while writing the super admin role.' };
+    } catch (error: any) {
+        console.error(`Error updating role for UID ${uid}:`, error);
+        return { success: false, error: error.message || 'An unexpected error occurred while updating the user role.' };
     }
 }
-

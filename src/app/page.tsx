@@ -179,8 +179,7 @@ function AppContent() {
   
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEditor, setIsEditor] = useState(false);
-  const [forceAdminClicked, setForceAdminClicked] = useState(false);
-
+  
   useEffect(() => {
     if (isTestingAdmin) {
       setIsAdmin(true);
@@ -473,19 +472,6 @@ function AppContent() {
     }
   };
   
-  const handleForceAdmin = async () => {
-    if (!user) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Debes iniciar sesión primero.'});
-        return;
-    }
-    setForceAdminClicked(true);
-    toast({ title: 'Procesando...', description: 'Forzando la asignación del rol de administrador.'});
-    // The UID and role here are irrelevant because our backend function will override them.
-    await updateUserRole(user.uid, 'admin'); 
-    toast({ title: '¡Petición enviada!', description: 'Rol de administrador forzado. Por favor, cierre la sesión y vuelva a iniciarla para que los cambios surtan efecto.'});
-  }
-
-
   const NavLink = ({
     targetView,
     icon,
@@ -548,23 +534,18 @@ function AppContent() {
       return <Skeleton className="h-full w-full" />;
     }
     
-    // TEMPORARY FAIL-SAFE BUTTON
-    if (!isAdmin) {
-        return (
-            <Card>
-                <CardHeader>
-                    <CardTitle>Acceso de Administrador Requerido</CardTitle>
-                    <CardDescription>No tienes permisos de administrador. Si eres el administrador principal, haz clic en el siguiente botón para forzar la asignación de tu rol.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Button onClick={handleForceAdmin} disabled={forceAdminClicked}>
-                        <ShieldAlert className="mr-2 h-4 w-4"/>
-                        Forzar Rol de Admin
-                    </Button>
-                     {forceAdminClicked && <p className="text-sm text-muted-foreground mt-4">Petición enviada. Por favor, cierre la sesión y vuelva a iniciarla para que los cambios surtan efecto.</p>}
-                </CardContent>
-            </Card>
-        )
+    // Fallback screen if user is not an admin, but the UI thinks they should be.
+    // This provides a clear message and avoids a broken UI state.
+    if (!isAdmin && (view === 'users' || view === 'organization')) {
+      setView('dashboard'); // Force back to a safe view
+      return (
+          <Card>
+              <CardHeader>
+                  <CardTitle>Acceso de Administrador Requerido</CardTitle>
+                  <CardDescription>No tienes los permisos necesarios para acceder a esta sección. Si crees que esto es un error, por favor, contacta al administrador.</CardDescription>
+              </CardHeader>
+          </Card>
+      );
     }
     
     if (view === 'dashboard') {
@@ -594,25 +575,14 @@ function AppContent() {
         />
       );
     }
-    if (view === 'organization') {
-      if (!canEdit) { 
-        setView('dashboard');
-        toast({ title: "Acceso denegado", description: "Necesita permisos de editor o administrador.", variant: "destructive"})
-        return null;
-      }
+    if (view === 'organization' && canEdit) {
       return (
         <OrganizationView
           sectors={sortedSectors}
         />
       );
     }
-    if (view === 'users') {
-        if (!isAdmin) { 
-            setView('dashboard');
-            toast({ title: "Acceso denegado", description: "Necesita permisos de administrador.", variant: "destructive"})
-            return null;
-        }
-
+    if (view === 'users' && isAdmin) {
         const usersToManage = allUsers?.filter(u => user && u.uid !== user.uid) || [];
         return <UserManagementView isTesting={isTestingAdmin} users={usersToManage} />;
     }
