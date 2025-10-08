@@ -80,6 +80,8 @@ import UserManagementView from '@/components/app/user-management';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { setDocumentNonBlocking, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
+// TEMPORARY FLAG FOR ADMIN UI TESTING
+const isTestingAdmin = true;
 
 type View =
   | 'dashboard'
@@ -150,6 +152,11 @@ function AppContent() {
   const [isEditor, setIsEditor] = useState(false);
 
   useEffect(() => {
+    if (isTestingAdmin) {
+      setIsAdmin(true);
+      setIsEditor(true);
+      return;
+    }
     const fetchUserClaims = async () => {
       if (user) {
         try {
@@ -171,10 +178,10 @@ function AppContent() {
     fetchUserClaims();
   }, [user]);
 
-  const canLogUsage = !!user; // Any authenticated user can log usage
+  const canLogUsage = !!user || isTestingAdmin; // Any authenticated user can log usage
 
   // DATA FETCHING
-  const allUsersRef = useMemoFirebase(() => (firestore && isAdmin ? collection(firestore, 'users') : null), [firestore, isAdmin]);
+  const allUsersRef = useMemoFirebase(() => (firestore && isAdmin && !isTestingAdmin ? collection(firestore, 'users') : null), [firestore, isAdmin]);
   const { data: allUsers, isLoading: isAllUsersLoading } = useCollection<UserProfile>(allUsersRef);
 
   const inventoryRef = useMemoFirebase(() => firestore ? collection(firestore, 'inventory') : null, [firestore]);
@@ -186,12 +193,12 @@ function AppContent() {
   const assignmentsRef = useMemoFirebase(() => firestore ? collection(firestore, 'machineAssignments') : null, [firestore]);
   const { data: machineAssignments, isLoading: isAssignmentsLoading } = useCollection<MachineAssignment>(assignmentsRef);
   
-  const usageLogRef = useMemoFirebase(() => (firestore ? collection(firestore, 'usageLog') : null), [firestore]);
+  const usageLogRef = useMemoFirebase(() => (firestore && !isTestingAdmin ? collection(firestore, 'usageLog') : null), [firestore]);
   const { data: usageLog, isLoading: isUsageLogLoading } = useCollection<UsageLog>(usageLogRef);
 
   useEffect(() => {
     const seedData = async () => {
-        if (!firestore || !user || isInventoryLoading || isSectorsLoading || isSeeding || !isAdmin) return;
+        if (!firestore || (!user && !isTestingAdmin) || isInventoryLoading || isSectorsLoading || isSeeding || !isAdmin) return;
 
         const invQuery = query(collection(firestore, 'inventory'));
         const sectorsQuery = query(collection(firestore, 'sectors'));
@@ -265,13 +272,16 @@ function AppContent() {
     () => (machineAssignments ? [...machineAssignments] : []),
     [machineAssignments]
   );
+  
   const sortedUsageLog = useMemo(
-    () =>
-      usageLog
-        ? [...usageLog].sort(
-            (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-          )
-        : [],
+    () => {
+        if (isTestingAdmin) return []; // Don't show usage log in test mode
+        return usageLog
+            ? [...usageLog].sort(
+                (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+              )
+            : []
+    },
     [usageLog]
   );
 
@@ -475,13 +485,13 @@ function AppContent() {
 
   const renderContent = () => {
     const isDataLoading =
-      isUserLoading ||
+      (isUserLoading && !isTestingAdmin) ||
       isInventoryLoading ||
       isAssignmentsLoading ||
-      isUsageLogLoading ||
+      (isUsageLogLoading && !isTestingAdmin) ||
       isSectorsLoading ||
       isSeeding ||
-      (isAdmin && isAllUsersLoading);
+      (isAdmin && isAllUsersLoading && !isTestingAdmin);
 
     if (isDataLoading) {
       return <Skeleton className="h-full w-full" />;
@@ -531,7 +541,17 @@ function AppContent() {
             toast({ title: "Acceso denegado", description: "Necesita permisos de administrador.", variant: "destructive"})
             return null;
         }
-      return <UserManagementView users={allUsers?.filter(u => user && u.uid !== user.uid) || []} />;
+
+        let usersToManage = allUsers?.filter(u => user && u.uid !== user.uid) || [];
+
+        if (isTestingAdmin) {
+            usersToManage = [
+                { id: '1', uid: 'test-user-1', email: 'editor@example.com', displayName: 'Usuario Editor' },
+                { id: '2', uid: 'test-user-2', email: 'viewer@example.com', displayName: 'Usuario Lector' },
+            ];
+        }
+
+        return <UserManagementView users={usersToManage} isTesting={isTestingAdmin} />;
     }
     if (view.startsWith('machine-')) {
       const machineId = view.replace('machine-', '');
@@ -633,7 +653,7 @@ function AppContent() {
     </nav>
   );
 
-  if (isUserLoading) {
+  if (isUserLoading && !isTestingAdmin) {
       return (
         <div className="flex items-center justify-center min-h-screen">
           <Skeleton className="h-[95vh] w-[95vw] rounded-lg" />
@@ -702,7 +722,7 @@ function AppContent() {
               {getViewTitle()}
             </h1>
           </div>
-          {user && (
+          {(user || isTestingAdmin) && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="secondary" size="icon" className="rounded-full">
@@ -712,12 +732,12 @@ function AppContent() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>
-                  {user?.email}{' '}
-                  {isAdmin && '(Admin)'}
+                  {isTestingAdmin ? 'admin-test@example.com' : user?.email}{' '}
+                  {(isAdmin || isTestingAdmin) && '(Admin)'}
                   {isEditor && !isAdmin && '(Editor)'}
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={handleLogout}>
+                <DropdownMenuItem onSelect={handleLogout} disabled={isTestingAdmin}>
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Cerrar sesión</span>
                 </DropdownMenuItem>
@@ -738,12 +758,13 @@ export default function Page() {
   const router = useRouter();
 
   useEffect(() => {
+    if (isTestingAdmin) return;
     if (!isUserLoading && !user) {
       router.push('/login');
     }
   }, [user, isUserLoading, router]);
 
-  if (isUserLoading || !user) {
+  if (isUserLoading && !isTestingAdmin) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Skeleton className="h-[95vh] w-[95vw] rounded-lg" />
