@@ -16,15 +16,11 @@ const appName = 'firebase-admin-app';
 function createAdminApp(): App {
   const serviceAccountBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
 
-  // DEBUG: Log the first 10 characters of the env var to see if it's being loaded.
-  console.log("SERVER-APP: Checking for FIREBASE_SERVICE_ACCOUNT_BASE64. Found first 10 chars:", serviceAccountBase64?.substring(0, 10));
-
   if (serviceAccountBase64) {
     try {
       // Decode the Base64 string to a JSON string
       const decodedServiceAccount = Buffer.from(serviceAccountBase64, 'base64').toString('utf8');
       const serviceAccount = JSON.parse(decodedServiceAccount);
-      console.log("Initializing Firebase Admin SDK with Base64 service account...");
       
       // Explicitly pass the projectId from the service account to avoid environment detection issues.
       return initializeApp({
