@@ -19,13 +19,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { updateUserRole } from '@/app/actions';
+import { updateUserRole, deleteUser } from '@/app/actions';
 import type { UserProfile, UserRole } from '@/lib/types';
-import { Loader2, ShieldQuestion, UserX, CheckCircle, Shield, User } from 'lucide-react';
+import { Loader2, ShieldQuestion, UserX, CheckCircle, Shield, User, Trash2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+
 
 type UserManagementViewProps = {
     users: UserProfile[] | null;
@@ -70,24 +72,28 @@ const UserRow = ({ user, onSelect, isSelected }: { user: UserProfile, onSelect: 
 };
 
 
-export default function UserManagementView({ users }: UserManagementViewProps) {
+export default function UserManagementView({ users: initialUsers }: UserManagementViewProps) {
     const { toast } = useToast();
+    const [users, setUsers] = useState(initialUsers);
     const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
-    const [selectedRole, setSelectedRole] = useState<'admin' | 'editor'>('editor');
+    const [selectedRole, setSelectedRole] = useState<'admin' | 'editor' | 'user'>('user');
     const [isSubmitting, setIsSubmitting] = useState(false);
-
+    
     const firestore = useFirestore();
     const roleRef = useMemoFirebase(() => (firestore && selectedUser) ? doc(firestore, 'roles', selectedUser.id) : null, [firestore, selectedUser]);
     const { data: roleDoc, isLoading: isRoleLoading } = useDoc<UserRole>(roleRef);
 
     useEffect(() => {
-        if (roleDoc && (roleDoc.role === 'admin' || roleDoc.role === 'editor')) {
-            setSelectedRole(roleDoc.role);
-        } else {
-            // Default to 'editor' when the user has role 'user' or no role.
-            setSelectedRole('editor');
+        if (roleDoc) {
+            setSelectedRole(roleDoc.role as 'admin' | 'editor' | 'user');
+        } else if (selectedUser) {
+            setSelectedRole('user');
         }
     }, [roleDoc, selectedUser]);
+
+    useEffect(() => {
+        setUsers(initialUsers);
+    }, [initialUsers]);
 
 
     const handleSelectUser = (user: UserProfile) => {
@@ -118,6 +124,30 @@ export default function UserManagementView({ users }: UserManagementViewProps) {
                 title: 'Error al Actualizar Rol',
                 description: result.error || 'Ocurrió un error inesperado.',
                 variant: 'destructive',
+            });
+        }
+        setIsSubmitting(false);
+    };
+
+     const handleDeleteUser = async () => {
+        if (!selectedUser) return;
+        
+        setIsSubmitting(true);
+        const result = await deleteUser(selectedUser.uid);
+        
+        if (result.success) {
+            toast({
+                title: "Usuario Eliminado",
+                description: `El usuario ${selectedUser.email} ha sido eliminado.`,
+            });
+            // Remove user from local state to update UI instantly
+            setUsers(currentUsers => currentUsers?.filter(u => u.id !== selectedUser.id) || null);
+            setSelectedUser(null);
+        } else {
+            toast({
+                title: "Error al Eliminar",
+                description: result.error || "No se pudo eliminar el usuario.",
+                variant: "destructive",
             });
         }
         setIsSubmitting(false);
@@ -170,7 +200,7 @@ export default function UserManagementView({ users }: UserManagementViewProps) {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Asignar Rol</CardTitle>
+                    <CardTitle>Gestionar Usuario</CardTitle>
                     <CardDescription>
                        {selectedUser ? `Gestionando a ${selectedUser.displayName}` : "Seleccione un usuario de la lista."}
                     </CardDescription>
@@ -193,9 +223,9 @@ export default function UserManagementView({ users }: UserManagementViewProps) {
                         </div>
 
                          <div className="space-y-1">
-                            <label className="text-sm font-medium">Asignar Nuevo Rol</label>
+                            <label className="text-sm font-medium">Asignar Rol</label>
                              <Select 
-                                onValueChange={(value: 'admin' | 'editor') => setSelectedRole(value)} 
+                                onValueChange={(value: 'admin' | 'editor' | 'user') => setSelectedRole(value)} 
                                 value={selectedRole} 
                                 disabled={isSubmitting || isRoleLoading}
                             >
@@ -203,6 +233,7 @@ export default function UserManagementView({ users }: UserManagementViewProps) {
                                     <SelectValue placeholder="Seleccione un rol" />
                                 </SelectTrigger>
                                 <SelectContent>
+                                    <SelectItem value="user">Usuario</SelectItem>
                                     <SelectItem value="editor">Editor</SelectItem>
                                     <SelectItem value="admin">Administrador</SelectItem>
                                 </SelectContent>
@@ -215,8 +246,36 @@ export default function UserManagementView({ users }: UserManagementViewProps) {
                         >
                             {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                             {(roleDoc && selectedRole === roleDoc.role) ? <CheckCircle className="mr-2 h-4 w-4" /> : null}
-                            {isSubmitting ? 'Asignando...' : (roleDoc && selectedRole === roleDoc.role) ? 'Rol ya asignado' : 'Confirmar Cambio'}
+                            {isSubmitting ? 'Asignando...' : (roleDoc && selectedRole === roleDoc.role) ? 'Rol ya asignado' : 'Confirmar Cambio de Rol'}
                         </Button>
+                         <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button
+                                    variant="destructive"
+                                    className="w-full"
+                                    disabled={isSubmitting || !selectedUser}
+                                >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Eliminar Usuario
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>¿Está absolutamente seguro?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        Esta acción no se puede deshacer. Esto eliminará permanentemente al usuario
+                                        <strong className="px-1">{selectedUser.email}</strong>
+                                        y todos sus datos asociados.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction onClick={handleDeleteUser}>
+                                        Sí, eliminar usuario
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
                     </div>
                     )}
                 </CardContent>

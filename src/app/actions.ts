@@ -92,7 +92,7 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
  * Updates a user's role in the Firestore 'roles' collection and their custom claims using the Admin SDK.
  * This function is designed to be called from the server.
  */
-export async function updateUserRole(uid: string, role: 'admin' | 'editor'): Promise<{ success: boolean; error?: string }> {
+export async function updateUserRole(uid: string, role: 'admin' | 'editor' | 'user'): Promise<{ success: boolean; error?: string }> {
     if (!uid || !role) {
         return { success: false, error: 'User ID and role are required.' };
     }
@@ -108,7 +108,10 @@ export async function updateUserRole(uid: string, role: 'admin' | 'editor'): Pro
         console.log(`(Admin) Successfully assigned role '${role}' to UID: ${uid} in Firestore.`);
 
         // Step 2: Update the custom claims in Firebase Auth using Admin SDK
-        const claims = role === 'admin' ? { admin: true, editor: false } : { editor: true, admin: false };
+        const claims = {
+            admin: role === 'admin',
+            editor: role === 'editor',
+        };
         await adminAuth.setCustomUserClaims(uid, claims);
         console.log(`(Admin) Successfully set custom claims for UID: ${uid}`, claims);
 
@@ -116,5 +119,38 @@ export async function updateUserRole(uid: string, role: 'admin' | 'editor'): Pro
     } catch (error: any) {
         console.error(`Error updating role for UID ${uid}:`, error);
         return { success: false, error: error.message || 'An unexpected error occurred while updating the user role.' };
+    }
+}
+
+
+export async function deleteUser(uid: string): Promise<{ success: boolean; error?: string }> {
+    if (!uid) {
+        return { success: false, error: 'User ID is required.' };
+    }
+
+    try {
+        const adminApp = getAdminApp();
+        const adminAuth = getAdminAuth(adminApp);
+        const adminFirestore = getAdminFirestore(adminApp);
+
+        // Step 1: Delete user from Firebase Authentication
+        await adminAuth.deleteUser(uid);
+        console.log(`(Admin) Successfully deleted user with UID: ${uid} from Authentication.`);
+
+        // Step 2: Delete user documents from Firestore in a batch
+        const batch = adminFirestore.batch();
+        const userRef = adminFirestore.collection('users').doc(uid);
+        const roleRef = adminFirestore.collection('roles').doc(uid);
+        
+        batch.delete(userRef);
+        batch.delete(roleRef);
+        
+        await batch.commit();
+        console.log(`(Admin) Successfully deleted user data for UID: ${uid} from Firestore.`);
+
+        return { success: true };
+    } catch (error: any) {
+        console.error(`Error deleting user with UID ${uid}:`, error);
+        return { success: false, error: error.message || 'An unexpected error occurred while deleting the user.' };
     }
 }
