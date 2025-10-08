@@ -10,7 +10,7 @@ import { PackagePlus, Trash2 } from 'lucide-react';
 import AssignItemDialog from './assign-item-dialog';
 import UpdateStockDialog from './update-stock-dialog';
 import { useDoc, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, collection, query, where } from 'firebase/firestore';
+import { doc, collection, query, where, getDoc } from 'firebase/firestore';
 import { Skeleton } from '../ui/skeleton';
 
 type MachineViewProps = {
@@ -21,6 +21,7 @@ type MachineViewProps = {
     onRemoveItem: (assignmentId: string) => void;
     onLogUsage: (itemId: string, quantity: number, machineId: string, sectorId: string) => void;
     canEdit: boolean;
+    canLogUsage: boolean;
 };
 
 // Helper component to find and load the machine
@@ -39,7 +40,7 @@ function MachineLoader({ machineId, children }: { machineId: string, children: (
             setIsLoading(true);
             for (const sector of sectors) {
                 const machineRef = doc(firestore, `sectors/${sector.id}/machines`, machineId);
-                const machineSnap = await import('firebase/firestore').then(m => m.getDoc(machineRef));
+                const machineSnap = await getDoc(machineRef);
                 if (machineSnap.exists() && isMounted) {
                     setFoundMachine({ id: machineSnap.id, ...machineSnap.data() } as Machine);
                     break;
@@ -85,7 +86,7 @@ function MachineLoader({ machineId, children }: { machineId: string, children: (
 }
 
 
-function MachineDetails({ machine, allInventory, machineAssignments, onAssignItem, onRemoveItem, onLogUsage, canEdit }: { machine: Machine, allInventory: InventoryItem[], machineAssignments: MachineAssignment[], onAssignItem: (itemId: string, machineId: string, sectorId: string, quantity: number) => void, onRemoveItem: (assignmentId: string) => void, onLogUsage: (itemId: string, quantity: number, machineId: string, sectorId: string) => void, canEdit: boolean }) {
+function MachineDetails({ machine, allInventory, machineAssignments, onAssignItem, onRemoveItem, onLogUsage, canEdit, canLogUsage }: { machine: Machine, allInventory: InventoryItem[], machineAssignments: MachineAssignment[], onAssignItem: (itemId: string, machineId: string, sectorId: string, quantity: number) => void, onRemoveItem: (assignmentId: string) => void, onLogUsage: (itemId: string, quantity: number, machineId: string, sectorId: string) => void, canEdit: boolean, canLogUsage: boolean }) {
     const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
     const [logUsageItem, setLogUsageItem] = useState<InventoryItem | null>(null);
     const firestore = useFirestore();
@@ -149,7 +150,7 @@ function MachineDetails({ machine, allInventory, machineAssignments, onAssignIte
                                     <TableHead>Artículo</TableHead>
                                     <TableHead className="text-right">Cantidad Asignada</TableHead>
                                     <TableHead className="text-right">Stock General Actual</TableHead>
-                                    {canEdit && <TableHead className="w-[120px]">Acciones</TableHead>}
+                                    <TableHead className="w-[120px]">Acciones</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -159,8 +160,8 @@ function MachineDetails({ machine, allInventory, machineAssignments, onAssignIte
                                             <TableCell className="font-medium">{item.itemName}</TableCell>
                                             <TableCell className="text-right font-semibold">{item.quantity}</TableCell>
                                             <TableCell className="text-right">{item.stock}</TableCell>
-                                            {canEdit && (
-                                                <TableCell className="flex justify-end gap-1">
+                                            <TableCell className="flex justify-end gap-1">
+                                                {canLogUsage && (
                                                     <Button 
                                                         variant="outline" 
                                                         size="sm" 
@@ -169,6 +170,8 @@ function MachineDetails({ machine, allInventory, machineAssignments, onAssignIte
                                                     >
                                                         Registrar Uso
                                                     </Button>
+                                                )}
+                                                {canEdit && (
                                                     <Button 
                                                         variant="ghost" 
                                                         size="icon" 
@@ -177,13 +180,13 @@ function MachineDetails({ machine, allInventory, machineAssignments, onAssignIte
                                                     >
                                                         <Trash2 className="h-4 w-4 text-destructive" />
                                                     </Button>
-                                                </TableCell>
-                                            )}
+                                                )}
+                                            </TableCell>
                                         </TableRow>
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={canEdit ? 4 : 3} className="h-24 text-center">
+                                        <TableCell colSpan={4} className="h-24 text-center">
                                             Aún no se han asignado artículos a esta máquina.
                                         </TableCell>
                                     </TableRow>
@@ -202,7 +205,7 @@ function MachineDetails({ machine, allInventory, machineAssignments, onAssignIte
                     onAssign={onAssignItem}
                 />
             )}
-             {logUsageItem && canEdit && (
+             {logUsageItem && canLogUsage && (
                 <UpdateStockDialog
                     key={`log-${logUsageItem.id}`}
                     item={logUsageItem}

@@ -149,10 +149,6 @@ function AppContent() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEditor, setIsEditor] = useState(false);
 
-  // Get user role from /roles/{uid} collection
-  const roleRef = useMemoFirebase(() => (firestore && user) ? doc(firestore, 'roles', user.uid) : null, [firestore, user]);
-  const { data: userRoleDoc, isLoading: isRoleLoading } = useDoc<UserRole>(roleRef);
-
   useEffect(() => {
     const fetchUserClaims = async () => {
       if (user) {
@@ -175,6 +171,7 @@ function AppContent() {
     fetchUserClaims();
   }, [user]);
 
+  const canLogUsage = !!user; // Any authenticated user can log usage
 
   // DATA FETCHING
   const allUsersRef = useMemoFirebase(() => (firestore && isAdmin ? collection(firestore, 'users') : null), [firestore, isAdmin]);
@@ -356,7 +353,7 @@ function AppContent() {
     machineId: string,
     sectorId: string
   ) => {
-    if (!isEditor || !inventory || !firestore) {
+    if (!canLogUsage || !inventory || !firestore) {
       toast({ title: "Acceso denegado", variant: "destructive" });
       return;
     }
@@ -384,23 +381,32 @@ function AppContent() {
       machineId,
     };
 
-    const batch = writeBatch(firestore);
-    batch.set(itemRef, { stock: updatedStock }, { merge: true });
-    batch.set(doc(collection(firestore, 'usageLog')), newLog);
+    try {
+        const batch = writeBatch(firestore);
+        batch.update(itemRef, { stock: updatedStock });
+        batch.set(doc(collection(firestore, 'usageLog')), newLog);
 
-    await batch.commit();
+        await batch.commit();
 
-    toast({
-      title: 'Uso Registrado',
-      description: `Se han usado ${quantity} unidades de ${item.name}.`,
-    });
+        toast({
+            title: 'Uso Registrado',
+            description: `Se han usado ${quantity} unidades de ${item.name}.`,
+        });
 
-    if (updatedStock <= item.threshold && item.stock > item.threshold) {
-      toast({
-        variant: 'destructive',
-        title: 'Alerta de Stock Bajo',
-        description: `El artículo ${item.name} ha entrado en nivel de stock bajo.`,
-      });
+        if (updatedStock <= item.threshold && item.stock > item.threshold) {
+            toast({
+                variant: 'destructive',
+                title: 'Alerta de Stock Bajo',
+                description: `El artículo ${item.name} ha entrado en nivel de stock bajo.`,
+            });
+        }
+    } catch (error) {
+        console.error("Error logging usage: ", error);
+        toast({
+            variant: "destructive",
+            title: "Error al registrar uso",
+            description: "No se pudo actualizar el stock o el historial."
+        })
     }
   };
 
@@ -470,7 +476,6 @@ function AppContent() {
   const renderContent = () => {
     const isDataLoading =
       isUserLoading ||
-      isRoleLoading ||
       isInventoryLoading ||
       isAssignmentsLoading ||
       isUsageLogLoading ||
@@ -541,6 +546,7 @@ function AppContent() {
           onRemoveItem={handleRemoveItemFromMachine}
           onLogUsage={handleLogUsage}
           canEdit={isEditor}
+          canLogUsage={canLogUsage}
         />
       );
     }
