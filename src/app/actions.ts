@@ -4,7 +4,6 @@
 import { getReorderRecommendations, ReorderRecommendationsInput } from "@/ai/flows/reorder-recommendations";
 import { doc, getDoc, writeBatch } from 'firebase/firestore';
 import { getAdminApp } from "@/firebase/server-app";
-import { getFirestore as getClientFirestore } from 'firebase/firestore';
 import { getSdks } from "@/firebase/client-provider";
 import { UserProfile } from "@/lib/types";
 import { getAuth as getAdminAuth } from 'firebase-admin/auth';
@@ -24,7 +23,7 @@ export async function getAIReorderRecommendations(input: ReorderRecommendationsI
 /**
  * Ensures a user profile exists and sets up their initial role in Firestore if needed.
  * This is the primary source of truth for user and role creation.
- * It also sets the custom claim for the admin user.
+ * It now uses the Admin SDK for all writes to ensure permissions.
  */
 export async function setupUserAndRole(uid: string, email: string | null): Promise<{ success: boolean; error?: string }> {
     if (!uid || !email) {
@@ -32,14 +31,17 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
     }
 
     try {
-        // This action can be called from client components, so we use the client SDKs here for writes.
-        const { firestore } = getSdks();
-        const batch = writeBatch(firestore);
+        const adminApp = getAdminApp();
+        const adminAuth = getAdminAuth(adminApp);
+        const adminFirestore = getAdminFirestore(adminApp);
+
+        // Batch writes using the Admin SDK
+        const batch = adminFirestore.batch();
 
         // 1. Ensure User Profile Document Exists
-        const userRef = doc(firestore, 'users', uid);
-        const userDoc = await getDoc(userRef);
-        if (!userDoc.exists()) {
+        const userRef = adminFirestore.collection('users').doc(uid);
+        const userDoc = await userRef.get();
+        if (!userDoc.exists) {
             const userData: Omit<UserProfile, 'id' | 'uid'> = {
                 email: email,
                 displayName: email.split('@')[0] || 'Usuario',
@@ -48,18 +50,16 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
         }
 
         // 2. Set Role in Firestore '/roles' collection
-        const roleRef = doc(firestore, 'roles', uid);
-        const roleDoc = await getDoc(roleRef);
+        const roleRef = adminFirestore.collection('roles').doc(uid);
+        const roleDoc = await roleRef.get();
 
-        if (!roleDoc.exists()) {
+        if (!roleDoc.exists) {
             if (email === 'maurofbordon@gmail.com') {
                 console.log(`>>>>>> Matched admin user: ${email}. Setting role in Firestore. <<<<<<`);
                 batch.set(roleRef, { role: 'admin' });
                 
                 // Set custom claim for admin user using Admin SDK
                 try {
-                    const adminApp = getAdminApp();
-                    const adminAuth = getAdminAuth(adminApp);
                     await adminAuth.setCustomUserClaims(uid, { admin: true });
                     console.log(`>>>>>> Successfully set custom claim 'admin:true' for UID: ${uid} <<<<<<`);
                 } catch (claimError) {
