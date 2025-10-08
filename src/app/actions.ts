@@ -118,5 +118,3 @@ export async function updateUserRole(uid: string, role: 'admin' | 'editor'): Pro
         return { success: false, error: error.message || 'An unexpected error occurred while updating the user role.' };
     }
 }
-
-

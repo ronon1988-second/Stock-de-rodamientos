@@ -84,9 +84,10 @@ export default function UserManagementView({ users }: UserManagementViewProps) {
         if (roleDoc && (roleDoc.role === 'admin' || roleDoc.role === 'editor')) {
             setSelectedRole(roleDoc.role);
         } else {
+            // Default to 'editor' when the user has role 'user' or no role.
             setSelectedRole('editor');
         }
-    }, [roleDoc]);
+    }, [roleDoc, selectedUser]);
 
 
     const handleSelectUser = (user: UserProfile) => {
@@ -99,8 +100,8 @@ export default function UserManagementView({ users }: UserManagementViewProps) {
             return;
         }
         
-        if (selectedRole === (roleDoc?.role || null)) {
-             toast({ title: 'Sin cambios', description: `El usuario ya tiene el rol de ${selectedRole}.` });
+        if (selectedRole === (roleDoc?.role || 'user')) {
+             toast({ title: 'Sin cambios', description: `El usuario ya tiene el rol seleccionado.` });
             return;
         }
 
@@ -138,7 +139,7 @@ export default function UserManagementView({ users }: UserManagementViewProps) {
                             <UserX className="h-4 w-4" />
                             <AlertTitle>No se pudieron cargar los usuarios</AlertTitle>
                             <AlertDescription>
-                                No tienes permisos para listar todos los usuarios. Por favor, contacta al administrador para ajustar las reglas de seguridad de Firestore si necesitas esta funcionalidad.
+                                No tienes los permisos necesarios para listar todos los usuarios. Por favor, contacta al administrador para ajustar las reglas de seguridad de Firestore si necesitas esta funcionalidad.
                             </AlertDescription>
                         </Alert>
                     ) : (
@@ -209,7 +210,7 @@ export default function UserManagementView({ users }: UserManagementViewProps) {
                          </div>
                         <Button 
                             onClick={handleUpdateRole} 
-                            disabled={isSubmitting || isRoleLoading || !selectedUser || selectedRole === (roleDoc?.role || null)} 
+                            disabled={isSubmitting || isRoleLoading || !selectedUser || selectedRole === (roleDoc?.role || 'user')} 
                             className="w-full"
                         >
                             {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
@@ -223,4 +224,3 @@ export default function UserManagementView({ users }: UserManagementViewProps) {
         </div>
     );
 }
-    
