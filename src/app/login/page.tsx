@@ -33,19 +33,14 @@ export default function LoginPage() {
   const router = useRouter();
 
   const handleAuthenticationSuccess = async (user: User) => {
-    // For the master user, this logic runs on every login to ensure roles/claims are set.
-    if (user.email === 'maurofbordon@gmail.com' || user.uid === 'zqq7dO1wxbgZVcIXSNwRU6DEXqw1') {
-        await setupUserAndRole(user.uid, user.email || "");
-        // Crucially, force a refresh of the ID token to get the latest custom claims from the server.
-        console.log("Login: Forcing token refresh for admin user...");
-        await getIdToken(user, true);
-        console.log("Login: Token refresh complete.");
-    } else {
-        // For regular users, only set up their initial document on first creation.
-        const isNewUser = user.metadata.creationTime === user.metadata.lastSignInTime;
-        if (isNewUser) {
-           await setupUserAndRole(user.uid, user.email || "");
-        }
+    // Run the server action to ensure roles/claims are set, especially for admin.
+    await setupUserAndRole(user.uid, user.email || "");
+
+    // For the master user, we explicitly refresh the token to get the new claims.
+    if (user.email === 'maurofbordon@gmail.com') {
+      console.log("Admin user detected, forcing token refresh...");
+      await getIdToken(user, true);
+      console.log("Token refresh complete.");
     }
     
     toast({
@@ -54,6 +49,7 @@ export default function LoginPage() {
     });
 
     // Use window.location to force a full page reload to ensure new claims are loaded client-side.
+    // This is the most reliable way.
     window.location.href = '/';
   }
 
@@ -70,13 +66,14 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
+      let userCredential;
       if (action === "signup") {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        await handleAuthenticationSuccess(userCredential.user);
+        userCredential = await createUserWithEmailAndPassword(auth, email, password);
       } else { // login
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        await handleAuthenticationSuccess(userCredential.user);
+        userCredential = await signInWithEmailAndPassword(auth, email, password);
       }
+      await handleAuthenticationSuccess(userCredential.user);
+
     } catch (error: any) {
       let description = "Ha ocurrido un error inesperado.";
       let title = `Error de ${action === 'login' ? 'inicio de sesión' : 'registro'}`;
@@ -90,23 +87,6 @@ export default function LoginPage() {
         case 'auth/email-already-in-use':
           description = "Este email ya está registrado. Intente iniciar sesión.";
           title = "Error de Registro";
-          // Attempt to sign in if email already exists during signup
-          if (action === 'signup') {
-            try {
-              toast({
-                  title: "El email ya existe",
-                  description: "Intentando iniciar sesión en su lugar...",
-              });
-              const userCredential = await signInWithEmailAndPassword(auth, email, password);
-              await handleAuthenticationSuccess(userCredential.user);
-            } catch (signInError: any) {
-               toast({
-                variant: "destructive",
-                title: "Error de inicio de sesión",
-                description: "El email o la contraseña son incorrectos.",
-              });
-            }
-          }
           break;
         case 'auth/weak-password':
           description = "La contraseña debe tener al menos 6 caracteres.";
@@ -115,13 +95,11 @@ export default function LoginPage() {
             console.error("Auth Error:", error.code, error.message);
       }
       
-      if (error.code !== 'auth/email-already-in-use') {
-         toast({
-            variant: "destructive",
-            title: title,
-            description: description,
-          });
-      }
+      toast({
+        variant: "destructive",
+        title: title,
+        description: description,
+      });
 
     } finally {
         setIsLoading(false);

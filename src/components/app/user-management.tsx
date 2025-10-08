@@ -26,27 +26,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 
 type UserManagementViewProps = {
     users: UserProfile[];
-    isTesting: boolean;
 }
 
-const mockUsers: UserProfile[] = [
-    { id: '1', uid: 'mock-uid-1', email: 'editor-test@example.com', displayName: 'Usuario Editor' },
-    { id: '2', uid: 'mock-uid-2', email: 'viewer-test@example.com', displayName: 'Usuario Normal' },
-];
-
-export default function UserManagementView({ users, isTesting }: UserManagementViewProps) {
+export default function UserManagementView({ users }: UserManagementViewProps) {
     const { toast } = useToast();
     const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
     const [role, setRole] = useState<'admin' | 'editor'>('editor');
     const [isLoading, setIsLoading] = useState(false);
 
-    const displayUsers = isTesting ? mockUsers : users;
-
-    useEffect(() => {
-        if(isTesting) {
-            setSelectedUser(null);
-        }
-    }, [isTesting])
 
     const handleSelectUser = (user: UserProfile) => {
         setSelectedUser(user);
@@ -62,15 +49,6 @@ export default function UserManagementView({ users, isTesting }: UserManagementV
                 description: 'Por favor, seleccione un usuario de la lista.',
                 variant: 'destructive',
             });
-            return;
-        }
-
-        if(isTesting) {
-             toast({
-                title: 'Rol Asignado (Simulación)',
-                description: `El usuario ${selectedUser.email} ahora tiene el rol de ${role}.`,
-            });
-            setSelectedUser(null);
             return;
         }
         
@@ -113,7 +91,7 @@ export default function UserManagementView({ users, isTesting }: UserManagementV
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {displayUsers.map(user => (
+                            {users.map(user => (
                                 <TableRow 
                                     key={user.uid} 
                                     className={selectedUser?.uid === user.uid ? 'bg-muted' : ''}
@@ -175,7 +153,3 @@ export default function UserManagementView({ users, isTesting }: UserManagementV
         </div>
     );
 }
-
-    
-
-    

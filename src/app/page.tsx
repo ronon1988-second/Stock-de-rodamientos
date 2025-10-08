@@ -168,7 +168,6 @@ function useAllMachines(sectors: Sector[]) {
 
 
 function AppContent() {
-  const isTestingAdmin = false;
   const [view, setView] = useState<View>('dashboard');
   const { toast } = useToast();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -181,15 +180,10 @@ function AppContent() {
   const [isEditor, setIsEditor] = useState(false);
   
   useEffect(() => {
-    if (isTestingAdmin) {
-      setIsAdmin(true);
-      setIsEditor(true);
-      return;
-    }
     const fetchUserClaims = async () => {
       if (user) {
         try {
-          // Force a refresh of the token to get the latest claims from the server.
+          // It's often better to force a refresh on login, but we can do it here too for robustness.
           const idTokenResult = await user.getIdTokenResult(true); 
           const claims = idTokenResult.claims;
           console.log("[ADMIN CHECK] User claims:", claims);
@@ -207,13 +201,13 @@ function AppContent() {
     };
 
     fetchUserClaims();
-  }, [user, isTestingAdmin]);
+  }, [user]);
   
   const canLogUsage = !!user;
   const canEdit = isEditor || isAdmin;
 
   // DATA FETCHING
-  const allUsersRef = useMemoFirebase(() => (firestore && isAdmin && !isTestingAdmin ? collection(firestore, 'users') : null), [firestore, isAdmin, isTestingAdmin]);
+  const allUsersRef = useMemoFirebase(() => (firestore && isAdmin ? collection(firestore, 'users') : null), [firestore, isAdmin]);
   const { data: allUsers, isLoading: isAllUsersLoading } = useCollection<UserProfile>(allUsersRef);
 
   const inventoryRef = useMemoFirebase(() => firestore ? collection(firestore, 'inventory') : null, [firestore]);
@@ -225,7 +219,7 @@ function AppContent() {
   const assignmentsRef = useMemoFirebase(() => firestore ? collection(firestore, 'machineAssignments') : null, [firestore]);
   const { data: machineAssignments, isLoading: isAssignmentsLoading } = useCollection<MachineAssignment>(assignmentsRef);
   
-  const usageLogRef = useMemoFirebase(() => (firestore && !isTestingAdmin ? collection(firestore, 'usageLog') : null), [firestore, isTestingAdmin]);
+  const usageLogRef = useMemoFirebase(() => (firestore ? collection(firestore, 'usageLog') : null), [firestore]);
   const { data: usageLog, isLoading: isUsageLogLoading } = useCollection<UsageLog>(usageLogRef);
 
   const { machinesBySector, isLoading: isLoadingMachines } = useAllMachines(sectors || []);
@@ -310,14 +304,13 @@ function AppContent() {
   
   const sortedUsageLog = useMemo(
     () => {
-        if(isTestingAdmin) return [];
         return usageLog
             ? [...usageLog].sort(
                 (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
               )
             : []
     },
-    [usageLog, isTestingAdmin]
+    [usageLog]
   );
 
   const handleAddItem = (newItem: Omit<InventoryItem, 'id'>) => {
@@ -583,7 +576,7 @@ function AppContent() {
     }
     if (view === 'users' && isAdmin) {
         const usersToManage = allUsers?.filter(u => user && u.uid !== user.uid) || [];
-        return <UserManagementView isTesting={isTestingAdmin} users={usersToManage} />;
+        return <UserManagementView users={usersToManage} />;
     }
     if (view.startsWith('machine-')) {
       const machineId = view.replace('machine-', '');
