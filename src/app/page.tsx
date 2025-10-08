@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -93,11 +92,9 @@ type View =
 function MachineList({
   sector,
   onNavClick,
-  isMobile,
 }: {
   sector: Sector;
   onNavClick: (view: View) => void;
-  isMobile: boolean;
 }) {
   const firestore = useFirestore();
   const machinesQuery = useMemoFirebase(
@@ -127,7 +124,7 @@ function MachineList({
               e.preventDefault();
               onNavClick(`machine-${machine.id}`);
             }}
-            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary pl-4 ${isMobile ? 'text-lg' : 'text-sm'}`}
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary pl-4 text-sm"
           >
             <HardDrive className="h-4 w-4" />
             {machine.name}
@@ -136,6 +133,7 @@ function MachineList({
     </div>
   );
 }
+
 
 function useAllMachines(sectors: Sector[] | null) {
   const firestore = useFirestore();
@@ -639,80 +637,75 @@ function AppContent() {
     </Card>
   );
 
-  const MainNav = ({ isMobile = false }) => (
-    <nav
-      className={`grid items-start ${
-        isMobile ? 'gap-2 text-lg' : 'px-2 text-sm'
-      } font-medium ${isMobile ? '' : 'lg:px-4'}`}
-    >
-      <NavLink
-        targetView="dashboard"
-        icon={<Home className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
-        label="Panel de control"
-        onClick={handleNavClick}
-      />
-      {canEdit && (
-        <NavLink
-            targetView="organization"
-            icon={<Settings className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
-            label="Organización"
-            onClick={handleNavClick}
-        />
-      )}
-       {isAdmin && (
-        <NavLink
-            targetView="users"
-            icon={<Users className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
-            label="Gestionar Usuarios"
-            onClick={handleNavClick}
-        />
-      )}
+  const MainNav = ({ isMobile = false }) => {
+    const navItemClass = isMobile ? 'text-lg' : 'text-sm';
+    const iconClass = isMobile ? 'h-5 w-5' : 'h-4 w-4';
 
-      <Accordion type="single" collapsible className="w-full">
-        <AccordionItem value="item-1" className="border-b-0">
-            <AccordionTrigger className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${isMobile ? 'text-lg' : 'text-sm'} hover:no-underline`}>
-                <div className="flex items-center gap-3">
-                    <Package className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />
-                    <span>Sectores</span>
-                </div>
-            </AccordionTrigger>
-            <AccordionContent>
+    return (
+        <nav className={`grid items-start ${isMobile ? 'gap-2' : 'px-2 lg:px-4'} font-medium`}>
+            <NavLink
+                targetView="dashboard"
+                icon={<Home className={iconClass} />}
+                label="Panel de control"
+                onClick={handleNavClick}
+            />
+            
+            {canEdit && (
+                <NavLink
+                    targetView="organization"
+                    icon={<Settings className={iconClass} />}
+                    label="Organización"
+                    onClick={handleNavClick}
+                />
+            )}
+            {isAdmin && (
+                <NavLink
+                    targetView="users"
+                    icon={<Users className={iconClass} />}
+                    label="Gestionar Usuarios"
+                    onClick={handleNavClick}
+                />
+            )}
+
+            <div className="my-2 border-t -mx-4"></div>
+
+            <h3 className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Sectores</h3>
+            
             {(sortedSectors || []).map(sector => (
                 <Accordion key={sector.id} type="single" collapsible className="w-full">
-                <AccordionItem value={sector.id} className="border-b-0">
-                    <AccordionTrigger className="text-left hover:no-underline">
-                    <div className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary">
-                        <span className="font-semibold">{sector.name}</span>
-                    </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                    <MachineList sector={sector} onNavClick={handleNavClick} isMobile={isMobile} />
-                    </AccordionContent>
-                </AccordionItem>
+                    <AccordionItem value={sector.id} className="border-b-0">
+                        <AccordionTrigger className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${navItemClass} hover:no-underline`}>
+                            <div className="flex items-center gap-3">
+                                <Package className={iconClass} />
+                                <span>{sector.name}</span>
+                            </div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                           <MachineList sector={sector} onNavClick={handleNavClick} />
+                        </AccordionContent>
+                    </AccordionItem>
                 </Accordion>
             ))}
-            </AccordionContent>
-        </AccordionItem>
-        </Accordion>
 
+            <div className="my-2 border-t -mx-4"></div>
+            
+            <NavLink
+                targetView="to-buy"
+                icon={<ShoppingCart className={iconClass} />}
+                label="Artículos a Comprar"
+                badgeCount={lowStockCount}
+                onClick={handleNavClick}
+            />
+            <NavLink
+                targetView="reports"
+                icon={<LineChart className={iconClass} />}
+                label="Reportes"
+                onClick={handleNavClick}
+            />
+        </nav>
+    );
+};
 
-      <div className="mt-auto border-t pt-4">
-        <NavLink
-          targetView="to-buy"
-          icon={<ShoppingCart className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
-          label="Artículos a Comprar"
-          badgeCount={lowStockCount}
-          onClick={handleNavClick}
-        />
-        <NavLink
-          targetView="reports"
-          icon={<LineChart className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
-          label="Reportes"
-          onClick={handleNavClick}
-        />
-      </div>
-    </nav>
-  );
 
   if (isUserLoading) {
       return (
@@ -828,5 +821,3 @@ export default function Page() {
 
   return <AppContent />;
 }
-
-    

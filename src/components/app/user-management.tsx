@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -40,7 +39,10 @@ export default function UserManagementView({ users, allRoles }: UserManagementVi
     const [isLoading, setIsLoading] = useState(false);
 
     const usersWithRoles: UserWithRole[] | null = React.useMemo(() => {
-        if (!users || !allRoles) return null; 
+        // If users is null (due to permission error), return null immediately.
+        if (!users) return null;
+        if (!allRoles) return users.map(user => ({...user, role: null}));
+        
         const rolesMap = new Map(allRoles.map(r => [r.id, r.role]));
         return users.map(user => ({
             ...user,
@@ -217,4 +219,3 @@ export default function UserManagementView({ users, allRoles }: UserManagementVi
         </div>
     );
 }
-
