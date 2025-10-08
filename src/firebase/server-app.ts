@@ -32,15 +32,15 @@ function createAdminApp(): App {
         projectId: serviceAccount.project_id,
       }, appName);
 
-    } catch (e) {
+    } catch (e: any) {
       console.error(
-        "Failed to parse Base64 encoded FIREBASE_SERVICE_ACCOUNT. Falling back to default credentials.",
-        e
+        "Failed to parse Base64 encoded FIREBASE_SERVICE_ACCOUNT. Error:", e.message,
+        "Falling back to default credentials."
       );
     }
   }
   
-  console.log("FIREBASE_SERVICE_ACCOUNT_BASE64 not set. Attempting to use Application Default Credentials.");
+  console.log("FIREBASE_SERVICE_ACCOUNT_BASE64 not set or failed to parse. Attempting to use Application Default Credentials.");
   return initializeApp({
     credential: applicationDefault(),
   }, appName);
