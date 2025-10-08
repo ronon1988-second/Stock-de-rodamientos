@@ -33,15 +33,22 @@ export default function LoginPage() {
 
   const handleAuthenticationSuccess = async (user: User) => {
     // Run the server action to ensure the user document and role document exist in Firestore.
-    await setupUserAndRole(user.uid, user.email || "");
+    const result = await setupUserAndRole(user.uid, user.email || "");
     
-    toast({
-        title: "Éxito de inicio de sesión",
-        description: "¡Bienvenido! Redirigiendo...",
-    });
-
-    // Use window.location to force a full page reload to ensure the app fetches the new role from Firestore.
-    window.location.href = '/';
+    if (result.success) {
+      toast({
+          title: "Éxito de inicio de sesión",
+          description: "¡Bienvenido! Redirigiendo...",
+      });
+      // Use window.location to force a full page reload to ensure the app fetches the new role from Firestore.
+      window.location.href = '/';
+    } else {
+        toast({
+            variant: "destructive",
+            title: "Error de configuración",
+            description: result.error || "No se pudo configurar el perfil del usuario."
+        })
+    }
   }
 
   const handleAuthAction = async (action: "login" | "signup") => {

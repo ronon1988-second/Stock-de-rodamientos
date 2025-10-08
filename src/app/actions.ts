@@ -41,10 +41,14 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
         // 1. Ensure User Profile Document Exists
         const userRef = adminFirestore.collection('users').doc(uid);
         const userDoc = await userRef.get();
+
+        // Use a default display name if the email part is empty
+        const displayName = email.split('@')[0] || `user_${uid.substring(0, 5)}`;
+        
         if (!userDoc.exists) {
             const userData: Omit<UserProfile, 'id' | 'uid'> = {
                 email: email,
-                displayName: email.split('@')[0] || 'Usuario',
+                displayName: displayName,
             };
             batch.set(userRef, userData);
         }
@@ -68,11 +72,13 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
                 }
 
             } else {
-                batch.set(roleRef, {}); // Creates an empty doc to signify a 'user' role without special perms
+                // Creates a doc with an empty role to signify a 'user' without special perms
+                batch.set(roleRef, { role: null }); 
             }
         }
         
         await batch.commit();
+        console.log(`Successfully set up user profile and role for ${email}`);
         return { success: true };
 
     } catch (error: any) {
@@ -112,3 +118,4 @@ export async function updateUserRole(uid: string, role: 'admin' | 'editor'): Pro
         return { success: false, error: error.message || 'An unexpected error occurred while updating the user role.' };
     }
 }
+

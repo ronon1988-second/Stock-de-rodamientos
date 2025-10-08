@@ -137,13 +137,13 @@ function MachineList({
   );
 }
 
-function useAllMachines(sectors: Sector[]) {
+function useAllMachines(sectors: Sector[] | null) {
   const firestore = useFirestore();
   const [machinesBySector, setMachinesBySector] = useState<MachinesBySector>({});
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!firestore || sectors.length === 0) {
+    if (!firestore || !sectors || sectors.length === 0) {
       setIsLoading(false);
       return;
     }
@@ -185,30 +185,20 @@ function AppContent() {
     const fetchAndSetUserRole = async () => {
       if (user && firestore) {
         const roleRef = doc(firestore, 'roles', user.uid);
-        const roleSnap = await getDoc(roleRef);
+        try {
+          const roleSnap = await getDoc(roleRef);
 
-        if (roleSnap.exists()) {
-          const roleData = roleSnap.data() as UserRole;
-          console.log("🟢 Rol ya asignado:", roleData.role);
-          setUserRole(roleData.role);
-        } else {
-          // Si el documento de rol NO existe...
-          if (user.email === 'maurofbordon@gmail.com') {
-            // ...y el usuario es el admin maestro, crearlo.
-            try {
-              await setDoc(roleRef, { role: 'admin' });
-              console.log("✅ Documento de rol de admin creado automáticamente.");
-              setUserRole('admin'); // Actualiza el estado local inmediatamente
-              window.location.reload(); // Recarga para asegurar consistencia
-            } catch (error) {
-              console.error("Error creando el documento de rol:", error);
-              setUserRole(null);
-            }
+          if (roleSnap.exists()) {
+            const roleData = roleSnap.data() as UserRole;
+            console.log("🟢 Rol de usuario obtenido:", roleData.role);
+            setUserRole(roleData.role);
           } else {
-            // ...y es otro usuario, no tiene rol asignado.
-            console.warn("❌ Usuario sin rol y no autorizado para crear uno.");
+            console.warn("🟡 Documento de rol no encontrado para el usuario. Asumiendo rol nulo/por defecto.");
             setUserRole(null);
           }
+        } catch (error) {
+           console.error("🔴 Error al obtener el documento de rol:", error);
+           setUserRole(null);
         }
       } else {
         setUserRole(null);
@@ -238,7 +228,7 @@ function AppContent() {
   const usageLogRef = useMemoFirebase(() => (firestore ? collection(firestore, 'usageLog') : null), [firestore]);
   const { data: usageLog, isLoading: isUsageLogLoading } = useCollection<UsageLog>(usageLogRef);
 
-  const { machinesBySector, isLoading: isLoadingMachines } = useAllMachines(sectors || []);
+  const { machinesBySector, isLoading: isLoadingMachines } = useAllMachines(sectors);
 
 
   useEffect(() => {
@@ -838,5 +828,3 @@ export default function Page() {
 
   return <AppContent />;
 }
-
-    

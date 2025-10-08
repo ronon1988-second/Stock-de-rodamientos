@@ -15,31 +15,39 @@ const appName = 'firebase-admin-app';
  */
 function createAdminApp(): App {
   const serviceAccountBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
+  console.log("SERVER-APP: Checking for FIREBASE_SERVICE_ACCOUNT_BASE64...");
 
   if (serviceAccountBase64) {
     try {
+      console.log("SERVER-APP: Found variable, attempting to decode and initialize...");
       // Decode the Base64 string to a JSON string
       const decodedServiceAccount = Buffer.from(serviceAccountBase64, 'base64').toString('utf8');
       const serviceAccount = JSON.parse(decodedServiceAccount);
       
       // Explicitly pass the projectId from the service account to avoid environment detection issues.
-      return initializeApp({
+      const app = initializeApp({
         credential: cert(serviceAccount),
         projectId: serviceAccount.project_id,
       }, appName);
 
+      console.log("SERVER-APP: Successfully initialized with Base64 credentials.");
+      return app;
+
     } catch (e: any) {
       console.error(
-        "Failed to parse Base64 encoded FIREBASE_SERVICE_ACCOUNT. Error:", e.message,
+        "SERVER-APP: FATAL - Failed to parse Base64 encoded FIREBASE_SERVICE_ACCOUNT. The variable might be malformed. Error:", e.message,
         "Falling back to default credentials."
       );
     }
   }
   
-  console.log("FIREBASE_SERVICE_ACCOUNT_BASE64 not set or failed to parse. Attempting to use Application Default Credentials.");
-  return initializeApp({
+  console.log("SERVER-APP: FIREBASE_SERVICE_ACCOUNT_BASE64 not set or failed to parse. Attempting to use Application Default Credentials.");
+  const app = initializeApp({
     credential: applicationDefault(),
   }, appName);
+  
+  console.log("SERVER-APP: Initialized with Application Default Credentials.");
+  return app;
 }
 
 /**
