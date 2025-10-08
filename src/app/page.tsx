@@ -717,18 +717,18 @@ function AppContent() {
           </div>
           <div className="mt-auto p-4">
             <Card>
-              <CardHeader className="p-2 pt-0 md:p-4">
-                <CardTitle>¿Necesitas Ayuda?</CardTitle>
-                <CardDescription>
-                  Contacta a soporte si tienes problemas o quieres nuevas
-                  funcionalidades.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-2 pt-0 md:p-4 md:pt-0">
-                <Button size="sm" className="w-full">
-                  Contactar a Soporte
-                </Button>
-              </CardContent>
+                <CardHeader className="p-4">
+                    <CardTitle className="text-base">¿Necesitas Ayuda?</CardTitle>
+                    <CardDescription className="text-xs">
+                    Contacta a soporte si tienes problemas o quieres nuevas
+                    funcionalidades.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="p-4 pt-0">
+                    <Button size="sm" className="w-full text-xs" asChild>
+                    <a href="mailto:soporte@balance-rodamientos.com">Contactar a Soporte</a>
+                    </Button>
+                </CardContent>
             </Card>
           </div>
         </div>
