@@ -583,8 +583,7 @@ function AppContent() {
       );
     }
     if (view === 'users' && isAdmin) {
-        const usersToManage = allUsers?.filter(u => user && u.uid !== user.uid) || [];
-        return <UserManagementView users={usersToManage} />;
+        return <UserManagementView users={allUsers} />;
     }
     if (view.startsWith('machine-')) {
       const machineId = view.replace('machine-', '');

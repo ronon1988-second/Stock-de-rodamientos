@@ -33,10 +33,11 @@ type UserManagementViewProps = {
 
 const UserRow = ({ user, onSelect, isSelected }: { user: UserProfile, onSelect: (user: UserProfile) => void, isSelected: boolean }) => {
     const firestore = useFirestore();
+    // Memoize the doc reference to avoid re-renders
     const roleRef = useMemoFirebase(() => firestore ? doc(firestore, 'roles', user.id) : null, [firestore, user.id]);
     const { data: roleDoc, isLoading } = useDoc<UserRole>(roleRef);
 
-    const getRoleDisplayName = (role: UserRole['role'] | null) => {
+    const getRoleDisplayName = (role: UserRole['role'] | undefined | null) => {
         if (role === 'admin') return 'Administrador';
         if (role === 'editor') return 'Editor';
         return 'Usuario';
@@ -54,7 +55,7 @@ const UserRow = ({ user, onSelect, isSelected }: { user: UserProfile, onSelect: 
                 <span className="flex items-center gap-2">
                     {isLoading ? <Loader2 size={16} className="animate-spin" /> : 
                      (!roleDoc?.role && <ShieldQuestion size={16} className="text-muted-foreground" />)}
-                    {isLoading ? 'Cargando...' : getRoleDisplayName(roleDoc?.role || null)}
+                    {isLoading ? 'Cargando...' : getRoleDisplayName(roleDoc?.role)}
                 </span>
             </TableCell>
         </TableRow>
@@ -73,11 +74,14 @@ export default function UserManagementView({ users }: UserManagementViewProps) {
     const { data: roleDoc, isLoading: isRoleLoading } = useDoc<UserRole>(roleRef);
 
     useEffect(() => {
-        if(roleDoc && (roleDoc.role === 'admin' || roleDoc.role === 'editor')) {
+        // This effect now correctly sets the role when a user is selected
+        // or resets it when the selection is cleared.
+        if (roleDoc && (roleDoc.role === 'admin' || roleDoc.role === 'editor')) {
             setSelectedRole(roleDoc.role);
         } else if (!selectedUser) {
             setSelectedRole('editor');
         } else {
+             // Default for users with no special role or if doc is loading
              setSelectedRole('editor');
         }
     }, [roleDoc, selectedUser]);
@@ -92,21 +96,20 @@ export default function UserManagementView({ users }: UserManagementViewProps) {
             toast({ title: 'Selección inválida', description: 'Por favor, seleccione un usuario.', variant: 'destructive' });
             return;
         }
-
-        const roleToSet = selectedRole;
         
-        if (roleToSet === (roleDoc?.role || null)) {
-             toast({ title: 'Sin cambios', description: `El usuario ya tiene este rol.` });
+        // Prevent action if the role is already set
+        if (selectedRole === (roleDoc?.role || null)) {
+             toast({ title: 'Sin cambios', description: `El usuario ya tiene el rol de ${selectedRole}.` });
             return;
         }
 
         setIsSubmitting(true);
-        const result = await updateUserRole(selectedUser.uid, roleToSet);
+        const result = await updateUserRole(selectedUser.uid, selectedRole);
 
         if (result.success) {
             toast({
                 title: 'Rol Actualizado',
-                description: `El usuario ${selectedUser.email} ahora es ${roleToSet}.`,
+                description: `El usuario ${selectedUser.email} ahora es ${selectedRole}.`,
             });
         } else {
             toast({
@@ -118,7 +121,6 @@ export default function UserManagementView({ users }: UserManagementViewProps) {
         setIsSubmitting(false);
     };
 
-    const roleToSet = selectedRole;
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -204,12 +206,12 @@ export default function UserManagementView({ users }: UserManagementViewProps) {
                          </div>
                         <Button 
                             onClick={handleUpdateRole} 
-                            disabled={isSubmitting || isRoleLoading || !selectedUser || roleToSet === (roleDoc?.role || null)} 
+                            disabled={isSubmitting || isRoleLoading || !selectedUser || selectedRole === (roleDoc?.role || null)} 
                             className="w-full"
                         >
                             {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                             {(roleDoc && selectedRole === roleDoc.role) ? <CheckCircle className="mr-2 h-4 w-4" /> : null}
-                            {isSubmitting ? 'Asignando...' : (roleDoc && selectedRole === roleDoc.role) ? 'Rol Asignado' : 'Confirmar Cambio'}
+                            {isSubmitting ? 'Asignando...' : (roleDoc && selectedRole === roleDoc.role) ? 'Rol ya asignado' : 'Confirmar Cambio'}
                         </Button>
                     </div>
                     )}
