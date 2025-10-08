@@ -22,6 +22,7 @@ import {
   query,
   getDocs,
   getDoc,
+  setDoc,
 } from 'firebase/firestore';
 
 import { Badge } from '@/components/ui/badge';
@@ -180,25 +181,40 @@ function AppContent() {
   
   const [userRole, setUserRole] = useState<UserRole['role'] | null>(null);
   
-  // NEW: Read role directly from Firestore
   useEffect(() => {
-    const fetchUserRole = async () => {
+    const fetchAndSetUserRole = async () => {
       if (user && firestore) {
         const roleRef = doc(firestore, 'roles', user.uid);
         const roleSnap = await getDoc(roleRef);
+
         if (roleSnap.exists()) {
           const roleData = roleSnap.data() as UserRole;
-          console.log("🎖️ Rol detectado desde Firestore:", roleData.role);
+          console.log("🟢 Rol ya asignado:", roleData.role);
           setUserRole(roleData.role);
         } else {
-          console.log("No se encontró un documento de rol para el usuario.");
-          setUserRole(null); // Explicitly set to null or 'user' if you have a default
+          // Si el documento de rol NO existe...
+          if (user.email === 'maurofbordon@gmail.com') {
+            // ...y el usuario es el admin maestro, crearlo.
+            try {
+              await setDoc(roleRef, { role: 'admin' });
+              console.log("✅ Documento de rol de admin creado automáticamente.");
+              setUserRole('admin'); // Actualiza el estado local inmediatamente
+              window.location.reload(); // Recarga para asegurar consistencia
+            } catch (error) {
+              console.error("Error creando el documento de rol:", error);
+              setUserRole(null);
+            }
+          } else {
+            // ...y es otro usuario, no tiene rol asignado.
+            console.warn("❌ Usuario sin rol y no autorizado para crear uno.");
+            setUserRole(null);
+          }
         }
       } else {
         setUserRole(null);
       }
     };
-    fetchUserRole();
+    fetchAndSetUserRole();
   }, [user, firestore]);
 
   const isAdmin = userRole === 'admin';
@@ -514,7 +530,7 @@ function AppContent() {
   const renderContent = () => {
     const isDataLoading =
       isUserLoading ||
-      !userRole === undefined || // Still fetching role
+      userRole === undefined || // Still fetching/determining role
       isInventoryLoading ||
       isAssignmentsLoading ||
       isUsageLogLoading ||
@@ -800,3 +816,5 @@ export default function Page() {
 
   return <AppContent />;
 }
+
+    

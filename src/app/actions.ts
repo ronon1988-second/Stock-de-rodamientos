@@ -17,8 +17,8 @@ export async function getAIReorderRecommendations(input: ReorderRecommendationsI
 }
 
 /**
- * Ensures a user profile exists and sets up their role in Firestore.
- * This is the definitive source of truth for role creation.
+ * Ensures a user profile exists and sets up their initial role in Firestore if needed.
+ * This is the primary source of truth for user and role creation.
  */
 export async function setupUserAndRole(uid: string, email: string | null): Promise<{ success: boolean; error?: string }> {
     if (!uid || !email) {
@@ -40,19 +40,18 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
             batch.set(userRef, userData);
         }
 
-        // 2. Set Role in Firestore '/roles' collection
+        // 2. Set Role in Firestore '/roles' collection ONLY if it doesn't exist
         const roleRef = doc(firestore, 'roles', uid);
         const roleDoc = await getDoc(roleRef);
 
-        // Assign admin role only to the master user.
-        if (email === 'maurofbordon@gmail.com') {
-             console.log(`>>>>>> Matched admin user: ${email}. Setting role in Firestore. <<<<<<`);
-             batch.set(roleRef, { role: 'admin' }, { merge: true });
-        } else {
-            // For any other user, if they don't have a role document, create an empty one.
-            // This prevents errors if we try to read it later.
-            if (!roleDoc.exists()) {
-                batch.set(roleRef, {}); 
+        if (!roleDoc.exists()) {
+            if (email === 'maurofbordon@gmail.com') {
+                console.log(`>>>>>> Matched admin user: ${email}. Setting role in Firestore. <<<<<<`);
+                batch.set(roleRef, { role: 'admin' });
+            } else {
+                // For other users, we can decide to set a default role or leave it empty.
+                // Leaving it empty means they won't have a role until an admin assigns one.
+                batch.set(roleRef, {}); // Creates an empty doc to signify a 'user' role without special perms
             }
         }
         
@@ -67,8 +66,7 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
 
 
 /**
- * Updates a user's role ONLY in the Firestore 'roles' collection.
- * This is the definitive function for role management.
+ * Updates a user's role in the Firestore 'roles' collection.
  */
 export async function updateUserRole(uid: string, role: 'admin' | 'editor'): Promise<{ success: boolean; error?: string }> {
     if (!uid || !role) {
@@ -79,7 +77,7 @@ export async function updateUserRole(uid: string, role: 'admin' | 'editor'): Pro
         const { firestore } = getSdks();
         const roleRef = doc(firestore, 'roles', uid);
         
-        // Set the role in the Firestore 'roles' collection
+        // Overwrite the role in the Firestore 'roles' collection
         await setDoc(roleRef, { role: role });
         
         console.log(`Successfully assigned role '${role}' to UID: ${uid} in Firestore.`);
@@ -89,3 +87,5 @@ export async function updateUserRole(uid: string, role: 'admin' | 'editor'): Pro
         return { success: false, error: error.message || 'An unexpected error occurred while updating the user role.' };
     }
 }
+
+    
