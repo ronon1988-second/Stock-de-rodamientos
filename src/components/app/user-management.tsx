@@ -55,7 +55,7 @@ const UserRow = ({ user, onSelect, isSelected }: { user: UserProfile, onSelect: 
 
     return (
         <TableRow 
-            key={user.uid} 
+            key={user.id} 
             onClick={() => onSelect(user)}
             className={isSelected ? 'bg-muted' : 'cursor-pointer'}
         >
@@ -87,13 +87,19 @@ export default function UserManagementView({ users: initialUsers }: UserManageme
         if (roleDoc) {
             setSelectedRole(roleDoc.role as 'admin' | 'editor' | 'user');
         } else if (selectedUser) {
+            // This is a new user, default to 'user' but check if a role doc exists
+            // It might just not have a role yet if it's a very new user.
             setSelectedRole('user');
         }
     }, [roleDoc, selectedUser]);
 
     useEffect(() => {
         setUsers(initialUsers);
-    }, [initialUsers]);
+        // Deselect user if they've been removed from the list from above
+        if (selectedUser && !initialUsers?.find(u => u.id === selectedUser.id)) {
+            setSelectedUser(null);
+        }
+    }, [initialUsers, selectedUser]);
 
 
     const handleSelectUser = (user: UserProfile) => {
@@ -106,13 +112,14 @@ export default function UserManagementView({ users: initialUsers }: UserManageme
             return;
         }
         
-        if (selectedRole === (roleDoc?.role || 'user')) {
-             toast({ title: 'Sin cambios', description: `El usuario ya tiene el rol seleccionado.` });
+        const currentRole = roleDoc?.role || 'user';
+        if (selectedRole === currentRole) {
+             toast({ title: 'Sin cambios', description: `El usuario ya tiene el rol de '${selectedRole}'.` });
             return;
         }
 
         setIsSubmitting(true);
-        const result = await updateUserRole(selectedUser.uid, selectedRole);
+        const result = await updateUserRole(selectedUser.id, selectedRole);
 
         if (result.success) {
             toast({
@@ -133,15 +140,15 @@ export default function UserManagementView({ users: initialUsers }: UserManageme
         if (!selectedUser) return;
         
         setIsSubmitting(true);
-        const result = await deleteUser(selectedUser.uid);
+        const result = await deleteUser(selectedUser.id);
         
         if (result.success) {
             toast({
                 title: "Usuario Eliminado",
                 description: `El usuario ${selectedUser.email} ha sido eliminado.`,
             });
-            // Remove user from local state to update UI instantly
-            setUsers(currentUsers => currentUsers?.filter(u => u.id !== selectedUser.id) || null);
+            // User is already removed from the list by the parent component's re-render
+            // but we'll clear selection here.
             setSelectedUser(null);
         } else {
             toast({
