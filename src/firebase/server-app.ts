@@ -22,9 +22,13 @@ function createAdminApp(): App {
       const decodedServiceAccount = Buffer.from(serviceAccountBase64, 'base64').toString('utf8');
       const serviceAccount = JSON.parse(decodedServiceAccount);
       console.log("Initializing Firebase Admin SDK with Base64 service account...");
+      
+      // Explicitly pass the projectId from the service account to avoid environment detection issues.
       return initializeApp({
         credential: cert(serviceAccount),
+        projectId: serviceAccount.project_id,
       }, appName);
+
     } catch (e) {
       console.error(
         "Failed to parse Base64 encoded FIREBASE_SERVICE_ACCOUNT. Falling back to default credentials.",
