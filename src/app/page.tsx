@@ -166,7 +166,7 @@ function useAllMachines(sectors: Sector[]) {
 
 
 function AppContent() {
-  const isTestingAdmin = true;
+  const isTestingAdmin = false;
   const [view, setView] = useState<View>('dashboard');
   const { toast } = useToast();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -206,6 +206,7 @@ function AppContent() {
   }, [user, isTestingAdmin]);
   
   const canLogUsage = !!user;
+  const canEdit = isEditor || isAdmin;
 
   // DATA FETCHING
   const allUsersRef = useMemoFirebase(() => (firestore && isAdmin && !isTestingAdmin ? collection(firestore, 'users') : null), [firestore, isAdmin, isTestingAdmin]);
@@ -316,7 +317,7 @@ function AppContent() {
   );
 
   const handleAddItem = (newItem: Omit<InventoryItem, 'id'>) => {
-    if (!isEditor || !firestore) {
+    if (!canEdit || !firestore) {
         toast({ title: "Acceso denegado", variant: "destructive" });
         return;
     }
@@ -328,7 +329,7 @@ function AppContent() {
   };
 
   const handleUpdateItem = (updatedItem: InventoryItem) => {
-    if (!isEditor || !firestore) {
+    if (!canEdit || !firestore) {
         toast({ title: "Acceso denegado", variant: "destructive" });
         return;
     }
@@ -347,7 +348,7 @@ function AppContent() {
     sectorId: string,
     quantity: number
   ) => {
-    if (!isEditor || !inventory || !firestore) {
+    if (!canEdit || !inventory || !firestore) {
         toast({ title: "Acceso denegado", variant: "destructive" });
         return;
     }
@@ -372,7 +373,7 @@ function AppContent() {
 
 
   const handleRemoveItemFromMachine = (assignmentId: string) => {
-    if (!isEditor || !firestore) {
+    if (!canEdit || !firestore) {
         toast({ title: "Acceso denegado", variant: "destructive" });
         return;
     }
@@ -534,7 +535,7 @@ function AppContent() {
           inventory={sortedInventory}
           onUpdateItem={handleUpdateItem}
           onAddItem={handleAddItem}
-          canEdit={isEditor}
+          canEdit={canEdit}
         />
       );
     }
@@ -556,7 +557,7 @@ function AppContent() {
       );
     }
     if (view === 'organization') {
-      if (!isEditor) { 
+      if (!canEdit) { 
         setView('dashboard');
         toast({ title: "Acceso denegado", description: "Necesita permisos de editor o administrador.", variant: "destructive"})
         return null;
@@ -589,7 +590,7 @@ function AppContent() {
           onAssignItem={handleAssignItemToMachine}
           onRemoveItem={handleRemoveItemFromMachine}
           onLogUsage={handleLogUsage}
-          canEdit={isEditor}
+          canEdit={canEdit}
           canLogUsage={canLogUsage}
         />
       );
@@ -600,7 +601,7 @@ function AppContent() {
             inventory={sortedInventory}
             onUpdateItem={handleUpdateItem}
             onAddItem={handleAddItem}
-            canEdit={isEditor}
+            canEdit={canEdit}
         />
     );
   };
@@ -622,7 +623,7 @@ function AppContent() {
         label="Panel de control"
         onClick={handleNavClick}
       />
-      {isEditor && (
+      {canEdit && (
         <NavLink
             targetView="organization"
             icon={<Settings className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
@@ -799,6 +800,8 @@ export default function Page() {
 
   return <AppContent />;
 }
+
+    
 
     
 
