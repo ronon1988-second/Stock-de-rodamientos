@@ -20,41 +20,51 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { updateUserRole } from '@/app/actions';
-import type { UserProfile } from '@/lib/types';
-import { Loader2 } from 'lucide-react';
+import type { UserProfile, UserRole } from '@/lib/types';
+import { Loader2, ShieldQuestion } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 
 type UserManagementViewProps = {
     users: UserProfile[];
+    allRoles: UserRole[];
 }
 
-export default function UserManagementView({ users }: UserManagementViewProps) {
+type UserWithRole = UserProfile & { role: UserRole['role'] | null };
+
+export default function UserManagementView({ users, allRoles }: UserManagementViewProps) {
     const { toast } = useToast();
-    const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
-    const [role, setRole] = useState<'admin' | 'editor'>('editor');
+    const [selectedUser, setSelectedUser] = useState<UserWithRole | null>(null);
+    const [role, setRole] = useState<UserRole['role'] | 'user'>('user');
     const [isLoading, setIsLoading] = useState(false);
 
+    const usersWithRoles: UserWithRole[] = React.useMemo(() => {
+        const rolesMap = new Map(allRoles.map(r => [r.id, r.role]));
+        return users.map(user => ({
+            ...user,
+            role: rolesMap.get(user.uid) || null,
+        }));
+    }, [users, allRoles]);
 
-    const handleSelectUser = (user: UserProfile) => {
+    const handleSelectUser = (user: UserWithRole) => {
         setSelectedUser(user);
-        // We need to fetch the role for this user to pre-fill the select
-        // For now, let's just default to 'editor'. A more complete solution would fetch this.
-        setRole('editor');
-    }
+        setRole(user.role || 'user');
+    };
 
     const handleUpdateRole = async () => {
-        if (!selectedUser) {
+        if (!selectedUser || !role || role === 'user') {
             toast({
-                title: 'Usuario no seleccionado',
-                description: 'Por favor, seleccione un usuario de la lista.',
+                title: 'No se puede asignar el rol',
+                description: 'Por favor, seleccione un usuario y un rol válido (Editor o Administrador).',
                 variant: 'destructive',
             });
             return;
         }
+
+        const validRole = role as 'admin' | 'editor';
         
         setIsLoading(true);
 
-        const result = await updateUserRole(selectedUser.uid, role);
+        const result = await updateUserRole(selectedUser.uid, validRole);
 
         if (result.success) {
             toast({
@@ -62,6 +72,7 @@ export default function UserManagementView({ users }: UserManagementViewProps) {
                 description: `El usuario ${selectedUser.email} ahora tiene el rol de ${role}.`,
             });
             setSelectedUser(null);
+            // The parent component will receive the updated roles via the useCollection hook
         } else {
             toast({
                 title: 'Error al Actualizar Rol',
@@ -71,6 +82,12 @@ export default function UserManagementView({ users }: UserManagementViewProps) {
         }
         setIsLoading(false);
     };
+
+    const getRoleDisplayName = (role: UserRole['role'] | null) => {
+        if (role === 'admin') return 'Administrador';
+        if (role === 'editor') return 'Editor';
+        return 'Usuario';
+    }
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -87,17 +104,26 @@ export default function UserManagementView({ users }: UserManagementViewProps) {
                             <TableRow>
                                 <TableHead>Email</TableHead>
                                 <TableHead>Nombre</TableHead>
+                                <TableHead>Rol Actual</TableHead>
                                 <TableHead>Acción</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {users.map(user => (
+                            {usersWithRoles.map(user => (
                                 <TableRow 
                                     key={user.uid} 
                                     className={selectedUser?.uid === user.uid ? 'bg-muted' : ''}
                                 >
                                     <TableCell>{user.email}</TableCell>
                                     <TableCell>{user.displayName}</TableCell>
+                                    <TableCell>
+                                        {user.role ? getRoleDisplayName(user.role) : (
+                                            <span className="flex items-center gap-2 text-muted-foreground">
+                                                <ShieldQuestion size={16} />
+                                                Usuario
+                                            </span>
+                                        )}
+                                    </TableCell>
                                     <TableCell>
                                         <Button variant="outline" size="sm" onClick={() => handleSelectUser(user)}>
                                             Gestionar
@@ -119,29 +145,37 @@ export default function UserManagementView({ users }: UserManagementViewProps) {
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-4">
-                        <Input
-                            placeholder="Email del usuario"
-                            value={selectedUser?.email || ''}
-                            readOnly
-                            disabled
-                            className="flex-grow"
-                        />
-                        <Select 
-                            onValueChange={(value: 'admin' | 'editor') => setRole(value)} 
-                            value={role} 
-                            disabled={isLoading || !selectedUser}
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Seleccione un rol" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="editor">Editor</SelectItem>
-                                <SelectItem value="admin">Administrador</SelectItem>
-                            </SelectContent>
-                        </Select>
+                         <div className="space-y-1">
+                            <label className="text-sm font-medium text-muted-foreground">Usuario</label>
+                            <Input
+                                placeholder="Email del usuario"
+                                value={selectedUser?.email || ''}
+                                readOnly
+                                disabled
+                                className="flex-grow"
+                            />
+                        </div>
+
+                         <div className="space-y-1">
+                            <label className="text-sm font-medium">Nuevo Rol</label>
+                             <Select 
+                                onValueChange={(value: 'admin' | 'editor' | 'user') => setRole(value)} 
+                                value={role} 
+                                disabled={isLoading || !selectedUser}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Seleccione un rol" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="user">Usuario</SelectItem>
+                                    <SelectItem value="editor">Editor</SelectItem>
+                                    <SelectItem value="admin">Administrador</SelectItem>
+                                </SelectContent>
+                            </Select>
+                         </div>
                         <Button 
                             onClick={handleUpdateRole} 
-                            disabled={isLoading || !selectedUser} 
+                            disabled={isLoading || !selectedUser || role === 'user'} 
                             className="w-full"
                         >
                             {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}

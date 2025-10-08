@@ -215,6 +215,10 @@ function AppContent() {
   // DATA FETCHING
   const allUsersRef = useMemoFirebase(() => (firestore && isAdmin ? collection(firestore, 'users') : null), [firestore, isAdmin]);
   const { data: allUsers, isLoading: isAllUsersLoading } = useCollection<UserProfile>(allUsersRef);
+  
+  const allRolesRef = useMemoFirebase(() => (firestore && isAdmin ? collection(firestore, 'roles') : null), [firestore, isAdmin]);
+  const { data: allRoles, isLoading: isAllRolesLoading } = useCollection<UserRole>(allRolesRef);
+
 
   const inventoryRef = useMemoFirebase(() => firestore ? collection(firestore, 'inventory') : null, [firestore]);
   const { data: inventory, isLoading: isInventoryLoading } = useCollection<InventoryItem>(inventoryRef);
@@ -527,7 +531,7 @@ function AppContent() {
       isSectorsLoading ||
       isLoadingMachines ||
       isSeeding ||
-      (isAdmin && isAllUsersLoading);
+      (isAdmin && (isAllUsersLoading || isAllRolesLoading));
 
     if (isDataLoading) {
       return <Skeleton className="h-full w-full" />;
@@ -582,7 +586,7 @@ function AppContent() {
     }
     if (view === 'users' && isAdmin) {
         const usersToManage = allUsers?.filter(u => user && u.uid !== user.uid) || [];
-        return <UserManagementView users={usersToManage} />;
+        return <UserManagementView users={usersToManage} allRoles={allRoles || []} />;
     }
     if (view.startsWith('machine-')) {
       const machineId = view.replace('machine-', '');

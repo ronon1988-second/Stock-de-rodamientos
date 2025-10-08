@@ -49,7 +49,7 @@ export type MachineAssignment = {
 
 // Represents a user profile stored in Firestore.
 export type UserProfile = {
-  id: string;
+  id: string; // The doc id, which is the user's UID
   uid: string;
   email: string;
   displayName: string;
@@ -57,6 +57,6 @@ export type UserProfile = {
 
 // Represents a user's role stored in Firestore.
 export type UserRole = {
-    // The id of this doc is the user's UID
+    id: string; // The id of this doc is the user's UID
     role: 'admin' | 'editor';
 }
