@@ -72,8 +72,8 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
                 }
 
             } else {
-                // Creates a doc with an empty role to signify a 'user' without special perms
-                batch.set(roleRef, { role: null }); 
+                // Creates a doc with a 'user' role by default
+                batch.set(roleRef, { role: 'user' }); 
             }
         }
         
@@ -118,4 +118,5 @@ export async function updateUserRole(uid: string, role: 'admin' | 'editor'): Pro
         return { success: false, error: error.message || 'An unexpected error occurred while updating the user role.' };
     }
 }
+
 

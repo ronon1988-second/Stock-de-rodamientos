@@ -21,7 +21,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { updateUserRole } from '@/app/actions';
 import type { UserProfile, UserRole } from '@/lib/types';
-import { Loader2, ShieldQuestion, UserX, CheckCircle } from 'lucide-react';
+import { Loader2, ShieldQuestion, UserX, CheckCircle, Shield } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
@@ -33,14 +33,21 @@ type UserManagementViewProps = {
 
 const UserRow = ({ user, onSelect, isSelected }: { user: UserProfile, onSelect: (user: UserProfile) => void, isSelected: boolean }) => {
     const firestore = useFirestore();
-    // Memoize the doc reference to avoid re-renders
     const roleRef = useMemoFirebase(() => firestore ? doc(firestore, 'roles', user.id) : null, [firestore, user.id]);
     const { data: roleDoc, isLoading } = useDoc<UserRole>(roleRef);
 
     const getRoleDisplayName = (role: UserRole['role'] | undefined | null) => {
         if (role === 'admin') return 'Administrador';
         if (role === 'editor') return 'Editor';
-        return 'Usuario';
+        if (role === 'user') return 'Usuario';
+        return 'Sin rol';
+    }
+    
+    const getRoleIcon = (role: UserRole['role'] | undefined | null) => {
+        if (isLoading) return <Loader2 size={16} className="animate-spin" />;
+        if (role === 'admin') return <ShieldQuestion size={16} className="text-primary" />;
+        if (role === 'editor') return <Shield size={16} className="text-amber-600" />;
+        return <ShieldQuestion size={16} className="text-muted-foreground" />;
     }
 
     return (
@@ -53,8 +60,7 @@ const UserRow = ({ user, onSelect, isSelected }: { user: UserProfile, onSelect: 
             <TableCell>{user.email}</TableCell>
             <TableCell>
                 <span className="flex items-center gap-2">
-                    {isLoading ? <Loader2 size={16} className="animate-spin" /> : 
-                     (!roleDoc?.role && <ShieldQuestion size={16} className="text-muted-foreground" />)}
+                    {getRoleIcon(roleDoc?.role)}
                     {isLoading ? 'Cargando...' : getRoleDisplayName(roleDoc?.role)}
                 </span>
             </TableCell>
@@ -74,17 +80,12 @@ export default function UserManagementView({ users }: UserManagementViewProps) {
     const { data: roleDoc, isLoading: isRoleLoading } = useDoc<UserRole>(roleRef);
 
     useEffect(() => {
-        // This effect now correctly sets the role when a user is selected
-        // or resets it when the selection is cleared.
         if (roleDoc && (roleDoc.role === 'admin' || roleDoc.role === 'editor')) {
             setSelectedRole(roleDoc.role);
-        } else if (!selectedUser) {
-            setSelectedRole('editor');
         } else {
-             // Default for users with no special role or if doc is loading
-             setSelectedRole('editor');
+            setSelectedRole('editor');
         }
-    }, [roleDoc, selectedUser]);
+    }, [roleDoc]);
 
 
     const handleSelectUser = (user: UserProfile) => {
@@ -97,7 +98,6 @@ export default function UserManagementView({ users }: UserManagementViewProps) {
             return;
         }
         
-        // Prevent action if the role is already set
         if (selectedRole === (roleDoc?.role || null)) {
              toast({ title: 'Sin cambios', description: `El usuario ya tiene el rol de ${selectedRole}.` });
             return;
@@ -141,25 +141,27 @@ export default function UserManagementView({ users }: UserManagementViewProps) {
                             </AlertDescription>
                         </Alert>
                     ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Nombre</TableHead>
-                                    <TableHead>Email</TableHead>
-                                    <TableHead>Rol Actual</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {users.map(user => (
-                                    <UserRow 
-                                        key={user.id}
-                                        user={user}
-                                        onSelect={handleSelectUser}
-                                        isSelected={selectedUser?.id === user.id}
-                                    />
-                                ))}
-                            </TableBody>
-                        </Table>
+                        <div className="border rounded-md max-h-[60vh] overflow-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Nombre</TableHead>
+                                        <TableHead>Email</TableHead>
+                                        <TableHead>Rol Actual</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {users.map(user => (
+                                        <UserRow 
+                                            key={user.id}
+                                            user={user}
+                                            onSelect={handleSelectUser}
+                                            isSelected={selectedUser?.id === user.id}
+                                        />
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
                     )}
                 </CardContent>
             </Card>
@@ -189,7 +191,7 @@ export default function UserManagementView({ users }: UserManagementViewProps) {
                         </div>
 
                          <div className="space-y-1">
-                            <label className="text-sm font-medium">Asignar Rol</label>
+                            <label className="text-sm font-medium">Asignar Nuevo Rol</label>
                              <Select 
                                 onValueChange={(value: 'admin' | 'editor') => setSelectedRole(value)} 
                                 value={selectedRole} 
