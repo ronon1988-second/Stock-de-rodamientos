@@ -166,6 +166,7 @@ function useAllMachines(sectors: Sector[]) {
 
 
 function AppContent() {
+  const isTestingAdmin = true;
   const [view, setView] = useState<View>('dashboard');
   const { toast } = useToast();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -178,6 +179,11 @@ function AppContent() {
   const [isEditor, setIsEditor] = useState(false);
 
   useEffect(() => {
+    if (isTestingAdmin) {
+      setIsAdmin(true);
+      setIsEditor(true);
+      return;
+    }
     const fetchUserClaims = async () => {
       if (user) {
         try {
@@ -197,12 +203,12 @@ function AppContent() {
     };
 
     fetchUserClaims();
-  }, [user]);
+  }, [user, isTestingAdmin]);
   
   const canLogUsage = !!user;
 
   // DATA FETCHING
-  const allUsersRef = useMemoFirebase(() => (firestore && isAdmin ? collection(firestore, 'users') : null), [firestore, isAdmin]);
+  const allUsersRef = useMemoFirebase(() => (firestore && isAdmin && !isTestingAdmin ? collection(firestore, 'users') : null), [firestore, isAdmin, isTestingAdmin]);
   const { data: allUsers, isLoading: isAllUsersLoading } = useCollection<UserProfile>(allUsersRef);
 
   const inventoryRef = useMemoFirebase(() => firestore ? collection(firestore, 'inventory') : null, [firestore]);
@@ -214,7 +220,7 @@ function AppContent() {
   const assignmentsRef = useMemoFirebase(() => firestore ? collection(firestore, 'machineAssignments') : null, [firestore]);
   const { data: machineAssignments, isLoading: isAssignmentsLoading } = useCollection<MachineAssignment>(assignmentsRef);
   
-  const usageLogRef = useMemoFirebase(() => (firestore ? collection(firestore, 'usageLog') : null), [firestore]);
+  const usageLogRef = useMemoFirebase(() => (firestore && !isTestingAdmin ? collection(firestore, 'usageLog') : null), [firestore, isTestingAdmin]);
   const { data: usageLog, isLoading: isUsageLogLoading } = useCollection<UsageLog>(usageLogRef);
 
   const { machinesBySector, isLoading: isLoadingMachines } = useAllMachines(sectors || []);
@@ -298,12 +304,15 @@ function AppContent() {
   );
   
   const sortedUsageLog = useMemo(
-    () => usageLog
+    () => {
+        if(isTestingAdmin) return [];
+        return usageLog
             ? [...usageLog].sort(
                 (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
               )
-            : [],
-    [usageLog]
+            : []
+    },
+    [usageLog, isTestingAdmin]
   );
 
   const handleAddItem = (newItem: Omit<InventoryItem, 'id'>) => {
@@ -566,7 +575,7 @@ function AppContent() {
         }
 
         const usersToManage = allUsers?.filter(u => user && u.uid !== user.uid) || [];
-        return <UserManagementView users={usersToManage} />;
+        return <UserManagementView isTesting={isTestingAdmin} users={usersToManage} />;
     }
     if (view.startsWith('machine-')) {
       const machineId = view.replace('machine-', '');
@@ -790,5 +799,7 @@ export default function Page() {
 
   return <AppContent />;
 }
+
+    
 
     
