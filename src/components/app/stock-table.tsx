@@ -111,10 +111,10 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, canEdit
   };
 
   const exportAllToCSV = () => {
-    let csvContent = "data:text/csv;charset=utf-8,Artículo,Stock Actual,Umbral de Seguridad\n";
+    let csvContent = "data:text/csv;charset=utf-8,Artículo;Stock Actual;Umbral de Seguridad\n";
     
     inventory.sort((a,b) => a.name.localeCompare(b.name)).forEach(item => {
-        csvContent += `${item.name},${item.stock},${item.threshold}\n`;
+        csvContent += `${item.name};${item.stock};${item.threshold}\n`;
     });
 
     const encodedUri = encodeURI(csvContent);

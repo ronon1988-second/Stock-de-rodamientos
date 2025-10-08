@@ -164,13 +164,13 @@ export default function ToBuyView({ inventory, machineAssignments }: ToBuyViewPr
   }
   
   const exportToCSV = () => {
-    let csvContent = "data:text/csv;charset=utf-8,Artículo,Stock Actual,Total Requerido en Máquinas,Stock de Seguridad,Cantidad a Comprar (Calculado),Cantidad a Comprar (IA)\n";
+    let csvContent = "data:text/csv;charset=utf-8,Artículo;Stock Actual;Total Requerido en Máquinas;Stock de Seguridad;Cantidad a Comprar (Calculado);Cantidad a Comprar (IA)\n";
     
     for (const items of groupedItemsToReorder.values()) {
         items.forEach(itemInfo => {
             const { item, totalRequired, toBuy } = itemInfo;
             const aiQty = getAIRecommendationFor(item.name) ?? "";
-            csvContent += `${item.name},${item.stock},${totalRequired},${item.threshold},${toBuy},${aiQty}\n`;
+            csvContent += `${item.name};${item.stock};${totalRequired};${item.threshold};${toBuy};${aiQty}\n`;
         });
     }
 
