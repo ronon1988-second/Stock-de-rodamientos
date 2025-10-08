@@ -672,19 +672,13 @@ function AppContent() {
             <h3 className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Sectores</h3>
             
             {(sortedSectors || []).map(sector => (
-                <Accordion key={sector.id} type="single" collapsible className="w-full">
-                    <AccordionItem value={sector.id} className="border-b-0">
-                        <AccordionTrigger className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${navItemClass} hover:no-underline`}>
-                            <div className="flex items-center gap-3">
-                                <Package className={iconClass} />
-                                <span>{sector.name}</span>
-                            </div>
-                        </AccordionTrigger>
-                        <AccordionContent>
-                           <MachineList sector={sector} onNavClick={handleNavClick} />
-                        </AccordionContent>
-                    </AccordionItem>
-                </Accordion>
+              <div key={sector.id}>
+                <div className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground font-semibold">
+                  <Package className={iconClass} />
+                  <span>{sector.name}</span>
+                </div>
+                <MachineList sector={sector} onNavClick={handleNavClick} />
+              </div>
             ))}
 
             <div className="my-2 border-t -mx-4"></div>
@@ -821,3 +815,5 @@ export default function Page() {
 
   return <AppContent />;
 }
+
+    
