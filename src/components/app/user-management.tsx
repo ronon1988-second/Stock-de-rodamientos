@@ -41,8 +41,7 @@ const UserRow = ({ user, onSelect, isSelected }: { user: UserProfile, onSelect: 
     const getRoleDisplayName = (role: UserRole['role'] | 'user' | undefined | null) => {
         if (role === 'admin') return 'Administrador';
         if (role === 'editor') return 'Editor';
-        if (role === 'user') return 'Usuario';
-        return 'Sin rol';
+        return 'Usuario';
     }
     
     const getRoleIcon = (role: UserRole['role'] | 'user' | undefined | null) => {
@@ -87,15 +86,12 @@ export default function UserManagementView({ users: initialUsers }: UserManageme
         if (roleDoc) {
             setSelectedRole(roleDoc.role as 'admin' | 'editor' | 'user');
         } else if (selectedUser) {
-            // This is a new user, default to 'user' but check if a role doc exists
-            // It might just not have a role yet if it's a very new user.
             setSelectedRole('user');
         }
     }, [roleDoc, selectedUser]);
 
     useEffect(() => {
         setUsers(initialUsers);
-        // Deselect user if they've been removed from the list from above
         if (selectedUser && !initialUsers?.find(u => u.id === selectedUser.id)) {
             setSelectedUser(null);
         }
@@ -147,8 +143,6 @@ export default function UserManagementView({ users: initialUsers }: UserManageme
                 title: "Usuario Eliminado",
                 description: `El usuario ${selectedUser.email} ha sido eliminado.`,
             });
-            // User is already removed from the list by the parent component's re-render
-            // but we'll clear selection here.
             setSelectedUser(null);
         } else {
             toast({
