@@ -146,9 +146,6 @@ function AppContent() {
   const firestore = useFirestore();
   const [isSeeding, setIsSeeding] = useState(false);
   
-  // Temporary flag to test admin features
-  const isTestingAdmin = true;
-
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEditor, setIsEditor] = useState(false);
 
@@ -158,11 +155,6 @@ function AppContent() {
 
   useEffect(() => {
     const fetchUserClaims = async () => {
-      if (isTestingAdmin) {
-        setIsAdmin(true);
-        setIsEditor(true);
-        return;
-      }
       if (user) {
         try {
           const idTokenResult = await user.getIdTokenResult(true); // Force refresh
@@ -181,17 +173,12 @@ function AppContent() {
     };
 
     fetchUserClaims();
-  }, [user, isTestingAdmin]);
+  }, [user]);
 
 
   // DATA FETCHING
-  const allUsersRef = useMemoFirebase(() => (firestore && isAdmin && !isTestingAdmin ? collection(firestore, 'users') : null), [firestore, isAdmin, isTestingAdmin]);
-  const { data: allUsersData, isLoading: isAllUsersLoading } = useCollection<UserProfile>(allUsersRef);
-  
-  const allUsers = useMemo(() => {
-    if (isTestingAdmin) return []; // Don't fetch users in test mode
-    return allUsersData?.filter(u => user && u.uid !== user.uid);
-  }, [allUsersData, user, isTestingAdmin]);
+  const allUsersRef = useMemoFirebase(() => (firestore && isAdmin ? collection(firestore, 'users') : null), [firestore, isAdmin]);
+  const { data: allUsers, isLoading: isAllUsersLoading } = useCollection<UserProfile>(allUsersRef);
 
   const inventoryRef = useMemoFirebase(() => firestore ? collection(firestore, 'inventory') : null, [firestore]);
   const { data: inventory, isLoading: isInventoryLoading } = useCollection<InventoryItem>(inventoryRef);
@@ -202,17 +189,12 @@ function AppContent() {
   const assignmentsRef = useMemoFirebase(() => firestore ? collection(firestore, 'machineAssignments') : null, [firestore]);
   const { data: machineAssignments, isLoading: isAssignmentsLoading } = useCollection<MachineAssignment>(assignmentsRef);
   
-  const usageLogRef = useMemoFirebase(() => (firestore && !isTestingAdmin ? collection(firestore, 'usageLog') : null), [firestore, isTestingAdmin]);
-  const { data: usageLogData, isLoading: isUsageLogLoading } = useCollection<UsageLog>(usageLogRef);
+  const usageLogRef = useMemoFirebase(() => (firestore ? collection(firestore, 'usageLog') : null), [firestore]);
+  const { data: usageLog, isLoading: isUsageLogLoading } = useCollection<UsageLog>(usageLogRef);
 
-  const usageLog = useMemo(() => {
-      if (isTestingAdmin) return []; // Don't fetch usageLog in test mode
-      return usageLogData;
-  }, [usageLogData, isTestingAdmin]);
-    
   useEffect(() => {
     const seedData = async () => {
-        if (!firestore || (!user && !isTestingAdmin) || isInventoryLoading || isSectorsLoading || isSeeding || !isAdmin) return;
+        if (!firestore || !user || isInventoryLoading || isSectorsLoading || isSeeding || !isAdmin) return;
 
         const invQuery = query(collection(firestore, 'inventory'));
         const sectorsQuery = query(collection(firestore, 'sectors'));
@@ -267,7 +249,7 @@ function AppContent() {
     };
 
     seedData();
-  }, [firestore, user, toast, isSeeding, isInventoryLoading, isSectorsLoading, isAdmin, isTestingAdmin]);
+  }, [firestore, user, toast, isSeeding, isInventoryLoading, isSectorsLoading, isAdmin]);
 
 
   const sortedInventory = useMemo(
@@ -487,14 +469,14 @@ function AppContent() {
 
   const renderContent = () => {
     const isDataLoading =
-      (isUserLoading && !isTestingAdmin) ||
+      isUserLoading ||
       isRoleLoading ||
       isInventoryLoading ||
       isAssignmentsLoading ||
       isUsageLogLoading ||
       isSectorsLoading ||
       isSeeding ||
-      (isAdmin && isAllUsersLoading && !isTestingAdmin);
+      (isAdmin && isAllUsersLoading);
 
     if (isDataLoading) {
       return <Skeleton className="h-full w-full" />;
@@ -544,7 +526,7 @@ function AppContent() {
             toast({ title: "Acceso denegado", description: "Necesita permisos de administrador.", variant: "destructive"})
             return null;
         }
-      return <UserManagementView users={allUsers || []} />;
+      return <UserManagementView users={allUsers?.filter(u => user && u.uid !== user.uid) || []} />;
     }
     if (view.startsWith('machine-')) {
       const machineId = view.replace('machine-', '');
@@ -645,8 +627,7 @@ function AppContent() {
     </nav>
   );
 
-  const isLoading = isUserLoading && !isTestingAdmin;
-  if (isLoading) {
+  if (isUserLoading) {
       return (
         <div className="flex items-center justify-center min-h-screen">
           <Skeleton className="h-[95vh] w-[95vw] rounded-lg" />
@@ -715,7 +696,7 @@ function AppContent() {
               {getViewTitle()}
             </h1>
           </div>
-          {!isTestingAdmin && user && (
+          {user && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="secondary" size="icon" className="rounded-full">
@@ -737,21 +718,6 @@ function AppContent() {
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          {isTestingAdmin && (
-             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="secondary" size="icon" className="rounded-full">
-                  <User className="h-5 w-4" />
-                  <span className="sr-only">Perfil de usuario</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>
-                  Modo Test (Admin)
-                </DropdownMenuLabel>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
         </header>
         <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-muted/40">
           {renderContent()}
@@ -764,15 +730,14 @@ function AppContent() {
 export default function Page() {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
-  const isTestingAdmin = true; // Match the flag in AppContent
 
   useEffect(() => {
-    if (!isUserLoading && !user && !isTestingAdmin) {
+    if (!isUserLoading && !user) {
       router.push('/login');
     }
-  }, [user, isUserLoading, router, isTestingAdmin]);
+  }, [user, isUserLoading, router]);
 
-  if ((isUserLoading || !user) && !isTestingAdmin) {
+  if (isUserLoading || !user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Skeleton className="h-[95vh] w-[95vw] rounded-lg" />
@@ -782,5 +747,3 @@ export default function Page() {
 
   return <AppContent />;
 }
-
-    
