@@ -2,10 +2,14 @@
 'use server';
 
 import { getReorderRecommendations, ReorderRecommendationsInput } from "@/ai/flows/reorder-recommendations";
-import { doc, setDoc, getDoc, writeBatch } from 'firebase/firestore';
-import { getAdminApp, getSdks } from "@/firebase";
+import { doc, getDoc, writeBatch } from 'firebase/firestore';
+import { getAdminApp } from "@/firebase/server-app";
+import { getFirestore as getClientFirestore } from 'firebase/firestore';
+import { getSdks } from "@/firebase/client-provider";
 import { UserProfile } from "@/lib/types";
 import { getAuth as getAdminAuth } from 'firebase-admin/auth';
+import { getFirestore as getAdminFirestore } from 'firebase-admin/firestore';
+
 
 export async function getAIReorderRecommendations(input: ReorderRecommendationsInput) {
     try {
@@ -28,6 +32,7 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
     }
 
     try {
+        // This action can be called from client components, so we use the client SDKs here for writes.
         const { firestore } = getSdks();
         const batch = writeBatch(firestore);
 
@@ -51,7 +56,7 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
                 console.log(`>>>>>> Matched admin user: ${email}. Setting role in Firestore. <<<<<<`);
                 batch.set(roleRef, { role: 'admin' });
                 
-                // Set custom claim for admin user
+                // Set custom claim for admin user using Admin SDK
                 try {
                     const adminApp = getAdminApp();
                     const adminAuth = getAdminAuth(adminApp);
@@ -59,7 +64,7 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
                     console.log(`>>>>>> Successfully set custom claim 'admin:true' for UID: ${uid} <<<<<<`);
                 } catch (claimError) {
                     console.error("Error setting custom claim:", claimError);
-                    // We don't fail the whole operation, but we log the error.
+                    // Don't fail the whole operation, but log the error.
                 }
 
             } else {
@@ -78,7 +83,8 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
 
 
 /**
- * Updates a user's role in the Firestore 'roles' collection and their custom claims.
+ * Updates a user's role in the Firestore 'roles' collection and their custom claims using the Admin SDK.
+ * This function is designed to be called from the server.
  */
 export async function updateUserRole(uid: string, role: 'admin' | 'editor'): Promise<{ success: boolean; error?: string }> {
     if (!uid || !role) {
@@ -86,18 +92,19 @@ export async function updateUserRole(uid: string, role: 'admin' | 'editor'): Pro
     }
 
     try {
-        // Step 1: Update the role in the Firestore 'roles' collection
-        const { firestore } = getSdks();
-        const roleRef = doc(firestore, 'roles', uid);
-        await setDoc(roleRef, { role: role }, { merge: true });
-        console.log(`Successfully assigned role '${role}' to UID: ${uid} in Firestore.`);
-
-        // Step 2: Update the custom claims in Firebase Auth
         const adminApp = getAdminApp();
         const adminAuth = getAdminAuth(adminApp);
-        const claims = role === 'admin' ? { admin: true } : { editor: true, admin: false };
+        const adminFirestore = getAdminFirestore(adminApp);
+        
+        // Step 1: Update the role in the Firestore 'roles' collection using Admin SDK
+        const roleRef = adminFirestore.collection('roles').doc(uid);
+        await roleRef.set({ role: role }, { merge: true });
+        console.log(`(Admin) Successfully assigned role '${role}' to UID: ${uid} in Firestore.`);
+
+        // Step 2: Update the custom claims in Firebase Auth using Admin SDK
+        const claims = role === 'admin' ? { admin: true, editor: false } : { editor: true, admin: false };
         await adminAuth.setCustomUserClaims(uid, claims);
-        console.log(`Successfully set custom claims for UID: ${uid}`, claims);
+        console.log(`(Admin) Successfully set custom claims for UID: ${uid}`, claims);
 
         return { success: true };
     } catch (error: any) {
