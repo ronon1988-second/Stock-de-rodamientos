@@ -627,6 +627,24 @@ function AppContent() {
     setIsSheetOpen(false);
   };
 
+  const SupportCard = () => (
+    <Card>
+      <CardHeader className="p-2 pt-4">
+        <CardTitle className="text-sm">¿Necesitas Ayuda?</CardTitle>
+        <CardDescription className="text-xs">
+          Contacta a soporte si tienes problemas.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="p-2">
+        <Button size="sm" className="w-full text-xs" asChild>
+          <a href="mailto:maurofbordon@gmail.com">
+            Contactar a Soporte
+          </a>
+        </Button>
+      </CardContent>
+    </Card>
+  );
+
   const MainNav = ({ isMobile = false }) => (
     <nav
       className={`grid items-start ${
@@ -716,21 +734,7 @@ function AppContent() {
             <MainNav />
           </div>
           <div className="mt-auto p-4">
-            <Card>
-              <CardHeader className="p-2 pt-4">
-                <CardTitle className="text-sm">¿Necesitas Ayuda?</CardTitle>
-                <CardDescription className="text-xs">
-                  Contacta a soporte si tienes problemas.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-2">
-                <Button size="sm" className="w-full text-xs" asChild>
-                  <a href="mailto:maurofbordon@gmail.com">
-                    Contactar a Soporte
-                  </a>
-                </Button>
-              </CardContent>
-            </Card>
+            <SupportCard />
           </div>
         </div>
       </div>
@@ -755,7 +759,12 @@ function AppContent() {
                 <Logo className="h-8 w-8 text-primary" />
                 <span>Balance de Rodamientos</span>
               </div>
-              <MainNav isMobile={true} />
+              <div className="flex-1 overflow-auto">
+                <MainNav isMobile={true} />
+              </div>
+              <div className="mt-auto p-4">
+                <SupportCard />
+              </div>
             </SheetContent>
           </Sheet>
 
@@ -817,7 +826,3 @@ export default function Page() {
 
   return <AppContent />;
 }
-
-    
-
-    
