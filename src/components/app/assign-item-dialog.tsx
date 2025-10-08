@@ -23,13 +23,23 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { InventoryItem, Sector, Machine } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { Check, ChevronsUpDown } from "lucide-react";
+import * as React from "react";
+
 
 type AssignItemDialogProps = {
   sector: Sector;
@@ -53,7 +63,7 @@ export default function AssignItemDialog({
   onClose,
   onAssign,
 }: AssignItemDialogProps) {
-
+  const [open, setOpen] = React.useState(false);
   const form = useForm<z.infer<typeof AssignItemSchema>>({
     resolver: zodResolver(AssignItemSchema),
     defaultValues: {
@@ -66,9 +76,14 @@ export default function AssignItemDialog({
     onClose();
   }
 
+  const inventoryOptions = allInventory.sort((a,b) => a.name.localeCompare(b.name)).map(item => ({
+      value: item.id,
+      label: `${item.name} (Stock: ${item.stock})`,
+  }));
+
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Asignar Artículo a {machine.name}</DialogTitle>
           <DialogDescription>
@@ -81,22 +96,59 @@ export default function AssignItemDialog({
               control={form.control}
               name="itemId"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="flex flex-col">
                   <FormLabel>Artículo</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccione un artículo" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {allInventory.sort((a,b) => a.name.localeCompare(b.name)).map(item => (
-                        <SelectItem key={item.id} value={item.id}>
-                          {item.name} (Stock: {item.stock})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={open} onOpenChange={setOpen}>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          className={cn(
+                            "w-full justify-between",
+                            !field.value && "text-muted-foreground"
+                          )}
+                        >
+                          {field.value
+                            ? inventoryOptions.find(
+                                (option) => option.value === field.value
+                              )?.label
+                            : "Seleccione un artículo"}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[430px] p-0">
+                      <Command>
+                        <CommandInput placeholder="Buscar artículo..." />
+                        <CommandList>
+                            <CommandEmpty>No se encontró ningún artículo.</CommandEmpty>
+                            <CommandGroup>
+                            {inventoryOptions.map((option) => (
+                                <CommandItem
+                                value={option.label}
+                                key={option.value}
+                                onSelect={() => {
+                                    form.setValue("itemId", option.value)
+                                    setOpen(false)
+                                }}
+                                >
+                                <Check
+                                    className={cn(
+                                    "mr-2 h-4 w-4",
+                                    option.value === field.value
+                                        ? "opacity-100"
+                                        : "opacity-0"
+                                    )}
+                                />
+                                {option.label}
+                                </CommandItem>
+                            ))}
+                            </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                   <FormMessage />
                 </FormItem>
               )}
