@@ -21,12 +21,14 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { updateUserRole } from '@/app/actions';
 import type { UserProfile, UserRole } from '@/lib/types';
-import { Loader2, ShieldQuestion } from 'lucide-react';
+import { Loader2, ShieldQuestion, UserX } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+
 
 type UserManagementViewProps = {
-    users: UserProfile[];
-    allRoles: UserRole[];
+    users: UserProfile[] | null; // Can be null if query fails
+    allRoles: UserRole[] | null; // Can be null
 }
 
 type UserWithRole = UserProfile & { role: UserRole['role'] | null };
@@ -37,7 +39,8 @@ export default function UserManagementView({ users, allRoles }: UserManagementVi
     const [role, setRole] = useState<UserRole['role'] | 'user'>('user');
     const [isLoading, setIsLoading] = useState(false);
 
-    const usersWithRoles: UserWithRole[] = React.useMemo(() => {
+    const usersWithRoles: UserWithRole[] | null = React.useMemo(() => {
+        if (!users || !allRoles) return null; // Guard clause
         const rolesMap = new Map(allRoles.map(r => [r.id, r.role]));
         return users.map(user => ({
             ...user,
@@ -61,7 +64,7 @@ export default function UserManagementView({ users, allRoles }: UserManagementVi
         }
 
         const roleToSet = role === 'user' ? null : role;
-        const currentRole = usersWithRoles.find(u => u.uid === selectedUser.uid)?.role || null;
+        const currentRole = usersWithRoles?.find(u => u.uid === selectedUser.uid)?.role || null;
         
         if (roleToSet === currentRole) {
              toast({
@@ -122,38 +125,48 @@ export default function UserManagementView({ users, allRoles }: UserManagementVi
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Email</TableHead>
-                                <TableHead>Nombre</TableHead>
-                                <TableHead>Rol Actual</TableHead>
-                                <TableHead>Acción</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {usersWithRoles.map(user => (
-                                <TableRow 
-                                    key={user.uid} 
-                                    className={selectedUser?.uid === user.uid ? 'bg-muted' : ''}
-                                >
-                                    <TableCell>{user.email}</TableCell>
-                                    <TableCell>{user.displayName}</TableCell>
-                                    <TableCell>
-                                        <span className="flex items-center gap-2">
-                                            {user.role === null && <ShieldQuestion size={16} className="text-muted-foreground" />}
-                                            {getRoleDisplayName(user.role)}
-                                        </span>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Button variant="outline" size="sm" onClick={() => handleSelectUser(user)}>
-                                            Gestionar
-                                        </Button>
-                                    </TableCell>
+                    {!usersWithRoles ? (
+                         <Alert variant="destructive">
+                            <UserX className="h-4 w-4" />
+                            <AlertTitle>No se pudieron cargar los usuarios</AlertTitle>
+                            <AlertDescription>
+                                No se pudieron cargar los perfiles de usuario. Esto puede deberse a las reglas de seguridad de Firestore. Verifique que los administradores tengan permiso para listar la colección 'users'.
+                            </AlertDescription>
+                        </Alert>
+                    ) : (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Email</TableHead>
+                                    <TableHead>Nombre</TableHead>
+                                    <TableHead>Rol Actual</TableHead>
+                                    <TableHead>Acción</TableHead>
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
+                            </TableHeader>
+                            <TableBody>
+                                {usersWithRoles.map(user => (
+                                    <TableRow 
+                                        key={user.uid} 
+                                        className={selectedUser?.uid === user.uid ? 'bg-muted' : ''}
+                                    >
+                                        <TableCell>{user.email}</TableCell>
+                                        <TableCell>{user.displayName}</TableCell>
+                                        <TableCell>
+                                            <span className="flex items-center gap-2">
+                                                {user.role === null && <ShieldQuestion size={16} className="text-muted-foreground" />}
+                                                {getRoleDisplayName(user.role)}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Button variant="outline" size="sm" onClick={() => handleSelectUser(user)}>
+                                                Gestionar
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    )}
                 </CardContent>
             </Card>
 
@@ -208,4 +221,3 @@ export default function UserManagementView({ users, allRoles }: UserManagementVi
         </div>
     );
 }
-
