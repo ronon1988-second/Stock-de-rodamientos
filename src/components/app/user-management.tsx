@@ -21,7 +21,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { updateUserRole } from '@/app/actions';
 import type { UserProfile, UserRole } from '@/lib/types';
-import { Loader2, ShieldQuestion, UserX, CheckCircle, Shield } from 'lucide-react';
+import { Loader2, ShieldQuestion, UserX, CheckCircle, Shield, User } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
@@ -36,17 +36,18 @@ const UserRow = ({ user, onSelect, isSelected }: { user: UserProfile, onSelect: 
     const roleRef = useMemoFirebase(() => firestore ? doc(firestore, 'roles', user.id) : null, [firestore, user.id]);
     const { data: roleDoc, isLoading } = useDoc<UserRole>(roleRef);
 
-    const getRoleDisplayName = (role: UserRole['role'] | undefined | null) => {
+    const getRoleDisplayName = (role: UserRole['role'] | 'user' | undefined | null) => {
         if (role === 'admin') return 'Administrador';
         if (role === 'editor') return 'Editor';
         if (role === 'user') return 'Usuario';
         return 'Sin rol';
     }
     
-    const getRoleIcon = (role: UserRole['role'] | undefined | null) => {
+    const getRoleIcon = (role: UserRole['role'] | 'user' | undefined | null) => {
         if (isLoading) return <Loader2 size={16} className="animate-spin" />;
         if (role === 'admin') return <ShieldQuestion size={16} className="text-primary" />;
         if (role === 'editor') return <Shield size={16} className="text-amber-600" />;
+        if (role === 'user') return <User size={16} className="text-muted-foreground" />;
         return <ShieldQuestion size={16} className="text-muted-foreground" />;
     }
 
