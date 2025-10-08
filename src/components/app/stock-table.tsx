@@ -71,16 +71,14 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, canEdit
   const [addingItem, setAddingItem] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const groupedAndFilteredItems = useMemo(() => {
-    const filtered = inventory.filter(item => 
-        item.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+  const filteredItems = useMemo(() => {
+    return inventory
+      .filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [inventory, searchTerm]);
 
-    if (!filtered.length) {
-        return new Map<string, InventoryItem[]>();
-    }
-
-    const grouped = filtered.reduce((acc, item) => {
+  const groupedItems = useMemo(() => {
+    const grouped = inventory.reduce((acc, item) => {
         const series = getItemSeries(item.name);
         if (!acc.has(series)) {
             acc.set(series, []);
@@ -95,7 +93,7 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, canEdit
     // Sort groups by name
     return new Map([...grouped.entries()].sort((a, b) => a[0].localeCompare(b[0])));
 
-  }, [inventory, searchTerm]);
+  }, [inventory]);
 
 
   const getStatus = (item: InventoryItem) => {
@@ -124,6 +122,54 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, canEdit
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  }
+  
+  const renderItemRow = (item: InventoryItem) => {
+    const status = getStatus(item);
+    return (
+        <TableRow
+        key={item.id}
+        className={
+            status === "Stock Bajo"
+            ? "bg-amber-500/10"
+            : status === "Sin Stock"
+            ? "bg-destructive/10"
+            : ""
+        }
+        >
+        <TableCell className="font-medium">
+            {item.name}
+        </TableCell>
+        <TableCell className="text-right">{item.stock}</TableCell>
+        <TableCell className="text-center">
+            <Badge variant={getStatusVariant(status)}>{status}</Badge>
+        </TableCell>
+        {canEdit &&
+            <TableCell>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                <Button
+                    aria-haspopup="true"
+                    size="icon"
+                    variant="ghost"
+                >
+                    <MoreHorizontal className="h-4 w-4" />
+                    <span className="sr-only">Alternar menú</span>
+                </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                <DropdownMenuItem
+                    onSelect={() => setEditingItem(item)}
+                >
+                    Actualizar Stock
+                </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+            </TableCell>
+        }
+        </TableRow>
+    );
   }
 
   return (
@@ -165,85 +211,63 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, canEdit
         </CardHeader>
         <CardContent>
           <div className="max-h-[60vh] overflow-auto">
-            <Accordion type="multiple" className="w-full">
-                {Array.from(groupedAndFilteredItems.entries()).map(([series, items]) => (
-                    <AccordionItem value={series} key={series}>
-                        <AccordionTrigger className="text-lg font-semibold sticky top-0 bg-card z-10 px-4 py-3 border-b">
-                            {series} ({items.length})
-                        </AccordionTrigger>
-                        <AccordionContent>
-                             <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                    <TableHead>Nombre</TableHead>
-                                    <TableHead className="text-right">Stock</TableHead>
-                                    <TableHead className="text-center">Estado</TableHead>
-                                    {canEdit && 
-                                        <TableHead>
-                                        <span className="sr-only">Acciones</span>
-                                        </TableHead>
-                                    }
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {items.map((item) => {
-                                        const status = getStatus(item);
-                                        return (
-                                            <TableRow
-                                            key={item.id}
-                                            className={
-                                                status === "Stock Bajo"
-                                                ? "bg-amber-500/10"
-                                                : status === "Sin Stock"
-                                                ? "bg-destructive/10"
-                                                : ""
-                                            }
-                                            >
-                                            <TableCell className="font-medium">
-                                                {item.name}
-                                            </TableCell>
-                                            <TableCell className="text-right">{item.stock}</TableCell>
-                                            <TableCell className="text-center">
-                                                <Badge variant={getStatusVariant(status)}>{status}</Badge>
-                                            </TableCell>
-                                            {canEdit &&
-                                                <TableCell>
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                    <Button
-                                                        aria-haspopup="true"
-                                                        size="icon"
-                                                        variant="ghost"
-                                                    >
-                                                        <MoreHorizontal className="h-4 w-4" />
-                                                        <span className="sr-only">Alternar menú</span>
-                                                    </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end">
-                                                    <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                                    <DropdownMenuItem
-                                                        onSelect={() => setEditingItem(item)}
-                                                    >
-                                                        Actualizar Stock
-                                                    </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                                </TableCell>
-                                            }
-                                            </TableRow>
-                                        );
-                                    })}
-                                </TableBody>
-                            </Table>
-                        </AccordionContent>
-                    </AccordionItem>
-                ))}
-                {groupedAndFilteredItems.size === 0 && (
-                     <div className="text-center py-10 text-muted-foreground">
-                        {searchTerm ? "No se encontraron artículos." : "No hay artículos en el inventario."}
-                    </div>
-                )}
-            </Accordion>
+            {searchTerm ? (
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Nombre</TableHead>
+                            <TableHead className="text-right">Stock</TableHead>
+                            <TableHead className="text-center">Estado</TableHead>
+                            {canEdit && <TableHead><span className="sr-only">Acciones</span></TableHead>}
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {filteredItems.length > 0 ? (
+                            filteredItems.map(renderItemRow)
+                        ) : (
+                            <TableRow>
+                                <TableCell colSpan={canEdit ? 4 : 3} className="h-24 text-center">
+                                    No se encontraron artículos que coincidan con la búsqueda.
+                                </TableCell>
+                            </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            ) : (
+                <Accordion type="multiple" className="w-full">
+                    {Array.from(groupedItems.entries()).map(([series, items]) => (
+                        <AccordionItem value={series} key={series}>
+                            <AccordionTrigger className="text-lg font-semibold sticky top-0 bg-card z-10 px-4 py-3 border-b">
+                                {series} ({items.length})
+                            </AccordionTrigger>
+                            <AccordionContent>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                        <TableHead>Nombre</TableHead>
+                                        <TableHead className="text-right">Stock</TableHead>
+                                        <TableHead className="text-center">Estado</TableHead>
+                                        {canEdit && 
+                                            <TableHead>
+                                            <span className="sr-only">Acciones</span>
+                                            </TableHead>
+                                        }
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {items.map(renderItemRow)}
+                                    </TableBody>
+                                </Table>
+                            </AccordionContent>
+                        </AccordionItem>
+                    ))}
+                    {groupedItems.size === 0 && (
+                        <div className="text-center py-10 text-muted-foreground">
+                            No hay artículos en el inventario.
+                        </div>
+                    )}
+                </Accordion>
+            )}
           </div>
         </CardContent>
       </Card>
