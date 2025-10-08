@@ -77,6 +77,7 @@ import {
 import OrganizationView from '@/components/app/organization-view';
 import UserManagementView from '@/components/app/user-management';
 import { addDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 type View =
   | 'dashboard'
@@ -90,9 +91,11 @@ type View =
 function MachineList({
   sector,
   onNavClick,
+  currentView,
 }: {
   sector: Sector;
   onNavClick: (view: View) => void;
+  currentView: View;
 }) {
   const firestore = useFirestore();
   const machinesQuery = useMemoFirebase(
@@ -103,7 +106,7 @@ function MachineList({
 
   if (isLoading) {
     return (
-      <div className="space-y-1 pt-1 pl-11">
+      <div className="space-y-1 pt-1 pl-12">
         <Skeleton className="h-8 w-3/4" />
         <Skeleton className="h-8 w-1/2" />
       </div>
@@ -111,7 +114,7 @@ function MachineList({
   }
 
   return (
-    <div className="space-y-1 pt-1 pl-7">
+    <div className="space-y-1 pt-1 pl-8">
       {(machines || [])
         .sort((a, b) => a.name.localeCompare(b.name))
         .map(machine => (
@@ -122,7 +125,9 @@ function MachineList({
               e.preventDefault();
               onNavClick(`machine-${machine.id}`);
             }}
-            className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary pl-4 text-sm"
+            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary pl-4 text-sm ${
+                currentView === `machine-${machine.id}` ? 'bg-muted text-primary' : ''
+            }`}
           >
             <HardDrive className="h-4 w-4" />
             {machine.name}
@@ -578,7 +583,6 @@ function AppContent() {
     }
     if (view === 'users' && isAdmin) {
         const usersToManage = allUsers?.filter(u => user && u.uid !== user.uid) || [];
-        // The component no longer needs allRoles
         return <UserManagementView users={usersToManage} />;
     }
     if (view.startsWith('machine-')) {
@@ -660,15 +664,21 @@ function AppContent() {
 
             <div className="my-2 border-t -mx-4"></div>
             
-            {(sortedSectors || []).map(sector => (
-              <div key={sector.id}>
-                <div className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground font-semibold">
-                  <Package className={iconClass} />
-                  <span>{sector.name}</span>
-                </div>
-                <MachineList sector={sector} onNavClick={handleNavClick} />
-              </div>
-            ))}
+            <Accordion type="multiple" className="w-full">
+              {(sortedSectors || []).map(sector => (
+                <AccordionItem value={sector.id} key={sector.id} className="border-b-0">
+                  <AccordionTrigger className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary hover:no-underline text-base font-normal">
+                    <div className="flex items-center gap-3">
+                      <Package className={iconClass} />
+                      <span>{sector.name}</span>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="pb-0">
+                      <MachineList sector={sector} onNavClick={handleNavClick} currentView={view} />
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
 
             <div className="my-2 border-t -mx-4"></div>
             
