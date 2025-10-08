@@ -20,9 +20,6 @@ import {
   writeBatch,
   query,
   getDocs,
-  addDoc,
-  deleteDoc,
-  updateDoc,
 } from 'firebase/firestore';
 
 import { Badge } from '@/components/ui/badge';
@@ -48,7 +45,7 @@ import {
   Machine,
   MachineAssignment,
   UserProfile,
-  UserRole,
+  MachinesBySector,
 } from '@/lib/types';
 import { initialInventory, initialSectors, initialMachines } from '@/lib/data';
 import Dashboard from '@/components/app/dashboard';
@@ -63,7 +60,6 @@ import {
   useFirestore,
   useCollection,
   useMemoFirebase,
-  useDoc,
 } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -78,10 +74,7 @@ import {
 import OrganizationView from '@/components/app/organization-view';
 import UserManagementView from '@/components/app/user-management';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { setDocumentNonBlocking, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-
-// TEMPORARY FLAG FOR ADMIN UI TESTING
-const isTestingAdmin = true;
+import { addDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
 type View =
   | 'dashboard'
@@ -139,6 +132,39 @@ function MachineList({
   );
 }
 
+function useAllMachines(sectors: Sector[]) {
+  const firestore = useFirestore();
+  const [machinesBySector, setMachinesBySector] = useState<MachinesBySector>({});
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!firestore || sectors.length === 0) {
+      setIsLoading(false);
+      return;
+    }
+
+    const fetchAllMachines = async () => {
+      setIsLoading(true);
+      const allMachines: MachinesBySector = {};
+      await Promise.all(
+        sectors.map(async (sector) => {
+          const machinesQuery = query(collection(firestore, `sectors/${sector.id}/machines`));
+          const machinesSnapshot = await import('firebase/firestore').then(m => m.getDocs(machinesQuery));
+          allMachines[sector.id] = machinesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Machine));
+        })
+      );
+      setMachinesBySector(allMachines);
+      setIsLoading(false);
+    };
+
+    fetchAllMachines();
+
+  }, [firestore, sectors]);
+
+  return { machinesBySector, isLoading };
+}
+
+
 function AppContent() {
   const [view, setView] = useState<View>('dashboard');
   const { toast } = useToast();
@@ -152,11 +178,6 @@ function AppContent() {
   const [isEditor, setIsEditor] = useState(false);
 
   useEffect(() => {
-    if (isTestingAdmin) {
-      setIsAdmin(true);
-      setIsEditor(true);
-      return;
-    }
     const fetchUserClaims = async () => {
       if (user) {
         try {
@@ -177,11 +198,11 @@ function AppContent() {
 
     fetchUserClaims();
   }, [user]);
-
-  const canLogUsage = !!user || isTestingAdmin; // Any authenticated user can log usage
+  
+  const canLogUsage = !!user;
 
   // DATA FETCHING
-  const allUsersRef = useMemoFirebase(() => (firestore && isAdmin && !isTestingAdmin ? collection(firestore, 'users') : null), [firestore, isAdmin]);
+  const allUsersRef = useMemoFirebase(() => (firestore && isAdmin ? collection(firestore, 'users') : null), [firestore, isAdmin]);
   const { data: allUsers, isLoading: isAllUsersLoading } = useCollection<UserProfile>(allUsersRef);
 
   const inventoryRef = useMemoFirebase(() => firestore ? collection(firestore, 'inventory') : null, [firestore]);
@@ -193,12 +214,15 @@ function AppContent() {
   const assignmentsRef = useMemoFirebase(() => firestore ? collection(firestore, 'machineAssignments') : null, [firestore]);
   const { data: machineAssignments, isLoading: isAssignmentsLoading } = useCollection<MachineAssignment>(assignmentsRef);
   
-  const usageLogRef = useMemoFirebase(() => (firestore && !isTestingAdmin ? collection(firestore, 'usageLog') : null), [firestore]);
+  const usageLogRef = useMemoFirebase(() => (firestore ? collection(firestore, 'usageLog') : null), [firestore]);
   const { data: usageLog, isLoading: isUsageLogLoading } = useCollection<UsageLog>(usageLogRef);
+
+  const { machinesBySector, isLoading: isLoadingMachines } = useAllMachines(sectors || []);
+
 
   useEffect(() => {
     const seedData = async () => {
-        if (!firestore || (!user && !isTestingAdmin) || isInventoryLoading || isSectorsLoading || isSeeding || !isAdmin) return;
+        if (!firestore || !user || isInventoryLoading || isSectorsLoading || isSeeding || !isAdmin) return;
 
         const invQuery = query(collection(firestore, 'inventory'));
         const sectorsQuery = query(collection(firestore, 'sectors'));
@@ -274,14 +298,11 @@ function AppContent() {
   );
   
   const sortedUsageLog = useMemo(
-    () => {
-        if (isTestingAdmin) return []; // Don't show usage log in test mode
-        return usageLog
+    () => usageLog
             ? [...usageLog].sort(
                 (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
               )
-            : []
-    },
+            : [],
     [usageLog]
   );
 
@@ -485,13 +506,14 @@ function AppContent() {
 
   const renderContent = () => {
     const isDataLoading =
-      (isUserLoading && !isTestingAdmin) ||
+      isUserLoading ||
       isInventoryLoading ||
       isAssignmentsLoading ||
-      (isUsageLogLoading && !isTestingAdmin) ||
+      isUsageLogLoading ||
       isSectorsLoading ||
+      isLoadingMachines ||
       isSeeding ||
-      (isAdmin && isAllUsersLoading && !isTestingAdmin);
+      (isAdmin && isAllUsersLoading);
 
     if (isDataLoading) {
       return <Skeleton className="h-full w-full" />;
@@ -512,6 +534,7 @@ function AppContent() {
         <Reports
           usageLog={sortedUsageLog}
           sectors={sortedSectors}
+          machinesBySector={machinesBySector}
         />
       );
     }
@@ -542,16 +565,8 @@ function AppContent() {
             return null;
         }
 
-        let usersToManage = allUsers?.filter(u => user && u.uid !== user.uid) || [];
-
-        if (isTestingAdmin) {
-            usersToManage = [
-                { id: '1', uid: 'test-user-1', email: 'editor@example.com', displayName: 'Usuario Editor' },
-                { id: '2', uid: 'test-user-2', email: 'viewer@example.com', displayName: 'Usuario Lector' },
-            ];
-        }
-
-        return <UserManagementView users={usersToManage} isTesting={isTestingAdmin} />;
+        const usersToManage = allUsers?.filter(u => user && u.uid !== user.uid) || [];
+        return <UserManagementView users={usersToManage} />;
     }
     if (view.startsWith('machine-')) {
       const machineId = view.replace('machine-', '');
@@ -653,7 +668,7 @@ function AppContent() {
     </nav>
   );
 
-  if (isUserLoading && !isTestingAdmin) {
+  if (isUserLoading) {
       return (
         <div className="flex items-center justify-center min-h-screen">
           <Skeleton className="h-[95vh] w-[95vw] rounded-lg" />
@@ -722,7 +737,7 @@ function AppContent() {
               {getViewTitle()}
             </h1>
           </div>
-          {(user || isTestingAdmin) && (
+          {user && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="secondary" size="icon" className="rounded-full">
@@ -732,12 +747,12 @@ function AppContent() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>
-                  {isTestingAdmin ? 'admin-test@example.com' : user?.email}{' '}
-                  {(isAdmin || isTestingAdmin) && '(Admin)'}
+                  {user?.email}{' '}
+                  {isAdmin && '(Admin)'}
                   {isEditor && !isAdmin && '(Editor)'}
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={handleLogout} disabled={isTestingAdmin}>
+                <DropdownMenuItem onSelect={handleLogout}>
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Cerrar sesión</span>
                 </DropdownMenuItem>
@@ -758,19 +773,22 @@ export default function Page() {
   const router = useRouter();
 
   useEffect(() => {
-    if (isTestingAdmin) return;
     if (!isUserLoading && !user) {
       router.push('/login');
     }
   }, [user, isUserLoading, router]);
 
-  if (isUserLoading && !isTestingAdmin) {
+  if (isUserLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Skeleton className="h-[95vh] w-[95vw] rounded-lg" />
       </div>
     );
   }
+  
+  if (!user) return null;
 
   return <AppContent />;
 }
+
+    

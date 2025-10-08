@@ -19,52 +19,15 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import type { UsageLog, Sector, Machine, MachinesBySector } from "@/lib/types";
 import UsageChart from "./usage-chart";
-import { useMemo, useState, useEffect } from "react";
-import { useFirestore, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, query } from "firebase/firestore";
-
-// Component to fetch and hold machine data for all sectors
-function useAllMachines(sectors: Sector[]) {
-  const firestore = useFirestore();
-  const [machinesBySector, setMachinesBySector] = useState<MachinesBySector>({});
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    if (!firestore || sectors.length === 0) {
-      setIsLoading(false);
-      return;
-    }
-
-    const fetchAllMachines = async () => {
-      setIsLoading(true);
-      const allMachines: MachinesBySector = {};
-      await Promise.all(
-        sectors.map(async (sector) => {
-          const machinesQuery = query(collection(firestore, `sectors/${sector.id}/machines`));
-          const machinesSnapshot = await import('firebase/firestore').then(m => m.getDocs(machinesQuery));
-          allMachines[sector.id] = machinesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Machine));
-        })
-      );
-      setMachinesBySector(allMachines);
-      setIsLoading(false);
-    };
-
-    fetchAllMachines();
-
-  }, [firestore, sectors]);
-
-  return { machinesBySector, isLoading };
-}
-
 
 type ReportsProps = {
   usageLog: UsageLog[];
   sectors: Sector[];
+  machinesBySector: MachinesBySector;
 };
 
-export default function Reports({ usageLog, sectors }: ReportsProps) {
-  const { machinesBySector, isLoading: isLoadingMachines } = useAllMachines(sectors);
-
+export default function Reports({ usageLog, sectors, machinesBySector }: ReportsProps) {
+  
   const getMachineAndSectorName = (machineId: string, sectorId: string) => {
     const sector = sectors.find(s => s.id === sectorId);
     const machines = machinesBySector[sectorId] || [];
@@ -137,3 +100,5 @@ export default function Reports({ usageLog, sectors }: ReportsProps) {
     </div>
   );
 }
+
+    

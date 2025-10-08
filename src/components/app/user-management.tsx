@@ -26,10 +26,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 
 type UserManagementViewProps = {
     users: UserProfile[];
-    isTesting?: boolean;
 }
 
-export default function UserManagementView({ users, isTesting = false }: UserManagementViewProps) {
+export default function UserManagementView({ users }: UserManagementViewProps) {
     const { toast } = useToast();
     const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
     const [role, setRole] = useState<'admin' | 'editor'>('editor');
@@ -49,15 +48,6 @@ export default function UserManagementView({ users, isTesting = false }: UserMan
                 description: 'Por favor, seleccione un usuario de la lista.',
                 variant: 'destructive',
             });
-            return;
-        }
-
-        if (isTesting) {
-             toast({
-                title: 'Modo de Prueba',
-                description: `Simulando asignación del rol '${role}' a ${selectedUser.email}.`,
-            });
-            setSelectedUser(null);
             return;
         }
         
@@ -162,3 +152,5 @@ export default function UserManagementView({ users, isTesting = false }: UserMan
         </div>
     );
 }
+
+    
