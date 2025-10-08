@@ -212,11 +212,6 @@ function AppContent() {
   const allUsersRef = useMemoFirebase(() => (firestore && isAdmin ? collection(firestore, 'users') : null), [firestore, isAdmin]);
   const { data: allUsers, isLoading: isAllUsersLoading } = useCollection<UserProfile>(allUsersRef);
   
-  // THIS IS THE PROBLEMATIC LINE - REMOVED FETCHING ALL ROLES
-  // const allRolesRef = useMemoFirebase(() => (firestore && isAdmin ? collection(firestore, 'roles') : null), [firestore, isAdmin]);
-  // const { data: allRoles, isLoading: isAllRolesLoading } = useCollection<UserRole>(allRolesRef);
-
-
   const inventoryRef = useMemoFirebase(() => firestore ? collection(firestore, 'inventory') : null, [firestore]);
   const { data: inventory, isLoading: isInventoryLoading } = useCollection<InventoryItem>(inventoryRef);
 
@@ -528,7 +523,7 @@ function AppContent() {
       isSectorsLoading ||
       isLoadingMachines ||
       isSeeding ||
-      (isAdmin && isAllUsersLoading); // Removed isAllRolesLoading
+      (isAdmin && isAllUsersLoading); 
 
     if (isDataLoading) {
       return <Skeleton className="h-full w-full" />;
