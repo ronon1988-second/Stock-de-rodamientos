@@ -40,11 +40,11 @@ export default function UserManagementView({ users, allRoles }: UserManagementVi
     const [isLoading, setIsLoading] = useState(false);
 
     const usersWithRoles: UserWithRole[] | null = React.useMemo(() => {
-        if (!users || !allRoles) return null; // Guard clause
+        if (!users || !allRoles) return null; 
         const rolesMap = new Map(allRoles.map(r => [r.id, r.role]));
         return users.map(user => ({
             ...user,
-            role: rolesMap.get(user.uid) || null,
+            role: rolesMap.get(user.id) || null,
         }));
     }, [users, allRoles]);
 
@@ -54,7 +54,7 @@ export default function UserManagementView({ users, allRoles }: UserManagementVi
     };
 
     const handleUpdateRole = async () => {
-        if (!selectedUser || !role) { // Allow assigning 'user' (which is null in db)
+        if (!selectedUser || !role) { 
             toast({
                 title: 'Selección inválida',
                 description: 'Por favor, seleccione un usuario y un rol.',
@@ -76,9 +76,6 @@ export default function UserManagementView({ users, allRoles }: UserManagementVi
 
         setIsLoading(true);
         
-        // This is a special case to handle "demoting" to a regular user.
-        // The server action updateUserRole is designed for assigning 'admin' or 'editor'.
-        // For now, we allow assigning admin/editor. A future improvement could be a `removePrivileges` action.
         if (roleToSet === null) {
             toast({
                 title: 'Función no implementada',
@@ -98,7 +95,6 @@ export default function UserManagementView({ users, allRoles }: UserManagementVi
                 description: `El usuario ${selectedUser.email} ahora tiene el rol de ${getRoleDisplayName(roleToSet)}.`,
             });
             setSelectedUser(null);
-            // The parent component will receive the updated roles via the useCollection hook
         } else {
             toast({
                 title: 'Error al Actualizar Rol',
@@ -221,3 +217,4 @@ export default function UserManagementView({ users, allRoles }: UserManagementVi
         </div>
     );
 }
+
