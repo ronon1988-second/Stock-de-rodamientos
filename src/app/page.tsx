@@ -674,25 +674,37 @@ function AppContent() {
         />
       )}
 
-      <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
-        Máquinas por Sector
-      </div>
-
-      <Accordion type="single" collapsible className="w-full">
-        {(sortedSectors || []).map(sector => (
-          <AccordionItem key={sector.id} value={sector.id} className="border-b-0">
-            <AccordionTrigger className="text-left">
-              <div className="flex items-center gap-3">
-                <Package className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />
-                <span className="font-semibold">{sector.name}</span>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent>
-              <MachineList sector={sector} onNavClick={handleNavClick} isMobile={isMobile}/>
-            </AccordionContent>
-          </AccordionItem>
-        ))}
+      <Accordion type="single" collapsible className="w-full" defaultValue="item-1">
+        <AccordionItem value="item-1" className="border-b-0">
+          <AccordionTrigger
+            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${
+              isMobile ? 'text-lg' : 'text-sm'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <Package className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />
+              <span>Sectores</span>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent>
+            {(sortedSectors || []).map(sector => (
+              <Accordion key={sector.id} type="single" collapsible className="w-full">
+                <AccordionItem value={sector.id} className="border-b-0">
+                  <AccordionTrigger className="text-left hover:no-underline">
+                    <div className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary">
+                      <span className="font-semibold">{sector.name}</span>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <MachineList sector={sector} onNavClick={handleNavClick} isMobile={isMobile} />
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            ))}
+          </AccordionContent>
+        </AccordionItem>
       </Accordion>
+
 
       <div className="mt-auto border-t pt-4">
         <NavLink
@@ -751,7 +763,7 @@ function AppContent() {
                 <span className="sr-only">Alternar menú de navegación</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="flex flex-col overflow-auto">
+            <SheetContent side="left" className="flex flex-col">
               <SheetHeader>
                 <SheetTitle className="sr-only">Menú</SheetTitle>
               </SheetHeader>
@@ -762,7 +774,7 @@ function AppContent() {
               <div className="flex-1 overflow-auto">
                 <MainNav isMobile={true} />
               </div>
-              <div className="mt-auto p-4">
+               <div className="mt-auto p-4">
                 <SupportCard />
               </div>
             </SheetContent>
@@ -826,3 +838,5 @@ export default function Page() {
 
   return <AppContent />;
 }
+
+    
