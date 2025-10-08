@@ -2,7 +2,7 @@
 'use server';
 
 import { getReorderRecommendations, ReorderRecommendationsInput } from "@/ai/flows/reorder-recommendations";
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { getSdks } from "@/firebase";
 import { UserProfile } from "@/lib/types";
 import { getAdminApp } from "@/firebase/server-app";
@@ -29,22 +29,29 @@ export async function setupUserAndRole(uid: string, email: string): Promise<{ su
         const auth = getAuth(adminApp);
         
         const userRef = doc(firestore, 'users', uid);
-        const userData: Omit<UserProfile, 'id'|'uid'> = {
-            email: email,
-            displayName: email.split('@')[0] || 'Usuario',
-        };
-        await setDoc(userRef, userData);
-
         const roleRef = doc(firestore, 'roles', uid);
-        
-        // Temporary bypass: Force admin role for specific UID
+
+        // Check if user document already exists
+        const userDoc = await getDoc(userRef);
+        if (!userDoc.exists()) {
+            const userData: Omit<UserProfile, 'id'|'uid'> = {
+                email: email,
+                displayName: email.split('@')[0] || 'Usuario',
+            };
+            await setDoc(userRef, userData);
+        }
+
+        // Special admin role assignment
         if (email === 'maurofbordon@gmail.com' || uid === 'zqq7dO1wxbgZVcIXSNwRU6DEXqw1') {
-            await setDoc(roleRef, { role: 'admin' });
+            await setDoc(roleRef, { role: 'admin' }, { merge: true });
             await auth.setCustomUserClaims(uid, { admin: true, editor: true });
             console.log(`Force assigning admin role to UID: ${uid}`);
         } else {
-            await setDoc(roleRef, { role: 'editor' });
-            await auth.setCustomUserClaims(uid, { editor: true });
+             // For new users, check if a role already exists. If not, set up their user doc but no role.
+            const roleDoc = await getDoc(roleRef);
+            if (!roleDoc.exists()) {
+                await setDoc(roleRef, {}, { merge: true }); // Create an empty role doc if it doesn't exist
+            }
         }
 
         return { success: true };
@@ -78,5 +85,3 @@ export async function updateUserRole(uid: string, role: 'admin' | 'editor'): Pro
         return { success: false, error: error.message || 'An unexpected error occurred while writing the role to the database.' };
     }
 }
-
-    
