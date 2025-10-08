@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -30,9 +31,6 @@ type UserManagementViewProps = {
     users: UserProfile[] | null;
 }
 
-type UserWithRole = UserProfile & { role: UserRole['role'] | null };
-
-// This new component will fetch the role for a single user
 const UserRow = ({ user, onSelect, isSelected }: { user: UserProfile, onSelect: (user: UserProfile) => void, isSelected: boolean }) => {
     const firestore = useFirestore();
     const roleRef = useMemoFirebase(() => firestore ? doc(firestore, 'roles', user.id) : null, [firestore, user.id]);
@@ -55,7 +53,7 @@ const UserRow = ({ user, onSelect, isSelected }: { user: UserProfile, onSelect: 
             <TableCell>
                 <span className="flex items-center gap-2">
                     {isLoading ? <Loader2 size={16} className="animate-spin" /> : 
-                     (roleDoc?.role === null && <ShieldQuestion size={16} className="text-muted-foreground" />)}
+                     (!roleDoc?.role && <ShieldQuestion size={16} className="text-muted-foreground" />)}
                     {isLoading ? 'Cargando...' : getRoleDisplayName(roleDoc?.role || null)}
                 </span>
             </TableCell>
@@ -75,10 +73,12 @@ export default function UserManagementView({ users }: UserManagementViewProps) {
     const { data: roleDoc, isLoading: isRoleLoading } = useDoc<UserRole>(roleRef);
 
     useEffect(() => {
-        if(roleDoc) {
-            setSelectedRole(roleDoc.role || 'editor');
+        if(roleDoc && (roleDoc.role === 'admin' || roleDoc.role === 'editor')) {
+            setSelectedRole(roleDoc.role);
         } else if (!selectedUser) {
             setSelectedRole('editor');
+        } else {
+             setSelectedRole('editor');
         }
     }, [roleDoc, selectedUser]);
 
@@ -117,6 +117,8 @@ export default function UserManagementView({ users }: UserManagementViewProps) {
         }
         setIsSubmitting(false);
     };
+
+    const roleToSet = selectedRole;
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -216,3 +218,4 @@ export default function UserManagementView({ users }: UserManagementViewProps) {
         </div>
     );
 }
+    

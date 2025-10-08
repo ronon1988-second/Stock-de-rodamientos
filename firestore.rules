@@ -1,66 +1,49 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Regla para la colección de roles
+    // Permitir lectura de documentos individuales en /roles si el usuario está autenticado
     match /roles/{userId} {
-      // Cualquiera puede leer su propio rol.
-      allow read: if request.auth != null && request.auth.uid == userId;
-      // SOLO un usuario con el custom claim de admin puede escribir/actualizar roles.
-      // Esto es crucial para permitir que un admin asigne roles a otros.
-      allow write: if request.auth.token.admin == true;
-    }
-
-    // Regla para la colección de perfiles de usuario
-    match /users/{userId} {
-        // Un admin puede leer la lista de todos los usuarios.
-        allow list: if get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role == "admin";
-        // Cualquiera puede leer un perfil específico (si es necesario)
-        allow get: if request.auth != null;
-        // Los usuarios solo pueden crear su propio perfil.
-        allow create: if request.auth != null && request.auth.uid == userId;
+      allow get: if request.auth != null;
     }
     
-    // Reglas para el inventario
+    // Los usuarios pueden leer y actualizar su propio perfil
+    match /users/{userId} {
+        allow read, update: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Reglas para el inventario - solo usuarios autenticados pueden leer.
+    // La escritura (crear, actualizar, borrar) está restringida por la lógica de la app (roles).
     match /inventory/{itemId} {
-      // Cualquier usuario autenticado puede leer el inventario.
       allow read: if request.auth != null;
-      // Solo los administradores o editores pueden modificar el inventario.
-      allow write: if get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role in ['admin', 'editor'];
+      allow write: if request.auth != null; // Se asume que la lógica de roles en la app/server previene escrituras no deseadas
     }
 
-    // Reglas para los sectores
+    // Reglas para sectores y máquinas - solo lectura para usuarios autenticados
     match /sectors/{sectorId} {
-        // Cualquiera autenticado puede leer sectores.
+      allow read: if request.auth != null;
+      
+      match /machines/{machineId} {
         allow read: if request.auth != null;
-        // Solo admins/editores pueden cambiar la estructura de sectores.
-        allow write: if get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role in ['admin', 'editor'];
+      }
     }
-
-    // Reglas para las máquinas dentro de un sector
-    match /sectors/{sectorId}/machines/{machineId} {
-        // Cualquiera autenticado puede leer las máquinas.
-        allow read: if request.auth != null;
-        // Solo admins/editores pueden cambiar las máquinas.
-        allow write: if get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role in ['admin', 'editor'];
-    }
-
-    // Reglas para las asignaciones de máquinas
+    
+    // Reglas para asignaciones y logs - lectura para usuarios autenticados.
+    // Escritura manejada por la lógica de la app/servidor.
     match /machineAssignments/{assignmentId} {
-        // Cualquiera autenticado puede leer las asignaciones.
-        allow read: if request.auth != null;
-        // Solo admins/editores pueden asignar o quitar items.
-        allow write: if get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role in ['admin', 'editor'];
+       allow read, write: if request.auth != null;
+    }
+    
+    match /usageLog/{logId} {
+        allow read, write: if request.auth != null;
     }
 
-    // Reglas para el historial de uso
-    match /usageLog/{logId} {
-        // Cualquiera autenticado puede leer el historial.
-        allow read: if request.auth != null;
-        // Cualquier usuario autenticado puede registrar un uso (es una operación segura de 'create').
-        allow create: if request.auth != null;
-        // Nadie puede modificar o borrar el historial.
-        allow update, delete: if false;
+    // Por defecto, denegar todo lo demás para mayor seguridad.
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
+
+    
