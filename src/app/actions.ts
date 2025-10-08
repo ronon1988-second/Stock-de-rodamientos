@@ -43,6 +43,7 @@ export async function setupUserAndRole(uid: string, email: string): Promise<{ su
 
         // Special admin role assignment
         if (email === 'maurofbordon@gmail.com' || uid === 'zqq7dO1wxbgZVcIXSNwRU6DEXqw1') {
+            console.log(`>>>>>> SUCCESS: Matched admin user: ${email}. Attempting to set admin claims. <<<<<<`);
             await setDoc(roleRef, { role: 'admin' }, { merge: true });
             await auth.setCustomUserClaims(uid, { admin: true, editor: true });
             console.log(`Force assigning admin role to UID: ${uid}`);

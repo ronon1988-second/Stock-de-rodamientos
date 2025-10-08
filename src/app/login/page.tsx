@@ -36,16 +36,17 @@ export default function LoginPage() {
     // For the master user, always ensure the role and claims are set.
     if (isNewUser || user.email === 'maurofbordon@gmail.com' || user.uid === 'zqq7dO1wxbgZVcIXSNwRU6DEXqw1') {
         await setupUserAndRole(user.uid, user.email || "");
+        // Force refresh of the ID token to get the latest custom claims.
+        await getIdToken(user, true);
     }
-    // Force refresh of the ID token to get the latest custom claims.
-    await getIdToken(user, true);
     
     toast({
         title: `Éxito de ${isNewUser ? 'registro' : 'inicio de sesión'}`,
-        description: "¡Bienvenido!",
+        description: "¡Bienvenido! Redirigiendo...",
     });
 
-    router.push('/');
+    // Use window.location to force a full page reload to ensure new claims are loaded.
+    window.location.href = '/';
   }
 
   const handleAuthAction = async (action: "login" | "signup") => {
