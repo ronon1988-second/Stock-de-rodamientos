@@ -187,7 +187,8 @@ function AppContent() {
     const fetchUserClaims = async () => {
       if (user) {
         try {
-          const idTokenResult = await user.getIdTokenResult(true); // Force refresh
+          // Force a refresh of the token to get the latest claims from the server.
+          const idTokenResult = await user.getIdTokenResult(true); 
           const claims = idTokenResult.claims;
           setIsAdmin(!!claims.admin);
           setIsEditor(!!claims.editor || !!claims.admin);

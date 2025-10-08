@@ -32,20 +32,26 @@ export default function LoginPage() {
   const { toast } = useToast();
   const router = useRouter();
 
-  const handleAuthenticationSuccess = async (user: User, isNewUser: boolean) => {
-    // For the master user, always ensure the role and claims are set.
-    if (isNewUser || user.email === 'maurofbordon@gmail.com' || user.uid === 'zqq7dO1wxbgZVcIXSNwRU6DEXqw1') {
+  const handleAuthenticationSuccess = async (user: User) => {
+    // For the master user, this logic runs on every login to ensure roles/claims are set.
+    if (user.email === 'maurofbordon@gmail.com' || user.uid === 'zqq7dO1wxbgZVcIXSNwRU6DEXqw1') {
         await setupUserAndRole(user.uid, user.email || "");
-        // Force refresh of the ID token to get the latest custom claims.
+        // Crucially, force a refresh of the ID token to get the latest custom claims from the server.
         await getIdToken(user, true);
+    } else {
+        // For regular users, only set up their initial document on first creation.
+        const isNewUser = user.metadata.creationTime === user.metadata.lastSignInTime;
+        if (isNewUser) {
+           await setupUserAndRole(user.uid, user.email || "");
+        }
     }
     
     toast({
-        title: `Éxito de ${isNewUser ? 'registro' : 'inicio de sesión'}`,
+        title: "Éxito de inicio de sesión",
         description: "¡Bienvenido! Redirigiendo...",
     });
 
-    // Use window.location to force a full page reload to ensure new claims are loaded.
+    // Use window.location to force a full page reload to ensure new claims are loaded client-side.
     window.location.href = '/';
   }
 
@@ -64,10 +70,10 @@ export default function LoginPage() {
     try {
       if (action === "signup") {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        await handleAuthenticationSuccess(userCredential.user, true);
+        await handleAuthenticationSuccess(userCredential.user);
       } else { // login
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        await handleAuthenticationSuccess(userCredential.user, false);
+        await handleAuthenticationSuccess(userCredential.user);
       }
     } catch (error: any) {
       let description = "Ha ocurrido un error inesperado.";
@@ -90,7 +96,7 @@ export default function LoginPage() {
                   description: "Intentando iniciar sesión en su lugar...",
               });
               const userCredential = await signInWithEmailAndPassword(auth, email, password);
-              await handleAuthenticationSuccess(userCredential.user, false);
+              await handleAuthenticationSuccess(userCredential.user);
             } catch (signInError: any) {
                toast({
                 variant: "destructive",

@@ -41,17 +41,18 @@ export async function setupUserAndRole(uid: string, email: string): Promise<{ su
             await setDoc(userRef, userData);
         }
 
-        // Special admin role assignment
+        // Special admin role assignment for the master user.
+        // This block runs every time the master user logs in, ensuring claims are set.
         if (email === 'maurofbordon@gmail.com' || uid === 'zqq7dO1wxbgZVcIXSNwRU6DEXqw1') {
             console.log(`>>>>>> SUCCESS: Matched admin user: ${email}. Attempting to set admin claims. <<<<<<`);
             await setDoc(roleRef, { role: 'admin' }, { merge: true });
             await auth.setCustomUserClaims(uid, { admin: true, editor: true });
-            console.log(`Force assigning admin role to UID: ${uid}`);
+            console.log(`Force assigned admin role to UID: ${uid}`);
         } else {
-             // For new users, check if a role already exists. If not, set up their user doc but no role.
+             // For new non-admin users, check if a role already exists. If not, create an empty one.
             const roleDoc = await getDoc(roleRef);
             if (!roleDoc.exists()) {
-                await setDoc(roleRef, {}, { merge: true }); // Create an empty role doc if it doesn't exist
+                await setDoc(roleRef, {}, { merge: true }); 
             }
         }
 
