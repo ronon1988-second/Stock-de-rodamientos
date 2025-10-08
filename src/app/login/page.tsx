@@ -5,7 +5,6 @@ import { useState } from "react";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  getIdToken,
   User,
 } from "firebase/auth";
 import { useFirebase } from "@/firebase/provider";
@@ -33,23 +32,15 @@ export default function LoginPage() {
   const router = useRouter();
 
   const handleAuthenticationSuccess = async (user: User) => {
-    // Run the server action to ensure roles/claims are set, especially for admin.
+    // Run the server action to ensure the user document and role document exist in Firestore.
     await setupUserAndRole(user.uid, user.email || "");
-
-    // For the master user, we explicitly refresh the token to get the new claims.
-    if (user.email === 'maurofbordon@gmail.com') {
-      console.log("Admin user detected, forcing token refresh...");
-      await getIdToken(user, true);
-      console.log("Token refresh complete.");
-    }
     
     toast({
         title: "Éxito de inicio de sesión",
         description: "¡Bienvenido! Redirigiendo...",
     });
 
-    // Use window.location to force a full page reload to ensure new claims are loaded client-side.
-    // This is the most reliable way.
+    // Use window.location to force a full page reload to ensure the app fetches the new role from Firestore.
     window.location.href = '/';
   }
 

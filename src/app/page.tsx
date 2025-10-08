@@ -21,6 +21,7 @@ import {
   writeBatch,
   query,
   getDocs,
+  getDoc,
 } from 'firebase/firestore';
 
 import { Badge } from '@/components/ui/badge';
@@ -47,6 +48,7 @@ import {
   MachineAssignment,
   UserProfile,
   MachinesBySector,
+  UserRole
 } from '@/lib/types';
 import { initialInventory, initialSectors, initialMachines } from '@/lib/data';
 import Dashboard from '@/components/app/dashboard';
@@ -176,33 +178,31 @@ function AppContent() {
   const firestore = useFirestore();
   const [isSeeding, setIsSeeding] = useState(false);
   
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isEditor, setIsEditor] = useState(false);
+  const [userRole, setUserRole] = useState<UserRole['role'] | null>(null);
   
+  // NEW: Read role directly from Firestore
   useEffect(() => {
-    const fetchUserClaims = async () => {
-      if (user) {
-        try {
-          // It's often better to force a refresh on login, but we can do it here too for robustness.
-          const idTokenResult = await user.getIdTokenResult(true); 
-          const claims = idTokenResult.claims;
-          console.log("[ADMIN CHECK] User claims:", claims);
-          setIsAdmin(!!claims.admin);
-          setIsEditor(!!claims.editor || !!claims.admin);
-        } catch (error) {
-          console.error("Error fetching user claims:", error);
-          setIsAdmin(false);
-          setIsEditor(false);
+    const fetchUserRole = async () => {
+      if (user && firestore) {
+        const roleRef = doc(firestore, 'roles', user.uid);
+        const roleSnap = await getDoc(roleRef);
+        if (roleSnap.exists()) {
+          const roleData = roleSnap.data() as UserRole;
+          console.log("🎖️ Rol detectado desde Firestore:", roleData.role);
+          setUserRole(roleData.role);
+        } else {
+          console.log("No se encontró un documento de rol para el usuario.");
+          setUserRole(null); // Explicitly set to null or 'user' if you have a default
         }
       } else {
-        setIsAdmin(false);
-        setIsEditor(false);
+        setUserRole(null);
       }
     };
+    fetchUserRole();
+  }, [user, firestore]);
 
-    fetchUserClaims();
-  }, [user]);
-  
+  const isAdmin = userRole === 'admin';
+  const isEditor = userRole === 'admin' || userRole === 'editor';
   const canLogUsage = !!user;
   const canEdit = isEditor || isAdmin;
 
@@ -514,6 +514,7 @@ function AppContent() {
   const renderContent = () => {
     const isDataLoading =
       isUserLoading ||
+      !userRole === undefined || // Still fetching role
       isInventoryLoading ||
       isAssignmentsLoading ||
       isUsageLogLoading ||
@@ -527,7 +528,6 @@ function AppContent() {
     }
     
     // Fallback screen if user is not an admin, but the UI thinks they should be.
-    // This provides a clear message and avoids a broken UI state.
     if (!isAdmin && (view === 'users' || view === 'organization')) {
       setView('dashboard'); // Force back to a safe view
       return (
