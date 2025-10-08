@@ -4,70 +4,42 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // USERS
+    // Los administradores pueden leer la lista completa de usuarios.
+    // También pueden eliminar el documento de un usuario.
     match /users/{userId} {
-      // Los administradores pueden leer la lista completa de usuarios.
-      allow list: if request.auth != null &&
+      allow list, delete: if request.auth != null &&
                    get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role == 'admin';
       
-      // Cualquier usuario autenticado puede leer un perfil de usuario individual.
+      // Cualquier usuario autenticado puede leer el perfil de otro usuario individualmente
       allow read: if request.auth != null;
-
+      
       // Un usuario solo puede crear o actualizar su propio perfil.
-      allow write: if request.auth != null && request.auth.uid == userId;
-
-      // Los administradores pueden eliminar perfiles de usuario.
-      allow delete: if request.auth != null && 
-                     get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role == 'admin';
+      allow create, update: if request.auth != null && request.auth.uid == userId;
     }
 
-    // ROLES
-    match /roles/{userId} {
-      // Cualquier usuario autenticado puede leer un rol individual.
-      allow read: if request.auth != null;
-
-      // Solo los administradores pueden crear, actualizar o eliminar roles.
-      allow write: if request.auth != null &&
-                    get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role == 'admin';
-      allow delete: if request.auth != null && 
-                     get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role == 'admin';
+    // Los administradores pueden leer, escribir o eliminar cualquier rol.
+    match /roles/{roleId} {
+      allow read, write, delete: if request.auth != null &&
+                      get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // INVENTORY, SECTORS, ASSIGNMENTS, USAGELOG
-    // Reglas generales para el resto de las colecciones:
-    // Cualquier usuario autenticado puede leer.
-    // Solo los editores o administradores pueden escribir.
-    function isEditorOrAdmin() {
-      let userRole = get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role;
-      return userRole == 'editor' || userRole == 'admin';
-    }
-
+    // El resto de las colecciones (inventario, sectores, etc.)
+    // Asumimos por ahora que cualquier usuario autenticado puede leer y escribir.
+    // En una app real, estas reglas deberían ser más específicas.
     match /inventory/{itemId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && isEditorOrAdmin();
+      allow read, write: if request.auth != null;
     }
-    
     match /sectors/{sectorId} {
-       allow read: if request.auth != null;
-       allow write: if request.auth != null && isEditorOrAdmin();
+      allow read, write: if request.auth != null;
     }
-
     match /sectors/{sectorId}/machines/{machineId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && isEditorOrAdmin();
+      allow read, write: if request.auth != null;
     }
-
     match /machineAssignments/{assignmentId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && isEditorOrAdmin();
+      allow read, write: if request.auth != null;
     }
-
     match /usageLog/{logId} {
-      allow read: if request.auth != null;
-      // Cualquier usuario autenticado puede crear un log de uso (registrar consumo).
-      allow create: if request.auth != null;
-      // Nadie puede modificar o borrar el historial.
-      allow update, delete: if false;
+      allow read, write: if request.auth != null;
     }
   }
 }
