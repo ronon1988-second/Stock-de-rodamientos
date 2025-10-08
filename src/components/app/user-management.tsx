@@ -23,52 +23,81 @@ import type { UserProfile, UserRole } from '@/lib/types';
 import { Loader2, ShieldQuestion, UserX } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
 
 
 type UserManagementViewProps = {
-    users: UserProfile[] | null; // Can be null if query fails
-    allRoles: UserRole[] | null; // Can be null
+    users: UserProfile[] | null;
 }
 
-type UserWithRole = UserProfile & { role: UserRole['role'] | null };
+type UserWithRoleFetcherProps = {
+    user: UserProfile;
+    onSelect: (user: UserProfile & { role: UserRole['role'] | null }) => void;
+    isSelected: boolean;
+};
 
-export default function UserManagementView({ users, allRoles }: UserManagementViewProps) {
+// This new component will fetch the role for a single user
+const UserRow = ({ user, onSelect, isSelected }: UserWithRoleFetcherProps) => {
+    const firestore = useFirestore();
+    const roleRef = useMemoFirebase(() => firestore ? doc(firestore, 'roles', user.id) : null, [firestore, user.id]);
+    const { data: roleDoc, isLoading } = useDoc<UserRole>(roleRef);
+
+    const role = roleDoc?.role || null;
+    const getRoleDisplayName = (role: UserRole['role'] | null) => {
+        if (role === 'admin') return 'Administrador';
+        if (role === 'editor') return 'Editor';
+        return 'Usuario';
+    }
+
+    return (
+        <TableRow 
+            key={user.uid} 
+            className={isSelected ? 'bg-muted' : ''}
+        >
+            <TableCell>{user.email}</TableCell>
+            <TableCell>{user.displayName}</TableCell>
+            <TableCell>
+                <span className="flex items-center gap-2">
+                    {isLoading ? <Loader2 size={16} className="animate-spin" /> : 
+                     (role === null && <ShieldQuestion size={16} className="text-muted-foreground" />)}
+                    {isLoading ? 'Cargando...' : getRoleDisplayName(role)}
+                </span>
+            </TableCell>
+            <TableCell>
+                <Button variant="outline" size="sm" onClick={() => onSelect({ ...user, role })}>
+                    Gestionar
+                </Button>
+            </TableCell>
+        </TableRow>
+    );
+};
+
+
+export default function UserManagementView({ users }: UserManagementViewProps) {
     const { toast } = useToast();
-    const [selectedUser, setSelectedUser] = useState<UserWithRole | null>(null);
+    const [selectedUser, setSelectedUser] = useState<(UserProfile & { role: UserRole['role'] | null }) | null>(null);
     const [role, setRole] = useState<UserRole['role'] | 'user'>('user');
     const [isLoading, setIsLoading] = useState(false);
 
-    const usersWithRoles: UserWithRole[] | null = React.useMemo(() => {
-        // If users is null (due to permission error), return null immediately.
-        if (!users) return null;
-        if (!allRoles) return users.map(user => ({...user, role: null}));
-        
-        const rolesMap = new Map(allRoles.map(r => [r.id, r.role]));
-        return users.map(user => ({
-            ...user,
-            role: rolesMap.get(user.id) || null,
-        }));
-    }, [users, allRoles]);
-
-    const handleSelectUser = (user: UserWithRole) => {
-        setSelectedUser(user);
-        setRole(user.role || 'user');
+    const handleSelectUser = (userWithRole: UserProfile & { role: UserRole['role'] | null }) => {
+        setSelectedUser(userWithRole);
+        setRole(userWithRole.role || 'user');
     };
 
     const handleUpdateRole = async () => {
-        if (!selectedUser || !role) { 
+        if (!selectedUser) { 
             toast({
                 title: 'Selección inválida',
-                description: 'Por favor, seleccione un usuario y un rol.',
+                description: 'Por favor, seleccione un usuario.',
                 variant: 'destructive',
             });
             return;
         }
 
         const roleToSet = role === 'user' ? null : role;
-        const currentRole = usersWithRoles?.find(u => u.uid === selectedUser.uid)?.role || null;
         
-        if (roleToSet === currentRole) {
+        if (roleToSet === selectedUser.role) {
              toast({
                 title: 'Sin cambios',
                 description: `El usuario ya tiene el rol de ${getRoleDisplayName(roleToSet)}.`,
@@ -79,9 +108,10 @@ export default function UserManagementView({ users, allRoles }: UserManagementVi
         setIsLoading(true);
         
         if (roleToSet === null) {
+            // This is a limitation for now, as we need a separate server action to securely nullify claims.
             toast({
                 title: 'Función no implementada',
-                description: 'La degradación a rol de "Usuario" se debe implementar en una acción de servidor separada.',
+                description: 'La degradación a rol de "Usuario" aún no está soportada. Por favor asigne "Editor" o "Admin".',
                 variant: 'destructive',
             });
             setIsLoading(false);
@@ -94,7 +124,7 @@ export default function UserManagementView({ users, allRoles }: UserManagementVi
         if (result.success) {
             toast({
                 title: 'Rol Actualizado',
-                description: `El usuario ${selectedUser.email} ahora tiene el rol de ${getRoleDisplayName(roleToSet)}.`,
+                description: `El usuario ${selectedUser.email} ahora tiene el rol de ${getRoleDisplayName(roleToSet)}. Refresque la página para ver el cambio en la lista.`,
             });
             setSelectedUser(null);
         } else {
@@ -123,7 +153,7 @@ export default function UserManagementView({ users, allRoles }: UserManagementVi
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {!usersWithRoles ? (
+                    {!users ? (
                          <Alert variant="destructive">
                             <UserX className="h-4 w-4" />
                             <AlertTitle>No se pudieron cargar los usuarios</AlertTitle>
@@ -142,25 +172,13 @@ export default function UserManagementView({ users, allRoles }: UserManagementVi
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {usersWithRoles.map(user => (
-                                    <TableRow 
-                                        key={user.uid} 
-                                        className={selectedUser?.uid === user.uid ? 'bg-muted' : ''}
-                                    >
-                                        <TableCell>{user.email}</TableCell>
-                                        <TableCell>{user.displayName}</TableCell>
-                                        <TableCell>
-                                            <span className="flex items-center gap-2">
-                                                {user.role === null && <ShieldQuestion size={16} className="text-muted-foreground" />}
-                                                {getRoleDisplayName(user.role)}
-                                            </span>
-                                        </TableCell>
-                                        <TableCell>
-                                            <Button variant="outline" size="sm" onClick={() => handleSelectUser(user)}>
-                                                Gestionar
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
+                                {users.map(user => (
+                                    <UserRow 
+                                        key={user.id}
+                                        user={user}
+                                        onSelect={handleSelectUser}
+                                        isSelected={selectedUser?.id === user.id}
+                                    />
                                 ))}
                             </TableBody>
                         </Table>

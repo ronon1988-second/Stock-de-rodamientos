@@ -76,9 +76,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import OrganizationView from '@/components/app/organization-view';
 import UserManagementView from '@/components/app/user-management';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { addDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { updateUserRole } from './actions';
 
 type View =
   | 'dashboard'
@@ -214,8 +212,9 @@ function AppContent() {
   const allUsersRef = useMemoFirebase(() => (firestore && isAdmin ? collection(firestore, 'users') : null), [firestore, isAdmin]);
   const { data: allUsers, isLoading: isAllUsersLoading } = useCollection<UserProfile>(allUsersRef);
   
-  const allRolesRef = useMemoFirebase(() => (firestore && isAdmin ? collection(firestore, 'roles') : null), [firestore, isAdmin]);
-  const { data: allRoles, isLoading: isAllRolesLoading } = useCollection<UserRole>(allRolesRef);
+  // THIS IS THE PROBLEMATIC LINE - REMOVED FETCHING ALL ROLES
+  // const allRolesRef = useMemoFirebase(() => (firestore && isAdmin ? collection(firestore, 'roles') : null), [firestore, isAdmin]);
+  // const { data: allRoles, isLoading: isAllRolesLoading } = useCollection<UserRole>(allRolesRef);
 
 
   const inventoryRef = useMemoFirebase(() => firestore ? collection(firestore, 'inventory') : null, [firestore]);
@@ -529,7 +528,7 @@ function AppContent() {
       isSectorsLoading ||
       isLoadingMachines ||
       isSeeding ||
-      (isAdmin && (isAllUsersLoading || isAllRolesLoading));
+      (isAdmin && isAllUsersLoading); // Removed isAllRolesLoading
 
     if (isDataLoading) {
       return <Skeleton className="h-full w-full" />;
@@ -584,7 +583,8 @@ function AppContent() {
     }
     if (view === 'users' && isAdmin) {
         const usersToManage = allUsers?.filter(u => user && u.uid !== user.uid) || [];
-        return <UserManagementView users={usersToManage} allRoles={allRoles || []} />;
+        // The component no longer needs allRoles
+        return <UserManagementView users={usersToManage} />;
     }
     if (view.startsWith('machine-')) {
       const machineId = view.replace('machine-', '');
@@ -649,6 +649,33 @@ function AppContent() {
                 label="Panel de control"
                 onClick={handleNavClick}
             />
+            <NavLink
+                targetView="to-buy"
+                icon={<ShoppingCart className={iconClass} />}
+                label="Artículos a Comprar"
+                badgeCount={lowStockCount}
+                onClick={handleNavClick}
+            />
+            <NavLink
+                targetView="reports"
+                icon={<LineChart className={iconClass} />}
+                label="Reportes"
+                onClick={handleNavClick}
+            />
+
+            <div className="my-2 border-t -mx-4"></div>
+            
+            {(sortedSectors || []).map(sector => (
+              <div key={sector.id}>
+                <div className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground font-semibold">
+                  <Package className={iconClass} />
+                  <span>{sector.name}</span>
+                </div>
+                <MachineList sector={sector} onNavClick={handleNavClick} />
+              </div>
+            ))}
+
+            <div className="my-2 border-t -mx-4"></div>
             
             {canEdit && (
                 <NavLink
@@ -666,36 +693,6 @@ function AppContent() {
                     onClick={handleNavClick}
                 />
             )}
-
-            <div className="my-2 border-t -mx-4"></div>
-
-            <h3 className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Sectores</h3>
-            
-            {(sortedSectors || []).map(sector => (
-              <div key={sector.id}>
-                <div className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground font-semibold">
-                  <Package className={iconClass} />
-                  <span>{sector.name}</span>
-                </div>
-                <MachineList sector={sector} onNavClick={handleNavClick} />
-              </div>
-            ))}
-
-            <div className="my-2 border-t -mx-4"></div>
-            
-            <NavLink
-                targetView="to-buy"
-                icon={<ShoppingCart className={iconClass} />}
-                label="Artículos a Comprar"
-                badgeCount={lowStockCount}
-                onClick={handleNavClick}
-            />
-            <NavLink
-                targetView="reports"
-                icon={<LineChart className={iconClass} />}
-                label="Reportes"
-                onClick={handleNavClick}
-            />
         </nav>
     );
 };
@@ -815,5 +812,3 @@ export default function Page() {
 
   return <AppContent />;
 }
-
-    
