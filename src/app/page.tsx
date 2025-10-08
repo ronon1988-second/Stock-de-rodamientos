@@ -181,14 +181,6 @@ function AppContent() {
   const [isEditor, setIsEditor] = useState(false);
   
   useEffect(() => {
-    // ================== ADMIN DEBUGGING CODE ==================
-    if (user) {
-      user.getIdTokenResult(true).then((tokenResult) => {
-        console.log("[ADMIN DEBUG] 🎫 Custom claims:", tokenResult.claims);
-      });
-    }
-    // ========================================================
-
     if (isTestingAdmin) {
       setIsAdmin(true);
       setIsEditor(true);
@@ -200,6 +192,7 @@ function AppContent() {
           // Force a refresh of the token to get the latest claims from the server.
           const idTokenResult = await user.getIdTokenResult(true); 
           const claims = idTokenResult.claims;
+          console.log("[ADMIN CHECK] User claims:", claims);
           setIsAdmin(!!claims.admin);
           setIsEditor(!!claims.editor || !!claims.admin);
         } catch (error) {
@@ -814,5 +807,3 @@ export default function Page() {
 
   return <AppContent />;
 }
-
-    
