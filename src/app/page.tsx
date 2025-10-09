@@ -566,7 +566,10 @@ function AppContent() {
       return (
         <Dashboard
           inventory={sortedInventory}
-          onUpdateItem={handleUpdateItem}
+          onUpdateItem={(item) => {
+            const { id, stock, threshold } = item;
+            handleUpdateItem({ ...item, stock, threshold });
+          }}
           onAddItem={handleAddItem}
           onLogUsage={handleLogUsage}
           canEdit={canEditAnything}
@@ -623,7 +626,10 @@ function AppContent() {
     return (
         <Dashboard
             inventory={sortedInventory}
-            onUpdateItem={handleUpdateItem}
+            onUpdateItem={(item) => {
+                const { id, stock, threshold } = item;
+                handleUpdateItem({ ...item, stock, threshold });
+            }}
             onAddItem={handleAddItem}
             onLogUsage={handleLogUsage}
             canEdit={canEditAnything}
@@ -854,3 +860,5 @@ export default function Page() {
 
   return <AppContent />;
 }
+
+    
