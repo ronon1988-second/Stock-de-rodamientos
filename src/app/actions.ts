@@ -24,6 +24,7 @@ export async function getAIReorderRecommendations(input: ReorderRecommendationsI
  * Ensures a user profile exists and sets up their initial role in Firestore if needed.
  * This is the primary source of truth for user and role creation.
  * It now uses the Admin SDK for all writes to ensure permissions.
+ * This version is simplified to be more robust and avoid race conditions.
  */
 export async function setupUserAndRole(uid: string, email: string | null): Promise<{ success: boolean; error?: string }> {
     if (!uid || !email) {
@@ -35,51 +36,55 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
         const adminAuth = getAdminAuth(adminApp);
         const adminFirestore = getAdminFirestore(adminApp);
 
-        // Batch writes using the Admin SDK
-        const batch = adminFirestore.batch();
-
-        // 1. Ensure User Profile Document Exists
         const userRef = adminFirestore.collection('users').doc(uid);
+        const roleRef = adminFirestore.collection('roles').doc(uid);
         const userDoc = await userRef.get();
+
+        // If the user document already exists, we assume their role is also set.
+        if (userDoc.exists) {
+            console.log(`User ${email} already exists. Skipping setup.`);
+            return { success: true };
+        }
+        
+        console.log(`New user: ${email}. Proceeding with setup.`);
+
+        // Determine role and set custom claims if admin
+        let role: 'admin' | 'user' = 'user';
+        if (email === 'maurofbordon@gmail.com') {
+            role = 'admin';
+            try {
+                await adminAuth.setCustomUserClaims(uid, { admin: true });
+                console.log(`Successfully set custom claim 'admin:true' for UID: ${uid}`);
+            } catch (claimError) {
+                console.error("Error setting custom claim:", claimError);
+                // We don't want to fail the whole operation, but we log it.
+            }
+        }
 
         // Use a default display name if the email part is empty
         const displayName = email.split('@')[0] || `user_${uid.substring(0, 5)}`;
         
-        if (!userDoc.exists) {
-            const userData: Omit<UserProfile, 'id' | 'uid'> = {
-                email: email,
-                displayName: displayName,
-            };
-            batch.set(userRef, { uid, ...userData });
-        }
+        const userData: Omit<UserProfile, 'id' | 'uid'> = {
+            email: email,
+            displayName: displayName,
+        };
 
-        // 2. Set Role in Firestore '/roles' collection
-        const roleRef = adminFirestore.collection('roles').doc(uid);
-        const roleDoc = await roleRef.get();
-
-        if (!roleDoc.exists) {
-            let role: 'admin' | 'user' = 'user';
-            if (email === 'maurofbordon@gmail.com') {
-                console.log(`>>>>>> Matched admin user: ${email}. Setting role in Firestore. <<<<<<`);
-                role = 'admin';
-                
-                // Set custom claim for admin user using Admin SDK
-                try {
-                    await adminAuth.setCustomUserClaims(uid, { admin: true });
-                    console.log(`>>>>>> Successfully set custom claim 'admin:true' for UID: ${uid} <<<<<<`);
-                } catch (claimError) {
-                    console.error("Error setting custom claim:", claimError);
-                    // Don't fail the whole operation, but log the error.
-                }
-            }
-             batch.set(roleRef, { role: role });
-        }
+        // Create user and role documents in a single batch
+        const batch = adminFirestore.batch();
+        batch.create(userRef, { uid, ...userData });
+        batch.create(roleRef, { role: role });
         
         await batch.commit();
-        console.log(`Successfully set up user profile and role for ${email}`);
+
+        console.log(`Successfully created user profile and role for ${email}`);
         return { success: true };
 
     } catch (error: any) {
+        // Handle cases where documents might already exist if a previous attempt partially failed
+        if (error.code === 6 /* ALREADY_EXISTS */) {
+            console.warn(`Warning: Documents for user ${uid} might already exist. Error: ${error.message}`);
+            return { success: true }; // Consider it a success if they already exist.
+        }
         console.error('Error setting up user and role in Firestore:', error);
         return { success: false, error: error.message || 'An unexpected error occurred while setting up the user.' };
     }
