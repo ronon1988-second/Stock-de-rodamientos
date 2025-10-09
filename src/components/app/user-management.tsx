@@ -34,24 +34,8 @@ type UserManagementViewProps = {
 }
 
 const UserRow = ({ user, onSelect, isSelected }: { user: UserProfile, onSelect: (user: UserProfile) => void, isSelected: boolean }) => {
-    const firestore = useFirestore();
-    const roleRef = useMemoFirebase(() => firestore ? doc(firestore, 'roles', user.id) : null, [firestore, user.id]);
-    const { data: roleDoc, isLoading } = useDoc<UserRole>(roleRef);
-
-    const getRoleDisplayName = (role: UserRole['role'] | 'user' | undefined | null) => {
-        if (role === 'admin') return 'Administrador';
-        if (role === 'editor') return 'Editor';
-        return 'Usuario';
-    }
-    
-    const getRoleIcon = (role: UserRole['role'] | 'user' | undefined | null) => {
-        if (isLoading) return <Loader2 size={16} className="animate-spin" />;
-        if (role === 'admin') return <ShieldQuestion size={16} className="text-primary" />;
-        if (role === 'editor') return <Shield size={16} className="text-amber-600" />;
-        if (role === 'user') return <User size={16} className="text-muted-foreground" />;
-        return <ShieldQuestion size={16} className="text-muted-foreground" />;
-    }
-
+    // This component is now simplified and does not fetch roles directly.
+    // The role will be displayed in the detail view once a user is selected.
     return (
         <TableRow 
             key={user.id} 
@@ -61,9 +45,9 @@ const UserRow = ({ user, onSelect, isSelected }: { user: UserProfile, onSelect: 
             <TableCell>{user.displayName}</TableCell>
             <TableCell>{user.email}</TableCell>
             <TableCell>
-                <span className="flex items-center gap-2">
-                    {getRoleIcon(roleDoc?.role)}
-                    {isLoading ? 'Cargando...' : getRoleDisplayName(roleDoc?.role)}
+                <span className="flex items-center gap-2 text-muted-foreground">
+                    <User size={16} />
+                    <span>Ver rol...</span>
                 </span>
             </TableCell>
         </TableRow>
@@ -79,19 +63,24 @@ export default function UserManagementView({ users: initialUsers }: UserManageme
     const [isSubmitting, setIsSubmitting] = useState(false);
     
     const firestore = useFirestore();
+    // This hook will now ONLY run when a user is selected.
     const roleRef = useMemoFirebase(() => (firestore && selectedUser) ? doc(firestore, 'roles', selectedUser.id) : null, [firestore, selectedUser]);
     const { data: roleDoc, isLoading: isRoleLoading } = useDoc<UserRole>(roleRef);
 
     useEffect(() => {
+        // When roleDoc finishes loading for the selected user, update the dropdown
         if (roleDoc) {
             setSelectedRole(roleDoc.role as 'admin' | 'editor' | 'user');
         } else if (selectedUser) {
+            // If no role doc exists for the user, default to 'user'
             setSelectedRole('user');
         }
     }, [roleDoc, selectedUser]);
 
     useEffect(() => {
+        // Sync the user list if it changes from props
         setUsers(initialUsers);
+        // If the selected user is no longer in the list (e.g., after deletion), deselect them
         if (selectedUser && !initialUsers?.find(u => u.id === selectedUser.id)) {
             setSelectedUser(null);
         }
@@ -143,7 +132,7 @@ export default function UserManagementView({ users: initialUsers }: UserManageme
                 title: "Usuario Eliminado",
                 description: `El usuario ${selectedUser.email} ha sido eliminado.`,
             });
-            setSelectedUser(null);
+            setSelectedUser(null); // Deselect the user after deletion
         } else {
             toast({
                 title: "Error al Eliminar",
@@ -180,7 +169,7 @@ export default function UserManagementView({ users: initialUsers }: UserManageme
                                     <TableRow>
                                         <TableHead>Nombre</TableHead>
                                         <TableHead>Email</TableHead>
-                                        <TableHead>Rol Actual</TableHead>
+                                        <TableHead>Rol</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -231,7 +220,7 @@ export default function UserManagementView({ users: initialUsers }: UserManageme
                                 disabled={isSubmitting || isRoleLoading}
                             >
                                 <SelectTrigger>
-                                    <SelectValue placeholder="Seleccione un rol" />
+                                     {isRoleLoading ? <Loader2 size={16} className="animate-spin" /> : <SelectValue placeholder="Seleccione un rol" />}
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="user">Usuario</SelectItem>
@@ -284,3 +273,5 @@ export default function UserManagementView({ users: initialUsers }: UserManageme
         </div>
     );
 }
+
+    
