@@ -33,22 +33,27 @@ type UserManagementViewProps = {
     users: UserProfile[] | null;
 }
 
-const UserRow = ({ user, onSelect, isSelected }: { user: UserProfile, onSelect: (user: UserProfile) => void, isSelected: boolean }) => {
-    // This component is now simplified and does not fetch roles directly.
-    // The role will be displayed in the detail view once a user is selected.
+const UserRow = ({ user, onSelect, isSelected, role, isLoadingRole }: { user: UserProfile, onSelect: (user: UserProfile) => void, isSelected: boolean, role: string, isLoadingRole: boolean }) => {
     return (
-        <TableRow 
-            key={user.id} 
+        <TableRow
+            key={user.id}
             onClick={() => onSelect(user)}
             className={isSelected ? 'bg-muted' : 'cursor-pointer'}
         >
             <TableCell>{user.displayName}</TableCell>
             <TableCell>{user.email}</TableCell>
             <TableCell>
-                <span className="flex items-center gap-2 text-muted-foreground">
-                    <User size={16} />
-                    <span>Ver rol...</span>
-                </span>
+                {isLoadingRole ? (
+                    <span className="flex items-center gap-2 text-muted-foreground">
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>Cargando...</span>
+                    </span>
+                ) : (
+                    <span className="flex items-center gap-2">
+                        {role === 'admin' ? <Shield size={16} className="text-primary"/> : <User size={16} />}
+                        <span className="capitalize">{role}</span>
+                    </span>
+                )}
             </TableCell>
         </TableRow>
     );
@@ -150,7 +155,7 @@ export default function UserManagementView({ users: initialUsers }: UserManageme
                 <CardHeader>
                     <CardTitle>Lista de Usuarios</CardTitle>
                     <CardDescription>
-                        Seleccione un usuario de la lista para gestionar su rol.
+                        Seleccione un usuario de la lista para gestionar su rol o eliminarlo.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -169,7 +174,7 @@ export default function UserManagementView({ users: initialUsers }: UserManageme
                                     <TableRow>
                                         <TableHead>Nombre</TableHead>
                                         <TableHead>Email</TableHead>
-                                        <TableHead>Rol</TableHead>
+                                        <TableHead>Rol Actual</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -179,6 +184,8 @@ export default function UserManagementView({ users: initialUsers }: UserManageme
                                             user={user}
                                             onSelect={handleSelectUser}
                                             isSelected={selectedUser?.id === user.id}
+                                            role={selectedUser?.id === user.id ? (roleDoc?.role || 'user') : '...'}
+                                            isLoadingRole={selectedUser?.id === user.id && isRoleLoading}
                                         />
                                     ))}
                                 </TableBody>
@@ -273,5 +280,6 @@ export default function UserManagementView({ users: initialUsers }: UserManageme
         </div>
     );
 }
+
 
     
