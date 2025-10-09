@@ -50,7 +50,7 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
                 email: email,
                 displayName: displayName,
             };
-            batch.set(userRef, userData);
+            batch.set(userRef, { uid, ...userData });
         }
 
         // 2. Set Role in Firestore '/roles' collection
@@ -58,9 +58,10 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
         const roleDoc = await roleRef.get();
 
         if (!roleDoc.exists) {
+            let role: 'admin' | 'user' = 'user';
             if (email === 'maurofbordon@gmail.com') {
                 console.log(`>>>>>> Matched admin user: ${email}. Setting role in Firestore. <<<<<<`);
-                batch.set(roleRef, { role: 'admin' });
+                role = 'admin';
                 
                 // Set custom claim for admin user using Admin SDK
                 try {
@@ -70,11 +71,8 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
                     console.error("Error setting custom claim:", claimError);
                     // Don't fail the whole operation, but log the error.
                 }
-
-            } else {
-                // Creates a doc with a 'user' role by default
-                batch.set(roleRef, { role: 'user' }); 
             }
+             batch.set(roleRef, { role: role });
         }
         
         await batch.commit();
