@@ -33,21 +33,24 @@ export default function LoginPage() {
 
   const handleAuthenticationSuccess = async (user: User) => {
     // Run the server action to ensure the user document and role document exist in Firestore.
-    const result = await setupUserAndRole(user.uid, user.email || "");
+    // This function is now idempotent and safe to call every time.
+    const result = await setupUserAndRole(user.uid, user.email);
     
     if (result.success) {
       toast({
           title: "Éxito de inicio de sesión",
           description: "¡Bienvenido! Redirigiendo...",
       });
-      // Use window.location to force a full page reload to ensure the app fetches the new role from Firestore.
-      window.location.href = '/';
+      // A standard router push is sufficient now that the server action is robust.
+      router.push('/');
+      router.refresh(); // This helps ensure the client gets fresh data after login.
     } else {
+        setIsLoading(false); // Stop loading on failure
         toast({
             variant: "destructive",
-            title: "Error de configuración",
-            description: result.error || "No se pudo configurar el perfil del usuario."
-        })
+            title: "Error de configuración de la cuenta",
+            description: result.error || "No se pudo configurar el perfil del usuario. Por favor, intente de nuevo."
+        });
     }
   }
 
@@ -70,6 +73,7 @@ export default function LoginPage() {
       } else { // login
         userCredential = await signInWithEmailAndPassword(auth, email, password);
       }
+      // This will now handle the redirect internally upon success
       await handleAuthenticationSuccess(userCredential.user);
 
     } catch (error: any) {
@@ -98,10 +102,10 @@ export default function LoginPage() {
         title: title,
         description: description,
       });
-
-    } finally {
-        setIsLoading(false);
+      
+      setIsLoading(false); // Ensure loading is stopped on auth error
     }
+    // No finally block needed as success path handles its own loading state.
   };
 
   return (

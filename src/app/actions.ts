@@ -20,33 +20,35 @@ export async function getAIReorderRecommendations(input: ReorderRecommendationsI
 
 /**
  * Ensures a user profile exists and sets up their initial role in Firestore if needed.
- * This is the primary source of truth for user and role creation.
- * It now uses the Admin SDK for all writes to ensure permissions.
- * This version is simplified to be more robust and avoid race conditions.
+ * This function is idempotent and safe to call on every login.
  */
 export async function setupUserAndRole(uid: string, email: string | null): Promise<{ success: boolean; error?: string }> {
     if (!uid || !email) {
         return { success: false, error: 'User ID and email are required.' };
     }
 
-    try {
-        const adminApp = getAdminApp();
-        const adminAuth = getAdminAuth(adminApp);
-        const adminFirestore = getAdminFirestore(adminApp);
+    const adminApp = getAdminApp();
+    const adminFirestore = getAdminFirestore(adminApp);
+    const userRef = adminFirestore.collection('users').doc(uid);
 
-        const userRef = adminFirestore.collection('users').doc(uid);
-        
-        // Let's check if the user doc exists. If it does, we can skip everything.
+    try {
         const userDoc = await userRef.get();
+
+        // If the user document already exists, we assume everything is set up.
         if (userDoc.exists) {
-            console.log(`User ${email} already exists. Skipping setup.`);
+            console.log(`User profile for ${email} already exists. Skipping setup.`);
             return { success: true };
         }
-        
-        console.log(`New user: ${email}. Proceeding with setup.`);
 
-        // Determine role and set custom claims if admin
+        // If the document does not exist, it's a new user. Let's create everything.
+        console.log(`New user: ${email}. Setting up profile and role.`);
+
+        const adminAuth = getAdminAuth(adminApp);
+        const roleRef = adminFirestore.collection('roles').doc(uid);
+        
         let role: 'admin' | 'user' = 'user';
+        
+        // Determine role and set custom claims if they are the designated admin.
         if (email === 'maurofbordon@gmail.com') {
             role = 'admin';
             try {
@@ -54,24 +56,20 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
                 console.log(`Successfully set custom claim 'admin:true' for UID: ${uid}`);
             } catch (claimError) {
                 console.error("Error setting custom claim:", claimError);
-                // Don't fail the whole operation, but log it.
+                // We will still proceed to create the user docs.
             }
         }
 
-        // Use a default display name if the email part is empty
         const displayName = email.split('@')[0] || `user_${uid.substring(0, 5)}`;
-        
         const userData: Omit<UserProfile, 'id' | 'uid'> = {
             email: email,
             displayName: displayName,
         };
-        
-        const roleRef = adminFirestore.collection('roles').doc(uid);
 
         // Use a single batch to create both documents atomically.
         const batch = adminFirestore.batch();
-        batch.create(userRef, { uid, ...userData });
-        batch.create(roleRef, { role: role });
+        batch.create(userRef, { uid, ...userData }); // Use create to ensure it only happens once.
+        batch.create(roleRef, { role });
         
         await batch.commit();
 
@@ -80,14 +78,14 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
 
     } catch (error: any) {
         // This specific error code means a `create` operation failed because the document already exists.
-        // If we hit this, it means another process created the user between our .get() and .commit().
-        // We can safely consider this a success.
-        if (error.code === 6 /* ALREADY_EXISTS */) {
-            console.warn(`Warning: Documents for user ${uid} might have been created by a concurrent process. Error: ${error.message}`);
+        // This can happen in a race condition. We can safely consider this a success.
+        if (error.code === 'ALREADY_EXISTS' || error.code === 6) {
+            console.warn(`User setup for ${uid} was likely completed by a concurrent process. Considering it a success.`, error.message);
             return { success: true }; 
         }
-        console.error('Error setting up user and role in Firestore:', error);
-        return { success: false, error: error.message || 'An unexpected error occurred while setting up the user.' };
+        
+        console.error('Error in setupUserAndRole:', error);
+        return { success: false, error: error.message || 'An unexpected error occurred during user setup.' };
     }
 }
 
