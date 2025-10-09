@@ -1,5 +1,6 @@
 
 import { initializeApp, getApps, App, cert, applicationDefault } from 'firebase-admin/app';
+import { firebaseConfig } from '@/firebase/config';
 
 // Define a unique name for the admin app to avoid conflicts.
 const appName = 'firebase-admin-app';
@@ -17,21 +18,22 @@ function createAdminApp(): App {
   const serviceAccountBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
   console.log("SERVER-APP: Checking for FIREBASE_SERVICE_ACCOUNT_BASE64...");
 
+  const appOptions = {
+    projectId: firebaseConfig.projectId, // Explicitly set the project ID
+    credential: applicationDefault(), // Default to ADC
+  };
+
   if (serviceAccountBase64) {
     try {
       console.log("SERVER-APP: Found variable, attempting to decode and initialize...");
-      // Decode the Base64 string to a JSON string
       const decodedServiceAccount = Buffer.from(serviceAccountBase64, 'base64').toString('utf8');
       const serviceAccount = JSON.parse(decodedServiceAccount);
       
-      // Explicitly pass the projectId from the service account to avoid environment detection issues.
-      const app = initializeApp({
-        credential: cert(serviceAccount),
-        projectId: serviceAccount.project_id,
-      }, appName);
-
-      console.log("SERVER-APP: Successfully initialized with Base64 credentials.");
-      return app;
+      appOptions.credential = cert(serviceAccount);
+      // The project ID from the service account is preferred if available
+      appOptions.projectId = serviceAccount.project_id || firebaseConfig.projectId;
+      
+      console.log("SERVER-APP: Successfully configured with Base64 credentials.");
 
     } catch (e: any) {
       console.error(
@@ -39,14 +41,13 @@ function createAdminApp(): App {
         "Falling back to default credentials."
       );
     }
+  } else {
+    console.log("SERVER-APP: FIREBASE_SERVICE_ACCOUNT_BASE64 not set. Using Application Default Credentials.");
   }
   
-  console.log("SERVER-APP: FIREBASE_SERVICE_ACCOUNT_BASE64 not set or failed to parse. Attempting to use Application Default Credentials.");
-  const app = initializeApp({
-    credential: applicationDefault(),
-  }, appName);
+  const app = initializeApp(appOptions, appName);
   
-  console.log("SERVER-APP: Initialized with Application Default Credentials.");
+  console.log(`SERVER-APP: Initialized app for project: ${appOptions.projectId}`);
   return app;
 }
 
