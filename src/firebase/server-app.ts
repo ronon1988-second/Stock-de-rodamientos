@@ -1,6 +1,12 @@
 
 import { initializeApp, getApps, App, cert, applicationDefault } from 'firebase-admin/app';
 import { firebaseConfig } from '@/firebase/config';
+import { config } from 'dotenv';
+
+// Carga las variables de entorno del archivo .env al inicio del proceso del servidor.
+// Esto es crucial para que las credenciales estén disponibles tanto en desarrollo como en producción.
+config({ path: '.env' });
+
 
 // Define a unique name for the admin app to avoid conflicts.
 const appName = 'firebase-admin-app';
