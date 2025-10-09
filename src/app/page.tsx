@@ -672,7 +672,7 @@ function AppContent() {
                       <Accordion type="multiple" className="w-full">
                         {(sortedSectors || []).map(sector => (
                           <AccordionItem value={sector.id} key={sector.id} className="border-b-0">
-                            <AccordionTrigger className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary hover:no-underline text-base font-normal">
+                            <AccordionTrigger className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary hover:no-underline text-sm font-normal">
                               <div className="flex items-center gap-3">
                                 <Package className={iconClass} />
                                 <span>{sector.name}</span>
@@ -688,6 +688,8 @@ function AppContent() {
                 </AccordionItem>
             </Accordion>
             
+            <div className="my-2 border-t -mx-4"></div>
+
             <NavLink
                 targetView="to-buy"
                 icon={<ShoppingCart className={iconClass} />}
@@ -703,8 +705,6 @@ function AppContent() {
                 onClick={handleNavClick}
             />
 
-            <div className="my-2 border-t -mx-4"></div>
-            
             {isAdmin && (
                 <NavLink
                     targetView="users"
@@ -832,7 +832,5 @@ export default function Page() {
 
   return <AppContent />;
 }
-
-    
 
     
