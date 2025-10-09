@@ -13,7 +13,7 @@ import {
   Settings,
   HardDrive,
   Users,
-  ShieldAlert,
+  Building,
 } from 'lucide-react';
 import {
   collection,
@@ -648,39 +648,6 @@ function AppContent() {
                 label="Panel de control"
                 onClick={handleNavClick}
             />
-            <NavLink
-                targetView="to-buy"
-                icon={<ShoppingCart className={iconClass} />}
-                label="Artículos a Comprar"
-                badgeCount={lowStockCount}
-                onClick={handleNavClick}
-            />
-            <NavLink
-                targetView="reports"
-                icon={<LineChart className={iconClass} />}
-                label="Reportes"
-                onClick={handleNavClick}
-            />
-
-            <div className="my-2 border-t -mx-4"></div>
-            
-            <Accordion type="multiple" className="w-full">
-              {(sortedSectors || []).map(sector => (
-                <AccordionItem value={sector.id} key={sector.id} className="border-b-0">
-                  <AccordionTrigger className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary hover:no-underline text-base font-normal">
-                    <div className="flex items-center gap-3">
-                      <Package className={iconClass} />
-                      <span>{sector.name}</span>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="pb-0">
-                      <MachineList sector={sector} onNavClick={handleNavClick} currentView={view} />
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
-
-            <div className="my-2 border-t -mx-4"></div>
             
             {canEdit && (
                 <NavLink
@@ -690,6 +657,54 @@ function AppContent() {
                     onClick={handleNavClick}
                 />
             )}
+
+            <div className="my-2 border-t -mx-4"></div>
+
+            <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="sectors-main" className="border-b-0">
+                  <AccordionTrigger className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary hover:no-underline text-base font-normal">
+                      <div className="flex items-center gap-3">
+                          <Building className={iconClass} />
+                          <span>Sectores</span>
+                      </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="pb-0 pl-4">
+                      <Accordion type="multiple" className="w-full">
+                        {(sortedSectors || []).map(sector => (
+                          <AccordionItem value={sector.id} key={sector.id} className="border-b-0">
+                            <AccordionTrigger className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary hover:no-underline text-base font-normal">
+                              <div className="flex items-center gap-3">
+                                <Package className={iconClass} />
+                                <span>{sector.name}</span>
+                              </div>
+                            </AccordionTrigger>
+                            <AccordionContent className="pb-0">
+                                <MachineList sector={sector} onNavClick={handleNavClick} currentView={view} />
+                            </AccordionContent>
+                          </AccordionItem>
+                        ))}
+                      </Accordion>
+                  </AccordionContent>
+                </AccordionItem>
+            </Accordion>
+            
+            <NavLink
+                targetView="to-buy"
+                icon={<ShoppingCart className={iconClass} />}
+                label="Artículos a Comprar"
+                badgeCount={lowStockCount}
+                onClick={handleNavClick}
+            />
+            
+            <NavLink
+                targetView="reports"
+                icon={<LineChart className={iconClass} />}
+                label="Reportes"
+                onClick={handleNavClick}
+            />
+
+            <div className="my-2 border-t -mx-4"></div>
+            
             {isAdmin && (
                 <NavLink
                     targetView="users"
@@ -817,5 +832,7 @@ export default function Page() {
 
   return <AppContent />;
 }
+
+    
 
     
