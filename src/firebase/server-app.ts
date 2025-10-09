@@ -1,11 +1,13 @@
 
 import { initializeApp, getApps, App, cert, applicationDefault } from 'firebase-admin/app';
 import { firebaseConfig } from '@/firebase/config';
-import { config } from 'dotenv';
 
-// Carga las variables de entorno del archivo .env al inicio del proceso del servidor.
-// Esto es crucial para que las credenciales estén disponibles tanto en desarrollo como en producción.
-config({ path: '.env' });
+// Load environment variables from .env file, but only in non-production environments.
+// In production (like Vercel), environment variables are injected directly into the process.
+if (process.env.NODE_ENV !== 'production') {
+  console.log("SERVER-APP: Development environment detected, loading .env file...");
+  require('dotenv').config({ path: '.env' });
+}
 
 
 // Define a unique name for the admin app to avoid conflicts.
