@@ -38,6 +38,7 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
 
         const userRef = adminFirestore.collection('users').doc(uid);
         const roleRef = adminFirestore.collection('roles').doc(uid);
+        
         const userDoc = await userRef.get();
 
         // If the user document already exists, we assume their role is also set.
