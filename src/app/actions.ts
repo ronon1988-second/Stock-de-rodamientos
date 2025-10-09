@@ -30,6 +30,7 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
     const adminApp = getAdminApp();
     const adminFirestore = getAdminFirestore(adminApp);
     const userRef = adminFirestore.collection('users').doc(uid);
+    const roleRef = adminFirestore.collection('roles').doc(uid);
 
     try {
         const userDoc = await userRef.get();
@@ -44,7 +45,6 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
         console.log(`New user: ${email}. Setting up profile and role.`);
 
         const adminAuth = getAdminAuth(adminApp);
-        const roleRef = adminFirestore.collection('roles').doc(uid);
         
         let role: 'admin' | 'user' = 'user';
         
