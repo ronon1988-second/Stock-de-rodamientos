@@ -2,9 +2,7 @@
 'use server';
 
 import { getReorderRecommendations, ReorderRecommendationsInput } from "@/ai/flows/reorder-recommendations";
-import { doc, getDoc, writeBatch } from 'firebase/firestore';
 import { getAdminApp } from "@/firebase/server-app";
-import { getSdks } from "@/firebase/client-provider";
 import { UserProfile } from "@/lib/types";
 import { getAuth as getAdminAuth } from 'firebase-admin/auth';
 import { getFirestore as getAdminFirestore } from 'firebase-admin/firestore';
@@ -52,8 +50,6 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
         if (email === 'maurofbordon@gmail.com') {
             role = 'admin';
             try {
-                // This is an async operation, but we don't need to block the user profile creation on it.
-                // We'll await it to ensure it completes, but handle errors gracefully.
                 await adminAuth.setCustomUserClaims(uid, { admin: true });
                 console.log(`Successfully set custom claim 'admin:true' for UID: ${uid}`);
             } catch (claimError) {
@@ -73,8 +69,6 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
         const roleRef = adminFirestore.collection('roles').doc(uid);
 
         // Use a single batch to create both documents atomically.
-        // The `create` method will fail if the document already exists, which is what we want
-        // to prevent overwriting data, although we've already checked for the user doc.
         const batch = adminFirestore.batch();
         batch.create(userRef, { uid, ...userData });
         batch.create(roleRef, { role: role });
@@ -164,4 +158,3 @@ export async function deleteUser(uid: string): Promise<{ success: boolean; error
         return { success: false, error: error.message || 'An unexpected error occurred while deleting the user.' };
     }
 }
-
