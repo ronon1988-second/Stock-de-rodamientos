@@ -38,9 +38,8 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
 
         const userRef = adminFirestore.collection('users').doc(uid);
         
+        // Let's check if the user doc exists. If it does, we can skip everything.
         const userDoc = await userRef.get();
-
-        // If the user document already exists, we assume their role is also set.
         if (userDoc.exists) {
             console.log(`User ${email} already exists. Skipping setup.`);
             return { success: true };
@@ -53,11 +52,13 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
         if (email === 'maurofbordon@gmail.com') {
             role = 'admin';
             try {
+                // This is an async operation, but we don't need to block the user profile creation on it.
+                // We'll await it to ensure it completes, but handle errors gracefully.
                 await adminAuth.setCustomUserClaims(uid, { admin: true });
                 console.log(`Successfully set custom claim 'admin:true' for UID: ${uid}`);
             } catch (claimError) {
                 console.error("Error setting custom claim:", claimError);
-                // We don't want to fail the whole operation, but we log it.
+                // Don't fail the whole operation, but log it.
             }
         }
 
@@ -71,7 +72,9 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
         
         const roleRef = adminFirestore.collection('roles').doc(uid);
 
-        // Create user and role documents in a single batch
+        // Use a single batch to create both documents atomically.
+        // The `create` method will fail if the document already exists, which is what we want
+        // to prevent overwriting data, although we've already checked for the user doc.
         const batch = adminFirestore.batch();
         batch.create(userRef, { uid, ...userData });
         batch.create(roleRef, { role: role });
@@ -82,10 +85,12 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
         return { success: true };
 
     } catch (error: any) {
-        // Handle cases where documents might already exist if a previous attempt partially failed
+        // This specific error code means a `create` operation failed because the document already exists.
+        // If we hit this, it means another process created the user between our .get() and .commit().
+        // We can safely consider this a success.
         if (error.code === 6 /* ALREADY_EXISTS */) {
-            console.warn(`Warning: Documents for user ${uid} might already exist. Error: ${error.message}`);
-            return { success: true }; // Consider it a success if they already exist.
+            console.warn(`Warning: Documents for user ${uid} might have been created by a concurrent process. Error: ${error.message}`);
+            return { success: true }; 
         }
         console.error('Error setting up user and role in Firestore:', error);
         return { success: false, error: error.message || 'An unexpected error occurred while setting up the user.' };
@@ -159,3 +164,4 @@ export async function deleteUser(uid: string): Promise<{ success: boolean; error
         return { success: false, error: error.message || 'An unexpected error occurred while deleting the user.' };
     }
 }
+
