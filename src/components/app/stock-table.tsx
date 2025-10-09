@@ -43,19 +43,19 @@ const getItemSeries = (name: string): string => {
   if (normalizedName.startsWith('6')) {
     const series = normalizedName.substring(0, 2);
     if (['60', '62', '63', '68', '69'].includes(series)) {
-      return `Rodamientos Serie ${series}xx`;
+      return `Rodamientos ${series}xx`;
     }
   }
-  if (normalizedName.startsWith('UC')) return 'Rodamientos Serie UC (Insertos)';
+  if (normalizedName.startsWith('UC')) return 'Rodamientos UC (Insertos)';
   if (normalizedName.startsWith('12') || normalizedName.startsWith('13') || normalizedName.startsWith('22') || normalizedName.startsWith('23')) {
     const series = normalizedName.substring(0, 2);
     if (['12', '13', '22', '23'].includes(series)) {
-        return `Rodamientos Serie ${series}xx (Autoalineables)`;
+        return `Rodamientos ${series}xx (Autoalineables)`;
     }
   }
   if (normalizedName.startsWith('30') || normalizedName.startsWith('32') || normalizedName.startsWith('33')) {
       const series = normalizedName.substring(0, 2);
-      return `Rodamientos Serie ${series}xxx (Rodillos Cónicos)`;
+      return `Rodamientos ${series}xxx (Rodillos Cónicos)`;
   }
   if (normalizedName.startsWith('NK') || normalizedName.startsWith('RNA') || normalizedName.startsWith('HK')) return 'Rodamientos de Agujas';
   if (normalizedName.startsWith('PHS') || normalizedName.startsWith('POS')) return 'Terminales de Rótula';
@@ -237,8 +237,8 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, canEdit
                 <Accordion type="multiple" className="w-full">
                     {Array.from(groupedItems.entries()).map(([series, items]) => (
                         <AccordionItem value={series} key={series}>
-                            <AccordionTrigger className="text-lg font-semibold sticky top-0 bg-card z-10 px-4 py-3 border-b">
-                                {series} ({items.length})
+                            <AccordionTrigger className="text-base font-semibold sticky top-0 bg-card z-10 px-4 py-3 border-b">
+                                {series}
                             </AccordionTrigger>
                             <AccordionContent>
                                 <Table>
