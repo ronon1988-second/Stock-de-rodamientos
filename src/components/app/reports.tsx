@@ -29,6 +29,9 @@ type ReportsProps = {
 export default function Reports({ usageLog, sectors, machinesBySector }: ReportsProps) {
   
   const getMachineAndSectorName = (machineId: string, sectorId: string) => {
+    if (sectorId === 'general' || machineId === 'general') {
+        return { sectorName: 'Uso General', machineName: 'No especificado' };
+    }
     const sector = sectors.find(s => s.id === sectorId);
     const machines = machinesBySector[sectorId] || [];
     const machine = machines.find(m => m.id === machineId);
@@ -100,5 +103,7 @@ export default function Reports({ usageLog, sectors, machinesBySector }: Reports
     </div>
   );
 }
+
+    
 
     

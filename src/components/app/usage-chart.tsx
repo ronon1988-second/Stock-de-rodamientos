@@ -22,10 +22,17 @@ export default function UsageChart({ usageData, sectors }: UsageChartProps) {
         return acc;
     }, {} as Record<string, number>);
 
+    // Add a category for general usage
+    dataBySector['Uso General'] = 0;
+
     usageData.forEach(log => {
-        const sector = sectors.find(s => s.id === log.sectorId);
-        if (sector && dataBySector.hasOwnProperty(sector.name)) {
-            dataBySector[sector.name] += log.quantity;
+        if (log.sectorId === 'general') {
+            dataBySector['Uso General'] += log.quantity;
+        } else {
+            const sector = sectors.find(s => s.id === log.sectorId);
+            if (sector && dataBySector.hasOwnProperty(sector.name)) {
+                dataBySector[sector.name] += log.quantity;
+            }
         }
     });
     
@@ -73,5 +80,7 @@ export default function UsageChart({ usageData, sectors }: UsageChartProps) {
     </div>
   );
 }
+
+    
 
     

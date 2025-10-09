@@ -181,7 +181,7 @@ function AppContent() {
   const firestore = useFirestore();
   const [isSeeding, setIsSeeding] = useState(false);
   
-  const [userRole, setUserRole] = useState<UserRole['role'] | null>(null);
+  const [userRole, setUserRole] = useState<UserRole['role'] | 'user' | null>(null);
   
   useEffect(() => {
     const fetchAndSetUserRole = async () => {
@@ -195,12 +195,12 @@ function AppContent() {
             console.log("🟢 Rol de usuario obtenido:", roleData.role);
             setUserRole(roleData.role);
           } else {
-            console.warn("🟡 Documento de rol no encontrado para el usuario. Asumiendo rol nulo/por defecto.");
-            setUserRole(null);
+            console.warn("🟡 Documento de rol no encontrado para el usuario. Asumiendo rol 'user'.");
+            setUserRole('user');
           }
         } catch (error) {
            console.error("🔴 Error al obtener el documento de rol:", error);
-           setUserRole(null);
+           setUserRole('user');
         }
       } else {
         setUserRole(null);
@@ -211,8 +211,11 @@ function AppContent() {
 
   const isAdmin = userRole === 'admin';
   const isEditor = userRole === 'admin' || userRole === 'editor';
-  const canLogUsage = !!user;
-  const canEdit = isEditor || isAdmin;
+  
+  // Per user request, any logged-in user can edit stock or log usage.
+  // Administrative tasks (org, user mgmt) remain protected.
+  const canEditAnything = !!user; 
+  const canManageOrg = isEditor;
 
   // DATA FETCHING
   const allUsersRef = useMemoFirebase(() => (firestore && isAdmin ? collection(firestore, 'users') : null), [firestore, isAdmin]);
@@ -322,7 +325,7 @@ function AppContent() {
   );
 
   const handleAddItem = (newItem: Omit<InventoryItem, 'id'>) => {
-    if (!canEdit || !firestore) {
+    if (!canEditAnything || !firestore) {
         toast({ title: "Acceso denegado", variant: "destructive" });
         return;
     }
@@ -334,7 +337,7 @@ function AppContent() {
   };
 
   const handleUpdateItem = (updatedItem: InventoryItem) => {
-    if (!canEdit || !firestore) {
+    if (!canEditAnything || !firestore) {
         toast({ title: "Acceso denegado", variant: "destructive" });
         return;
     }
@@ -353,7 +356,7 @@ function AppContent() {
     sectorId: string,
     quantity: number
   ) => {
-    if (!canEdit || !inventory || !firestore) {
+    if (!canManageOrg || !inventory || !firestore) { // Only admins/editors can assign
         toast({ title: "Acceso denegado", variant: "destructive" });
         return;
     }
@@ -378,7 +381,7 @@ function AppContent() {
 
 
   const handleRemoveItemFromMachine = (assignmentId: string) => {
-    if (!canEdit || !firestore) {
+    if (!canManageOrg || !firestore) { // Only admins/editors can un-assign
         toast({ title: "Acceso denegado", variant: "destructive" });
         return;
     }
@@ -396,10 +399,10 @@ function AppContent() {
   const handleLogUsage = async (
     itemId: string,
     quantity: number,
-    machineId: string,
-    sectorId: string
+    machineId: string | null,
+    sectorId: string | null
   ) => {
-    if (!canLogUsage || !inventory || !firestore) {
+    if (!canEditAnything || !inventory || !firestore) {
       toast({ title: "Acceso denegado", variant: "destructive" });
       return;
     }
@@ -418,13 +421,14 @@ function AppContent() {
     const updatedStock = item.stock - quantity;
     const itemRef = doc(firestore, 'inventory', itemId);
     
+    // Allow for general/unspecified usage
     const newLog: Omit<UsageLog, 'id'> = {
       itemId,
       itemName: item.name,
       quantity,
       date: new Date().toISOString(),
-      sectorId,
-      machineId,
+      sectorId: sectorId || 'general',
+      machineId: machineId || 'general',
     };
 
     try {
@@ -536,12 +540,23 @@ function AppContent() {
     }
     
     // Fallback screen if user is not an admin, but the UI thinks they should be.
-    if (!isAdmin && (view === 'users' || view === 'organization')) {
+    if (!isAdmin && (view === 'users')) {
       setView('dashboard'); // Force back to a safe view
       return (
           <Card>
               <CardHeader>
                   <CardTitle>Acceso de Administrador Requerido</CardTitle>
+                  <CardDescription>No tienes los permisos necesarios para acceder a esta sección. Si crees que esto es un error, por favor, contacta al administrador.</CardDescription>
+              </CardHeader>
+          </Card>
+      );
+    }
+     if (!canManageOrg && (view === 'organization')) {
+      setView('dashboard'); // Force back to a safe view
+      return (
+          <Card>
+              <CardHeader>
+                  <CardTitle>Acceso de Editor Requerido</CardTitle>
                   <CardDescription>No tienes los permisos necesarios para acceder a esta sección. Si crees que esto es un error, por favor, contacta al administrador.</CardDescription>
               </CardHeader>
           </Card>
@@ -554,7 +569,10 @@ function AppContent() {
           inventory={sortedInventory}
           onUpdateItem={handleUpdateItem}
           onAddItem={handleAddItem}
-          canEdit={canEdit}
+          onLogUsage={handleLogUsage}
+          canEdit={canEditAnything}
+          sectors={sortedSectors}
+          machinesBySector={machinesBySector}
         />
       );
     }
@@ -575,7 +593,7 @@ function AppContent() {
         />
       );
     }
-    if (view === 'organization' && canEdit) {
+    if (view === 'organization' && canManageOrg) {
       return (
         <OrganizationView
           sectors={sortedSectors}
@@ -597,8 +615,8 @@ function AppContent() {
           onAssignItem={handleAssignItemToMachine}
           onRemoveItem={handleRemoveItemFromMachine}
           onLogUsage={handleLogUsage}
-          canEdit={canEdit}
-          canLogUsage={canLogUsage}
+          canEdit={canManageOrg} // Assigning items is an organizational task
+          canLogUsage={canEditAnything}
         />
       );
     }
@@ -608,7 +626,10 @@ function AppContent() {
             inventory={sortedInventory}
             onUpdateItem={handleUpdateItem}
             onAddItem={handleAddItem}
-            canEdit={canEdit}
+            onLogUsage={handleLogUsage}
+            canEdit={canEditAnything}
+            sectors={sortedSectors}
+            machinesBySector={machinesBySector}
         />
     );
   };
@@ -649,7 +670,7 @@ function AppContent() {
                 onClick={handleNavClick}
             />
             
-            {canEdit && (
+            {canManageOrg && (
                 <NavLink
                     targetView="organization"
                     icon={<Settings className={iconClass} />}
@@ -832,5 +853,7 @@ export default function Page() {
 
   return <AppContent />;
 }
+
+    
 
     

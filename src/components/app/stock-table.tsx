@@ -19,9 +19,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import UpdateStockDialog from "./update-stock-dialog";
-import type { InventoryItem } from "@/lib/types";
+import type { InventoryItem, MachinesBySector, Sector } from "@/lib/types";
 import { MoreHorizontal, Search, PlusCircle, FileDown } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import AddItemDialog from "./add-item-dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -30,9 +30,12 @@ type StockTableProps = {
   inventory: InventoryItem[];
   onUpdateItem: (item: InventoryItem) => void;
   onAddItem: (item: Omit<InventoryItem, 'id'>) => void;
+  onLogUsage: (itemId: string, quantity: number, machineId: string | null, sectorId: string | null) => void;
   canEdit: boolean;
   title?: string;
   description?: string;
+  sectors: Sector[];
+  machinesBySector: MachinesBySector;
 };
 
 // Function to determine item series
@@ -66,8 +69,9 @@ const getItemSeries = (name: string): string => {
 };
 
 
-export default function StockTable({ inventory, onUpdateItem, onAddItem, canEdit, title, description }: StockTableProps) {
+export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUsage, canEdit, title, description, sectors, machinesBySector }: StockTableProps) {
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [logUsageItem, setLogUsageItem] = useState<InventoryItem | null>(null);
   const [addingItem, setAddingItem] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -158,12 +162,19 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, canEdit
                 </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                <DropdownMenuItem
-                    onSelect={() => setEditingItem(item)}
-                >
-                    Actualizar Stock
-                </DropdownMenuItem>
+                    <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                    <DropdownMenuItem
+                        onSelect={() => setLogUsageItem(item)}
+                        disabled={item.stock === 0}
+                    >
+                        Registrar Uso
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                        onSelect={() => setEditingItem(item)}
+                    >
+                        Actualizar Stock
+                    </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
             </TableCell>
@@ -291,6 +302,22 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, canEdit
             mode="updateStock"
         />
       )}
+      {logUsageItem && canEdit && (
+         <UpdateStockDialog
+            key={`log-${logUsageItem.id}`}
+            item={logUsageItem}
+            onClose={() => setLogUsageItem(null)}
+            onConfirm={(itemId, quantity, machineId, sectorId) => {
+              onLogUsage(itemId, quantity, machineId, sectorId);
+            }}
+            mode="logUsage"
+            sectors={sectors}
+            machinesBySector={machinesBySector}
+        />
+      )}
     </>
   );
 }
+
+
+    

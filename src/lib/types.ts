@@ -33,8 +33,8 @@ export type UsageLog = {
   itemName: string;
   quantity: number;
   date: string; // ISO string
-  sectorId: string;
-  machineId: string;
+  sectorId: string; // Can be 'general' for non-specific usage
+  machineId: string; // Can be 'general' for non-specific usage
 };
 
 // Represents the assignment of items to a machine.
@@ -58,5 +58,7 @@ export type UserProfile = {
 // Represents a user's role stored in Firestore.
 export type UserRole = {
     id: string; // The id of this doc is the user's UID
-    role: 'admin' | 'editor';
+    role: 'admin' | 'editor' | 'user';
 }
+
+    

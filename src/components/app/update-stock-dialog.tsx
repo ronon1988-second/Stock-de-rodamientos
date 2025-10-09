@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
@@ -24,23 +24,31 @@ import {
 } from "@/components/ui/form";
 import { InventoryItem, Machine, Sector } from "@/lib/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import React from "react";
 
 type UpdateStockDialogProps = {
   item: InventoryItem;
   onClose: () => void;
-  onConfirm: (itemId: string, quantity: number, machineId?: string, sectorId?: string) => void;
+  onConfirm: (itemId: string, quantity: number, machineId?: string | null, sectorId?: string | null) => void;
   mode: "logUsage" | "updateStock";
   sectors?: Sector[];
   machinesBySector?: Record<string, Machine[]>;
+  defaultValues?: {
+    sectorId?: string;
+    machineId?: string;
+  };
 };
+
+const GENERAL_USAGE_ID = "general";
 
 export default function UpdateStockDialog({
   item,
   onClose,
   onConfirm,
   mode,
-  sectors,
-  machinesBySector,
+  sectors = [],
+  machinesBySector = {},
+  defaultValues = {},
 }: UpdateStockDialogProps) {
 
   const logUsageSchema = z.object({
@@ -63,8 +71,8 @@ export default function UpdateStockDialog({
     resolver: zodResolver(formSchema),
     defaultValues: mode === 'logUsage' ? {
       quantity: 1,
-      sectorId: undefined,
-      machineId: undefined,
+      sectorId: defaultValues.sectorId ?? undefined,
+      machineId: defaultValues.machineId ?? undefined,
     } : {
       stock: item.stock,
     },
@@ -72,10 +80,21 @@ export default function UpdateStockDialog({
 
   const selectedSectorId = form.watch('sectorId' as any);
 
+  // Reset machineId when sectorId changes
+  React.useEffect(() => {
+    if (mode === 'logUsage') {
+        form.setValue('machineId' as any, undefined);
+    }
+  }, [selectedSectorId, form, mode]);
+
+
   function onSubmit(values: z.infer<typeof formSchema>) {
     if (mode === 'logUsage') {
-      const { quantity, machineId, sectorId } = values as z.infer<typeof logUsageSchema>;
-      onConfirm(item.id, quantity, machineId, sectorId);
+      let { quantity, machineId, sectorId } = values as z.infer<typeof logUsageSchema>;
+      // Handle "General Usage" selection
+      const finalSectorId = sectorId === GENERAL_USAGE_ID ? null : sectorId;
+      const finalMachineId = machineId === GENERAL_USAGE_ID ? null : machineId;
+      onConfirm(item.id, quantity, finalMachineId, finalSectorId);
     } else {
       const { stock } = values as z.infer<typeof updateStockSchema>;
       onConfirm(item.id, stock);
@@ -84,6 +103,10 @@ export default function UpdateStockDialog({
   }
   
   const isLogUsage = mode === 'logUsage';
+
+  const availableMachines = selectedSectorId && selectedSectorId !== GENERAL_USAGE_ID
+    ? machinesBySector[selectedSectorId] || []
+    : [];
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
@@ -100,7 +123,7 @@ export default function UpdateStockDialog({
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 py-4">
-            {isLogUsage && sectors && machinesBySector && (
+            {isLogUsage && (
                 <>
                 <FormField
                   control={form.control}
@@ -128,6 +151,7 @@ export default function UpdateStockDialog({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
+                          <SelectItem value={GENERAL_USAGE_ID}>Uso General / No especificado</SelectItem>
                           {sectors.map(sector => (
                             <SelectItem key={sector.id} value={sector.id}>{sector.name}</SelectItem>
                           ))}
@@ -137,30 +161,33 @@ export default function UpdateStockDialog({
                     </FormItem>
                   )}
                 />
-                {selectedSectorId && (
-                    <FormField
-                    control={form.control}
-                    name="machineId"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Máquina</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!selectedSectorId}>
-                            <FormControl>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Seleccione una máquina" />
-                            </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                            {(machinesBySector[selectedSectorId] || []).map(machine => (
-                                <SelectItem key={machine.id} value={machine.id}>{machine.name}</SelectItem>
-                            ))}
-                            </SelectContent>
-                        </Select>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                    />
-                )}
+                
+                <FormField
+                  control={form.control}
+                  name="machineId"
+                  render={({ field }) => (
+                      <FormItem>
+                      <FormLabel>Máquina</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={!selectedSectorId}>
+                          <FormControl>
+                          <SelectTrigger>
+                              <SelectValue placeholder="Seleccione una máquina" />
+                          </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {selectedSectorId === GENERAL_USAGE_ID ? (
+                                <SelectItem value={GENERAL_USAGE_ID}>No especificado</SelectItem>
+                            ) : (
+                                availableMachines.map(machine => (
+                                    <SelectItem key={machine.id} value={machine.id}>{machine.name}</SelectItem>
+                                ))
+                            )}
+                          </SelectContent>
+                      </Select>
+                      <FormMessage />
+                      </FormItem>
+                  )}
+                />
                 </>
             )}
             {!isLogUsage && (
@@ -189,3 +216,6 @@ export default function UpdateStockDialog({
     </Dialog>
   );
 }
+
+
+    

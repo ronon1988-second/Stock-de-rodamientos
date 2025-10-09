@@ -8,20 +8,26 @@ import {
 } from "@/components/ui/card";
 import { AlertCircle, Package, ShoppingCart, Truck } from "lucide-react";
 import StockTable from "./stock-table";
-import type { InventoryItem } from "@/lib/types";
+import type { InventoryItem, MachinesBySector, Sector } from "@/lib/types";
 
 type DashboardProps = {
   inventory: InventoryItem[];
   onUpdateItem: (item: InventoryItem) => void;
   onAddItem: (item: Omit<InventoryItem, 'id'>) => void;
+  onLogUsage: (itemId: string, quantity: number, machineId: string | null, sectorId: string | null) => void;
   canEdit: boolean;
+  sectors: Sector[];
+  machinesBySector: MachinesBySector;
 };
 
 export default function Dashboard({
   inventory,
   onUpdateItem,
   onAddItem,
-  canEdit
+  onLogUsage,
+  canEdit,
+  sectors,
+  machinesBySector,
 }: DashboardProps) {
   const totalStock = inventory.reduce((sum, b) => sum + b.stock, 0);
   const lowStockCount = inventory.filter((b) => b.stock < b.threshold).length;
@@ -80,11 +86,16 @@ export default function Dashboard({
             inventory={inventory} 
             onUpdateItem={onUpdateItem}
             onAddItem={onAddItem}
+            onLogUsage={onLogUsage}
             canEdit={canEdit}
+            sectors={sectors}
+            machinesBySector={machinesBySector}
           />
       </div>
     </div>
   );
 }
+
+    
 
     

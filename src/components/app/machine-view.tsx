@@ -19,7 +19,7 @@ type MachineViewProps = {
     machineAssignments: MachineAssignment[];
     onAssignItem: (itemId: string, machineId: string, sectorId: string, quantity: number) => void;
     onRemoveItem: (assignmentId: string) => void;
-    onLogUsage: (itemId: string, quantity: number, machineId: string, sectorId: string) => void;
+    onLogUsage: (itemId: string, quantity: number, machineId: string | null, sectorId: string | null) => void;
     canEdit: boolean;
     canLogUsage: boolean;
 };
@@ -86,7 +86,7 @@ function MachineLoader({ machineId, children }: { machineId: string, children: (
 }
 
 
-function MachineDetails({ machine, allInventory, machineAssignments, onAssignItem, onRemoveItem, onLogUsage, canEdit, canLogUsage }: { machine: Machine, allInventory: InventoryItem[], machineAssignments: MachineAssignment[], onAssignItem: (itemId: string, machineId: string, sectorId: string, quantity: number) => void, onRemoveItem: (assignmentId: string) => void, onLogUsage: (itemId: string, quantity: number, machineId: string, sectorId: string) => void, canEdit: boolean, canLogUsage: boolean }) {
+function MachineDetails({ machine, allInventory, machineAssignments, onAssignItem, onRemoveItem, onLogUsage, canEdit, canLogUsage }: { machine: Machine, allInventory: InventoryItem[], machineAssignments: MachineAssignment[], onAssignItem: (itemId: string, machineId: string, sectorId: string, quantity: number) => void, onRemoveItem: (assignmentId: string) => void, onLogUsage: (itemId: string, quantity: number, machineId: string | null, sectorId: string | null) => void, canEdit: boolean, canLogUsage: boolean }) {
     const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
     const [logUsageItem, setLogUsageItem] = useState<InventoryItem | null>(null);
     const firestore = useFirestore();
@@ -188,7 +188,7 @@ function MachineDetails({ machine, allInventory, machineAssignments, onAssignIte
                                     <TableRow>
                                         <TableCell colSpan={4} className="h-24 text-center">
                                             Aún no se han asignado artículos a esta máquina.
-                                        </TableCell>
+                                        </TableCell>TRow
                                     </TableRow>
                                 )}
                             </TableBody>
@@ -210,8 +210,14 @@ function MachineDetails({ machine, allInventory, machineAssignments, onAssignIte
                     key={`log-${logUsageItem.id}`}
                     item={logUsageItem}
                     onClose={() => setLogUsageItem(null)}
-                    onConfirm={(itemId, quantity) => onLogUsage(itemId, quantity, machine.id, sector.id)}
+                    onConfirm={(itemId, quantity, machineId, sectorId) => onLogUsage(itemId, quantity, machineId, sectorId)}
                     mode="logUsage"
+                    sectors={[sector]}
+                    machinesBySector={{ [sector.id]: [machine] }}
+                    defaultValues={{
+                        sectorId: sector.id,
+                        machineId: machine.id,
+                    }}
                 />
             )}
         </>
@@ -231,3 +237,6 @@ export default function MachineView({ machineId, ...props }: MachineViewProps) {
         </MachineLoader>
     );
 }
+
+
+    
