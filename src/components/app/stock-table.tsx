@@ -296,8 +296,8 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
             key={`edit-${editingItem.id}`}
             item={editingItem}
             onClose={() => setEditingItem(null)}
-            onConfirm={(itemId, newStock) => {
-              onUpdateItem({ ...editingItem, stock: newStock });
+            onConfirm={(_, stock, threshold) => {
+              onUpdateItem({ ...editingItem, stock: stock, threshold: threshold! });
             }}
             mode="updateStock"
         />
@@ -307,7 +307,7 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
             key={`log-${logUsageItem.id}`}
             item={logUsageItem}
             onClose={() => setLogUsageItem(null)}
-            onConfirm={(itemId, quantity, machineId, sectorId) => {
+            onConfirm={(itemId, quantity, __, machineId, sectorId) => {
               onLogUsage(itemId, quantity, machineId, sectorId);
             }}
             mode="logUsage"

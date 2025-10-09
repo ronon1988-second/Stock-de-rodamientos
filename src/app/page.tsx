@@ -346,7 +346,7 @@ function AppContent() {
     setDocumentNonBlocking(itemRef, data, { merge: true });
     toast({
       title: 'Artículo Actualizado',
-      description: `Se ha actualizado el stock de ${updatedItem.name}.`,
+      description: `Se ha actualizado el artículo ${updatedItem.name}.`,
     });
   };
 

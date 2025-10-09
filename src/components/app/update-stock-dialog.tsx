@@ -29,7 +29,7 @@ import React from "react";
 type UpdateStockDialogProps = {
   item: InventoryItem;
   onClose: () => void;
-  onConfirm: (itemId: string, quantity: number, machineId?: string | null, sectorId?: string | null) => void;
+  onConfirm: (itemId: string, quantity: number, threshold?: number, machineId?: string | null, sectorId?: string | null) => void;
   mode: "logUsage" | "updateStock";
   sectors?: Sector[];
   machinesBySector?: Record<string, Machine[]>;
@@ -63,6 +63,7 @@ export default function UpdateStockDialog({
 
   const updateStockSchema = z.object({
     stock: z.coerce.number().int().min(0, "El stock no puede ser negativo."),
+    threshold: z.coerce.number().int().min(0, "El umbral no puede ser negativo."),
   });
 
   const formSchema = mode === 'logUsage' ? logUsageSchema : updateStockSchema;
@@ -75,6 +76,7 @@ export default function UpdateStockDialog({
       machineId: defaultValues.machineId ?? undefined,
     } : {
       stock: item.stock,
+      threshold: item.threshold,
     },
   });
 
@@ -94,10 +96,10 @@ export default function UpdateStockDialog({
       // Handle "General Usage" selection
       const finalSectorId = sectorId === GENERAL_USAGE_ID ? null : sectorId;
       const finalMachineId = machineId === GENERAL_USAGE_ID ? null : machineId;
-      onConfirm(item.id, quantity, finalMachineId, finalSectorId);
+      onConfirm(item.id, quantity, undefined, finalMachineId, finalSectorId);
     } else {
-      const { stock } = values as z.infer<typeof updateStockSchema>;
-      onConfirm(item.id, stock);
+      const { stock, threshold } = values as z.infer<typeof updateStockSchema>;
+      onConfirm(item.id, stock, threshold);
     }
     onClose();
   }
@@ -112,11 +114,11 @@ export default function UpdateStockDialog({
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{isLogUsage ? 'Registrar Uso' : 'Actualizar Stock'} de {item.name}</DialogTitle>
+          <DialogTitle>{isLogUsage ? 'Registrar Uso' : 'Actualizar Artículo'} de {item.name}</DialogTitle>
           <DialogDescription>
              {isLogUsage 
                 ? 'Seleccione la máquina e ingrese la cantidad utilizada.' 
-                : 'Ingrese el nuevo total de stock para este artículo.'}
+                : 'Ingrese el nuevo total de stock y el umbral de seguridad para este artículo.'}
              <br />
              Stock actual: <strong>{item.stock} unidades</strong>
           </DialogDescription>
@@ -191,6 +193,7 @@ export default function UpdateStockDialog({
                 </>
             )}
             {!isLogUsage && (
+                <div className="grid grid-cols-2 gap-4">
                  <FormField
                   control={form.control}
                   name="stock"
@@ -204,6 +207,20 @@ export default function UpdateStockDialog({
                     </FormItem>
                   )}
                 />
+                 <FormField
+                  control={form.control}
+                  name="threshold"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Umbral de Seguridad</FormLabel>
+                      <FormControl>
+                        <Input type="number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                </div>
             )}
            
             <DialogFooter>
