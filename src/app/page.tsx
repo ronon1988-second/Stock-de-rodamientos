@@ -213,7 +213,6 @@ function AppContent() {
   const isEditor = userRole === 'admin' || userRole === 'editor';
   
   // Per user request, any logged-in user can edit stock or log usage.
-  // Administrative tasks (org, user mgmt) remain protected.
   const canEditAnything = !!user; 
   const canManageOrg = isEditor;
 
@@ -778,7 +777,7 @@ function AppContent() {
                 <span className="sr-only">Alternar menú de navegación</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="flex flex-col">
+            <SheetContent side="left" className="flex flex-col w-[280px] sm:max-w-[280px]">
               <SheetHeader>
                 <SheetTitle className="sr-only">Menú</SheetTitle>
               </SheetHeader>
@@ -823,7 +822,7 @@ function AppContent() {
             </DropdownMenu>
           )}
         </header>
-        <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-muted/40">
+        <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-muted/40 overflow-x-auto">
           {renderContent()}
         </main>
       </div>
@@ -858,3 +857,6 @@ export default function Page() {
 
     
 
+
+
+    
