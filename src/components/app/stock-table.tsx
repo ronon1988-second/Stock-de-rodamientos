@@ -354,8 +354,3 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
     </>
   );
 }
-
-
-    
-
-

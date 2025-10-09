@@ -40,7 +40,7 @@ export default function Dashboard({
   return (
     <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-2">
       <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
-        <Card className="border-2">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4">
             <CardTitle className="text-sm font-medium">Stock Total</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
@@ -50,7 +50,7 @@ export default function Dashboard({
             <p className="text-xs text-muted-foreground">Unidades totales en inventario</p>
           </CardContent>
         </Card>
-        <Card className="border-2">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4">
             <CardTitle className="text-sm font-medium">Tipos de Artículo</CardTitle>
             <Truck className="h-4 w-4 text-muted-foreground" />
@@ -60,7 +60,7 @@ export default function Dashboard({
              <p className="text-xs text-muted-foreground">Códigos únicos gestionados</p>
           </CardContent>
         </Card>
-        <Card className={`border-2 ${lowStockCount > 0 ? "border-amber-500/50" : ""}`}>
+        <Card className={`${lowStockCount > 0 ? "border-amber-500/50" : ""}`}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4">
             <CardTitle className="text-sm font-medium">Necesitan Reposición</CardTitle>
             <ShoppingCart className="h-4 w-4 text-muted-foreground" />
@@ -72,7 +72,7 @@ export default function Dashboard({
              <p className="text-xs text-muted-foreground">Artículos bajo el umbral</p>
           </CardContent>
         </Card>
-        <Card className={`border-2 ${outOfStockCount > 0 ? "border-destructive/50" : ""}`}>
+        <Card className={`${outOfStockCount > 0 ? "border-destructive/50" : ""}`}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4">
             <CardTitle className="text-sm font-medium">Sin Stock</CardTitle>
             <AlertCircle className="h-4 w-4 text-muted-foreground" />
@@ -101,9 +101,3 @@ export default function Dashboard({
     </div>
   );
 }
-
-    
-
-    
-
-    
