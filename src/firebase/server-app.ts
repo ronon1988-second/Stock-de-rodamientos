@@ -18,7 +18,7 @@ function createAdminApp(): App {
   const serviceAccountBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
   console.log("SERVER-APP: Checking for FIREBASE_SERVICE_ACCOUNT_BASE64...");
 
-  const appOptions = {
+  const appOptions: { projectId: string; credential?: any } = {
     projectId: firebaseConfig.projectId, // Explicitly set the project ID
     credential: applicationDefault(), // Default to ADC
   };
