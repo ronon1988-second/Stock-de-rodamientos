@@ -37,7 +37,6 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
         const adminFirestore = getAdminFirestore(adminApp);
 
         const userRef = adminFirestore.collection('users').doc(uid);
-        const roleRef = adminFirestore.collection('roles').doc(uid);
         
         const userDoc = await userRef.get();
 
@@ -69,6 +68,8 @@ export async function setupUserAndRole(uid: string, email: string | null): Promi
             email: email,
             displayName: displayName,
         };
+        
+        const roleRef = adminFirestore.collection('roles').doc(uid);
 
         // Create user and role documents in a single batch
         const batch = adminFirestore.batch();
