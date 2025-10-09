@@ -33,7 +33,6 @@ export default function LoginPage() {
 
   const handleAuthenticationSuccess = async (user: User) => {
     // Run the server action to ensure the user document and role document exist in Firestore.
-    // This function is now idempotent and safe to call every time.
     const result = await setupUserAndRole(user.uid, user.email);
     
     if (result.success) {
@@ -46,10 +45,13 @@ export default function LoginPage() {
       router.refresh(); // This helps ensure the client gets fresh data after login.
     } else {
         setIsLoading(false); // Stop loading on failure
+        const errorMessage = result.error || "No se pudo configurar el perfil del usuario. Por favor, intente de nuevo.";
+        console.error("Account setup failed:", errorMessage);
         toast({
             variant: "destructive",
             title: "Error de configuración de la cuenta",
-            description: result.error || "No se pudo configurar el perfil del usuario. Por favor, intente de nuevo."
+            description: errorMessage,
+            duration: 9000,
         });
     }
   }
@@ -80,6 +82,8 @@ export default function LoginPage() {
       let description = "Ha ocurrido un error inesperado.";
       let title = `Error de ${action === 'login' ? 'inicio de sesión' : 'registro'}`;
       
+      console.error(`Auth Error (${action}):`, error);
+
       switch (error.code) {
         case 'auth/user-not-found':
         case 'auth/wrong-password':
@@ -94,18 +98,18 @@ export default function LoginPage() {
           description = "La contraseña debe tener al menos 6 caracteres.";
           break;
         default:
-            console.error("Auth Error:", error.code, error.message);
+            description = error.message; // Show the specific Firebase error message
       }
       
       toast({
         variant: "destructive",
         title: title,
         description: description,
+        duration: 9000,
       });
       
       setIsLoading(false); // Ensure loading is stopped on auth error
     }
-    // No finally block needed as success path handles its own loading state.
   };
 
   return (
