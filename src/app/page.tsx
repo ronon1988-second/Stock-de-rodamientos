@@ -822,8 +822,10 @@ function AppContent() {
             </DropdownMenu>
           )}
         </header>
-        <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-muted/40 overflow-x-auto">
-          {renderContent()}
+        <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-muted/40">
+          <div className="overflow-x-auto">
+            {renderContent()}
+          </div>
         </main>
       </div>
     </div>
@@ -852,11 +854,3 @@ export default function Page() {
 
   return <AppContent />;
 }
-
-    
-
-    
-
-
-
-    
