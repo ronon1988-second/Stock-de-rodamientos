@@ -307,7 +307,7 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
             key={`log-${logUsageItem.id}`}
             item={logUsageItem}
             onClose={() => setLogUsageItem(null)}
-            onConfirm={(itemId, quantity, __, machineId, sectorId) => {
+            onConfirm={(itemId, quantity, _, machineId, sectorId) => {
               onLogUsage(itemId, quantity, machineId, sectorId);
             }}
             mode="logUsage"
@@ -321,3 +321,4 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
 
 
     
+

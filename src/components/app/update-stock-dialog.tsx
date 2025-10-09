@@ -29,7 +29,7 @@ import React from "react";
 type UpdateStockDialogProps = {
   item: InventoryItem;
   onClose: () => void;
-  onConfirm: (itemId: string, quantity: number, threshold?: number, machineId?: string | null, sectorId?: string | null) => void;
+  onConfirm: (itemId: string, quantityOrStock: number, threshold?: number, machineId?: string | null, sectorId?: string | null) => void;
   mode: "logUsage" | "updateStock";
   sectors?: Sector[];
   machinesBySector?: Record<string, Machine[]>;
@@ -84,10 +84,10 @@ export default function UpdateStockDialog({
 
   // Reset machineId when sectorId changes
   React.useEffect(() => {
-    if (mode === 'logUsage') {
+    if (mode === 'logUsage' && !defaultValues.machineId) {
         form.setValue('machineId' as any, undefined);
     }
-  }, [selectedSectorId, form, mode]);
+  }, [selectedSectorId, form, mode, defaultValues.machineId]);
 
 
   function onSubmit(values: z.infer<typeof formSchema>) {
@@ -236,3 +236,4 @@ export default function UpdateStockDialog({
 
 
     
+
