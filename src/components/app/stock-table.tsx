@@ -20,18 +20,21 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import UpdateStockDialog from "./update-stock-dialog";
 import type { InventoryItem, MachinesBySector, Sector } from "@/lib/types";
-import { MoreHorizontal, Search, PlusCircle, FileDown } from "lucide-react";
+import { MoreHorizontal, Search, PlusCircle, FileDown, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import AddItemDialog from "./add-item-dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 type StockTableProps = {
   inventory: InventoryItem[];
   onUpdateItem: (item: InventoryItem) => void;
   onAddItem: (item: Omit<InventoryItem, 'id'>) => void;
   onLogUsage: (itemId: string, quantity: number, machineId: string | null, sectorId: string | null) => void;
+  onDeleteItem: (itemId: string, itemName: string) => void;
   canEdit: boolean;
+  canDelete: boolean;
   title?: string;
   description?: string;
   sectors: Sector[];
@@ -69,7 +72,7 @@ const getItemSeries = (name: string): string => {
 };
 
 
-export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUsage, canEdit, title, description, sectors, machinesBySector }: StockTableProps) {
+export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUsage, onDeleteItem, canEdit, canDelete, title, description, sectors, machinesBySector }: StockTableProps) {
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [logUsageItem, setLogUsageItem] = useState<InventoryItem | null>(null);
   const [addingItem, setAddingItem] = useState(false);
@@ -148,7 +151,7 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
         <TableCell className="text-center">
             <Badge variant={getStatusVariant(status)}>{status}</Badge>
         </TableCell>
-        {canEdit &&
+        {(canEdit || canDelete) &&
             <TableCell>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -163,18 +166,51 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                     <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                    <DropdownMenuItem
-                        onSelect={() => setLogUsageItem(item)}
-                        disabled={item.stock === 0}
-                    >
-                        Registrar Uso
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                        onSelect={() => setEditingItem(item)}
-                    >
-                        Actualizar Stock
-                    </DropdownMenuItem>
+                    {canEdit && (
+                      <>
+                        <DropdownMenuItem
+                            onSelect={() => setLogUsageItem(item)}
+                            disabled={item.stock === 0}
+                        >
+                            Registrar Uso
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            onSelect={() => setEditingItem(item)}
+                        >
+                            Actualizar Stock
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                    {canDelete && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <DropdownMenuItem
+                              onSelect={(e) => e.preventDefault()}
+                              className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Eliminar Artículo
+                            </DropdownMenuItem>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>¿Está absolutamente seguro?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Esta acción no se puede deshacer. Esto eliminará permanentemente el artículo <strong>{item.name}</strong> del inventario.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => onDeleteItem(item.id, item.name)}>
+                                Sí, eliminar artículo
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </>
+                    )}
                 </DropdownMenuContent>
             </DropdownMenu>
             </TableCell>
@@ -229,7 +265,7 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
                             <TableHead>Nombre</TableHead>
                             <TableHead className="text-right">Stock</TableHead>
                             <TableHead className="text-center">Estado</TableHead>
-                            {canEdit && <TableHead><span className="sr-only">Acciones</span></TableHead>}
+                            {(canEdit || canDelete) && <TableHead><span className="sr-only">Acciones</span></TableHead>}
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -237,7 +273,7 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
                             filteredItems.map(renderItemRow)
                         ) : (
                             <TableRow>
-                                <TableCell colSpan={canEdit ? 4 : 3} className="h-24 text-center">
+                                <TableCell colSpan={canEdit || canDelete ? 4 : 3} className="h-24 text-center">
                                     No se encontraron artículos que coincidan con la búsqueda.
                                 </TableCell>
                             </TableRow>
@@ -258,7 +294,7 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
                                         <TableHead>Nombre</TableHead>
                                         <TableHead className="text-right">Stock</TableHead>
                                         <TableHead className="text-center">Estado</TableHead>
-                                        {canEdit && 
+                                        {(canEdit || canDelete) && 
                                             <TableHead>
                                             <span className="sr-only">Acciones</span>
                                             </TableHead>
@@ -321,4 +357,5 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
 
 
     
+
 

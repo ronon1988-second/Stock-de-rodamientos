@@ -79,6 +79,7 @@ import OrganizationView from '@/components/app/organization-view';
 import UserManagementView from '@/components/app/user-management';
 import { addDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { deleteInventoryItem } from './actions';
 
 type View =
   | 'dashboard'
@@ -349,6 +350,28 @@ function AppContent() {
     });
   };
 
+  const handleDeleteItem = async (itemId: string, itemName: string) => {
+    if (!isAdmin) {
+      toast({ title: 'Acceso denegado', description: 'No tiene permiso para eliminar artículos.', variant: 'destructive' });
+      return;
+    }
+
+    const result = await deleteInventoryItem(itemId);
+
+    if (result.success) {
+      toast({
+        title: 'Artículo Eliminado',
+        description: `El artículo '${itemName}' ha sido eliminado del inventario.`,
+      });
+    } else {
+      toast({
+        title: 'Error al Eliminar',
+        description: result.error || 'No se pudo eliminar el artículo.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleAssignItemToMachine = (
     itemId: string,
     machineId: string,
@@ -573,6 +596,8 @@ function AppContent() {
           onAddItem={handleAddItem}
           onLogUsage={handleLogUsage}
           canEdit={canEditAnything}
+          onDeleteItem={handleDeleteItem}
+          canDelete={isAdmin}
           sectors={sortedSectors}
           machinesBySector={machinesBySector}
         />
@@ -633,6 +658,8 @@ function AppContent() {
             onAddItem={handleAddItem}
             onLogUsage={handleLogUsage}
             canEdit={canEditAnything}
+            onDeleteItem={handleDeleteItem}
+            canDelete={isAdmin}
             sectors={sortedSectors}
             machinesBySector={machinesBySector}
         />

@@ -15,7 +15,9 @@ type DashboardProps = {
   onUpdateItem: (item: InventoryItem) => void;
   onAddItem: (item: Omit<InventoryItem, 'id'>) => void;
   onLogUsage: (itemId: string, quantity: number, machineId: string | null, sectorId: string | null) => void;
+  onDeleteItem: (itemId: string, itemName: string) => void;
   canEdit: boolean;
+  canDelete: boolean;
   sectors: Sector[];
   machinesBySector: MachinesBySector;
 };
@@ -25,7 +27,9 @@ export default function Dashboard({
   onUpdateItem,
   onAddItem,
   onLogUsage,
+  onDeleteItem,
   canEdit,
+  canDelete,
   sectors,
   machinesBySector,
 }: DashboardProps) {
@@ -87,7 +91,9 @@ export default function Dashboard({
             onUpdateItem={onUpdateItem}
             onAddItem={onAddItem}
             onLogUsage={onLogUsage}
+            onDeleteItem={onDeleteItem}
             canEdit={canEdit}
+            canDelete={canDelete}
             sectors={sectors}
             machinesBySector={machinesBySector}
           />

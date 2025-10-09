@@ -156,3 +156,24 @@ export async function deleteUser(uid: string): Promise<{ success: boolean; error
         return { success: false, error: error.message || 'An unexpected error occurred while deleting the user.' };
     }
 }
+
+export async function deleteInventoryItem(itemId: string): Promise<{ success: boolean; error?: string }> {
+    if (!itemId) {
+        return { success: false, error: 'Se requiere el ID del artículo.' };
+    }
+
+    try {
+        const adminApp = getAdminApp();
+        const adminFirestore = getAdminFirestore(adminApp);
+        
+        const itemRef = adminFirestore.collection('inventory').doc(itemId);
+        
+        await itemRef.delete();
+        console.log(`(Admin) Se eliminó exitosamente el artículo del inventario con ID: ${itemId}`);
+
+        return { success: true };
+    } catch (error: any) {
+        console.error(`Error al eliminar el artículo del inventario con ID ${itemId}:`, error);
+        return { success: false, error: error.message || 'Ocurrió un error inesperado al eliminar el artículo.' };
+    }
+}
