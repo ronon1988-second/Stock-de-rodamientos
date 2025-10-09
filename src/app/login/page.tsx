@@ -26,7 +26,7 @@ import { setupUserAndRole } from "../actions";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [loadingAction, setLoadingAction] = useState<'login' | 'signup' | null>(null);
   const { auth } = useFirebase();
   const { toast } = useToast();
   const router = useRouter();
@@ -44,7 +44,7 @@ export default function LoginPage() {
       router.push('/');
       router.refresh(); // This helps ensure the client gets fresh data after login.
     } else {
-        setIsLoading(false); // Stop loading on failure
+        setLoadingAction(null); // Stop loading on failure
         const errorMessage = result.error || "No se pudo configurar el perfil del usuario. Por favor, intente de nuevo.";
         console.error("Account setup failed:", errorMessage);
         toast({
@@ -66,7 +66,7 @@ export default function LoginPage() {
       return;
     }
     
-    setIsLoading(true);
+    setLoadingAction(action);
 
     try {
       let userCredential;
@@ -108,7 +108,7 @@ export default function LoginPage() {
         duration: 9000,
       });
       
-      setIsLoading(false); // Ensure loading is stopped on auth error
+      setLoadingAction(null); // Ensure loading is stopped on auth error
     }
   };
 
@@ -134,7 +134,7 @@ export default function LoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              disabled={isLoading}
+              disabled={!!loadingAction}
             />
           </div>
           <div className="grid gap-2">
@@ -145,7 +145,7 @@ export default function LoginPage() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              disabled={isLoading}
+              disabled={!!loadingAction}
             />
           </div>
         </CardContent>
@@ -153,15 +153,15 @@ export default function LoginPage() {
           <Button 
             variant="outline" 
             onClick={() => handleAuthAction("signup")}
-            disabled={isLoading}
+            disabled={!!loadingAction}
           >
-            {isLoading ? 'Registrando...' : 'Registrarse'}
+            {loadingAction === 'signup' ? 'Registrando...' : 'Registrarse'}
           </Button>
           <Button
             onClick={() => handleAuthAction("login")}
-            disabled={isLoading}
+            disabled={!!loadingAction}
           >
-            {isLoading ? 'Ingresando...' : 'Ingresar'}
+            {loadingAction === 'login' ? 'Ingresando...' : 'Ingresar'}
           </Button>
         </CardContent>
       </Card>
