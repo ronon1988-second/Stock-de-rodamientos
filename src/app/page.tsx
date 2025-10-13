@@ -771,7 +771,6 @@ function AppContent() {
                 targetView="to-buy"
                 icon={<ShoppingCart className={iconClass} />}
                 label="Artículos a Comprar"
-                badgeCount={lowStockCount}
                 onClick={handleNavClick}
             />
             
@@ -909,5 +908,3 @@ export default function Page() {
 
   return <AppContent />;
 }
-
-    
