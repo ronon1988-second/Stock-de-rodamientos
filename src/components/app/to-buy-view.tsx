@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo } from "react";
@@ -25,9 +26,8 @@ import {
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "../ui/command";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../ui/command";
 import { cn } from "@/lib/utils";
-import { Badge } from "../ui/badge";
 
 type ToBuyViewProps = {
   inventory: InventoryItem[];
@@ -42,6 +42,60 @@ type ReorderInfo = {
     toBuy: number;
 }
 
+// Multi-select popover component
+const MultiSelect = ({ title, options, selectedValues, onSelect }: { title: string, options: {value: string, label: string}[], selectedValues: string[], onSelect: (values: string[]) => void }) => {
+  const [open, setOpen] = useState(false);
+  const selectedLabels = selectedValues.map(val => options.find(o => o.value === val)?.label).filter(Boolean);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" role="combobox" aria-expanded={open} className="justify-between w-full">
+          <span className="truncate">
+            {selectedValues.length > 0 
+              ? `${title}: ${selectedLabels.join(', ')}` 
+              : `Todos los ${title.toLowerCase()}`}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[300px] p-0">
+        <Command>
+          <CommandInput placeholder={`Buscar ${title.toLowerCase()}...`} />
+          <CommandList>
+            <CommandEmpty>No se encontraron resultados.</CommandEmpty>
+            <CommandGroup>
+              {options.map((option) => (
+                <CommandItem
+                  key={option.value}
+                  onSelect={(currentValue) => {
+                    const value = options.find(o => o.label.toLowerCase() === currentValue.toLowerCase())?.value;
+                    if (!value) return;
+
+                    const newSelection = selectedValues.includes(value)
+                      ? selectedValues.filter((v) => v !== value)
+                      : [...selectedValues, value];
+                    onSelect(newSelection);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      selectedValues.includes(option.value) ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  {option.label}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+
 export default function ToBuyView({ inventory, machineAssignments, sectors, machinesBySector }: ToBuyViewProps) {
   const [recommendations, setRecommendations] = useState<ReorderRecommendationsOutput | null>(null);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
@@ -53,20 +107,30 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
 
   const filteredMachines = useMemo(() => {
     if (selectedSectorIds.length === 0) {
-      return Object.values(machinesBySector).flat();
+      return Object.values(machinesBySector).flat().sort((a, b) => a.name.localeCompare(b.name));
     }
-    return selectedSectorIds.flatMap(sectorId => machinesBySector[sectorId] || []);
+    return selectedSectorIds.flatMap(sectorId => machinesBySector[sectorId] || []).sort((a,b) => a.name.localeCompare(b.name));
   }, [selectedSectorIds, machinesBySector]);
 
   const itemsToReorder = useMemo(() => {
     const relevantMachineAssignments = machineAssignments.filter(assignment => {
-      const isSectorMatch = selectedSectorIds.length === 0 || selectedSectorIds.includes(assignment.sectorId);
-      const isMachineMatch = selectedMachineIds.length === 0 || selectedMachineIds.includes(assignment.machineId);
-      
-      if (selectedMachineIds.length > 0) {
-        return isMachineMatch;
+      const isSectorSelected = selectedSectorIds.length > 0;
+      const isMachineSelected = selectedMachineIds.length > 0;
+
+      // If no filters, include all assignments
+      if (!isSectorSelected && !isMachineSelected) {
+        return true;
       }
-      return isSectorMatch;
+      // If machines are selected, filter by machine ID (highest priority)
+      if (isMachineSelected) {
+        return selectedMachineIds.includes(assignment.machineId);
+      }
+      // If only sectors are selected, filter by sector ID
+      if (isSectorSelected) {
+        return selectedSectorIds.includes(assignment.sectorId);
+      }
+      
+      return false; // Should not be reached
     });
 
     const requiredByItem: { [itemId: string]: number } = {};
@@ -78,8 +142,12 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
     });
 
     const items: ReorderInfo[] = [];
-    inventory.forEach(item => {
-        const totalRequired = requiredByItem[item.id] || 0;
+    // Important: We only consider items that are actually required by the filtered assignments
+    for (const itemId in requiredByItem) {
+        const item = inventory.find(i => i.id === itemId);
+        if (!item) continue;
+
+        const totalRequired = requiredByItem[itemId] || 0;
         const safetyStock = item.threshold;
         const totalDemand = totalRequired + safetyStock;
         const toBuy = totalDemand - item.stock;
@@ -91,7 +159,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                 toBuy,
             });
         }
-    });
+    }
 
     return items.sort((a,b) => a.item.name.localeCompare(b.item.name));
   }, [inventory, machineAssignments, selectedSectorIds, selectedMachineIds]);
@@ -171,49 +239,6 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
     setSelectedMachineIds([]);
   }
 
-  // Multi-select popover component
-  const MultiSelect = ({ title, options, selectedValues, onSelect }: { title: string, options: {value: string, label: string}[], selectedValues: string[], onSelect: (values: string[]) => void }) => {
-    const [open, setOpen] = useState(false);
-    return (
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button variant="outline" role="combobox" aria-expanded={open} className="justify-between w-full">
-            <span className="truncate">{selectedValues.length > 0 ? `${title} (${selectedValues.length})` : `Todos los ${title.toLowerCase()}`}</span>
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[300px] p-0">
-          <Command>
-            <CommandInput placeholder={`Buscar ${title.toLowerCase()}...`} />
-            <CommandEmpty>No se encontraron resultados.</CommandEmpty>
-            <CommandGroup>
-              {options.map((option) => (
-                <CommandItem
-                  key={option.value}
-                  onSelect={() => {
-                    const newSelection = selectedValues.includes(option.value)
-                      ? selectedValues.filter((v) => v !== option.value)
-                      : [...selectedValues, option.value];
-                    onSelect(newSelection);
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      selectedValues.includes(option.value) ? "opacity-100" : "opacity-0"
-                    )}
-                  />
-                  {option.label}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </Command>
-        </PopoverContent>
-      </Popover>
-    );
-  }
-
-
   return (
     <div className="grid auto-rows-max items-start gap-4 md:gap-8">
       <Card>
@@ -256,7 +281,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                     <label className="text-sm font-medium">Filtro por Sector</label>
                     <MultiSelect 
                       title="Sectores"
-                      options={sectors.map(s => ({ value: s.id, label: s.name }))}
+                      options={sectors.sort((a,b) => a.name.localeCompare(b.name)).map(s => ({ value: s.id, label: s.name }))}
                       selectedValues={selectedSectorIds}
                       onSelect={(values) => {
                         setSelectedSectorIds(values);
@@ -303,7 +328,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                   <TableRow>
                   <TableHead>Artículo</TableHead>
                   <TableHead className="text-right">Stock Actual</TableHead>
-                  <TableHead className="text-right">Requerido (Máquinas)</TableHead>
+                  <TableHead className="text-right">Requerido (Filtro)</TableHead>
                   <TableHead className="text-right">Stock de Seguridad</TableHead>
                   <TableHead className="text-right font-bold text-primary">Cantidad a Comprar</TableHead>
                   {recommendations && <TableHead className="text-right font-bold">Sugerencia IA</TableHead>}
@@ -337,7 +362,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                 ) : (
                   <TableRow>
                       <TableCell colSpan={recommendations ? 6 : 5} className="h-48 text-center text-muted-foreground">
-                        <p>¡Todo en orden! No hay artículos que necesiten reposición para la selección actual.</p>
+                        <p>¡Todo en orden! No hay artículos que necesiten reposición para los filtros seleccionados.</p>
                       </TableCell>
                   </TableRow>
                 )}
