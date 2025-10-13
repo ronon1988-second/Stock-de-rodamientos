@@ -307,7 +307,6 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
                                     )}></span>
                                 )}
                                 <span>{series}</span>
-                                <span className="text-sm font-normal text-muted-foreground">({items.length})</span>
                                 </div>
                             </AccordionTrigger>
                             <AccordionContent>
