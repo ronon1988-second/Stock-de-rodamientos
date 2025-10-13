@@ -66,7 +66,9 @@ const MultiSelect = ({ title, options, selectedValues, onSelect, disabled }: { t
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[300px] p-0" onPointerDownOutside={() => setOpen(false)}>
+      <PopoverContent className="w-[300px] p-0" onPointerDownOutside={(e) => {
+          e.preventDefault();
+      }}>
         <Command>
           <CommandInput placeholder={`Buscar ${title.toLowerCase()}...`} />
           <CommandList>
@@ -76,8 +78,7 @@ const MultiSelect = ({ title, options, selectedValues, onSelect, disabled }: { t
                 <CommandItem
                   key={option.value}
                   onSelect={(currentValue) => {
-                    const optionValue = options.find(o => o.label.toLowerCase() === currentValue)?.value;
-                    if(optionValue) handleSelect(optionValue);
+                    handleSelect(option.value);
                   }}
                 >
                   <Check
@@ -445,4 +446,5 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
     </div>
   );
 }
- 
+
+    
