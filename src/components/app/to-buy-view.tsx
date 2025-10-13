@@ -77,7 +77,7 @@ const MultiSelect = ({ title, options, selectedValues, onSelect, disabled }: { t
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
-                  onSelect={(currentValue) => {
+                  onSelect={() => {
                     handleSelect(option.value);
                   }}
                 >
