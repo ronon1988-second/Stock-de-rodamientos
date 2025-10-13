@@ -643,6 +643,7 @@ function AppContent() {
           machineAssignments={sortedAssignments}
           sectors={sortedSectors}
           machinesBySector={machinesBySector}
+          isLoadingMachines={isLoadingMachines}
         />
       );
     }

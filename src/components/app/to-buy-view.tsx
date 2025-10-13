@@ -29,12 +29,14 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../ui/command";
 import { Checkbox } from "../ui/checkbox";
+import { Skeleton } from "../ui/skeleton";
 
 type ToBuyViewProps = {
   inventory: InventoryItem[];
   machineAssignments: MachineAssignment[];
   sectors: Sector[];
   machinesBySector: MachinesBySector;
+  isLoadingMachines: boolean;
 };
 
 type ReorderInfo = {
@@ -73,10 +75,10 @@ const getItemSeries = (name: string): string => {
 };
 
 
-export default function ToBuyView({ inventory, machineAssignments, sectors, machinesBySector }: ToBuyViewProps) {
+export default function ToBuyView({ inventory, machineAssignments, sectors, machinesBySector, isLoadingMachines }: ToBuyViewProps) {
   const [recommendations, setRecommendations] =
     useState<ReorderRecommendationsOutput | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   
@@ -93,6 +95,8 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
   const leadTime = 7;
 
   const groupedItemsToReorder = useMemo(() => {
+    if (isLoadingMachines) return null;
+
     const machinesInSelectedSectors = new Set<string>();
     selectedSectors.forEach(sectorId => {
       const machines = machinesBySector[sectorId] || [];
@@ -138,19 +142,19 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
     grouped.forEach(items => items.sort((a, b) => a.item.name.localeCompare(b.item.name)));
     
     return new Map([...grouped.entries()].sort((a, b) => a[0].localeCompare(b[0])));
-  }, [inventory, machineAssignments, selectedSectors, machinesBySector]);
+  }, [inventory, machineAssignments, selectedSectors, machinesBySector, isLoadingMachines]);
 
   const totalItemsToReorderCount = useMemo(() => {
+    if (!groupedItemsToReorder) return 0;
     return Array.from(groupedItemsToReorder.values()).reduce((acc, items) => acc + items.length, 0);
   }, [groupedItemsToReorder]);
 
 
   const handleGetAIRecommendations = async () => {
-    setIsLoading(true);
+    setIsLoadingAI(true);
     setError(null);
     setRecommendations(null);
     
-    // The AI prompt is simpler and doesn't need filtered data, it can reason over the whole set
     const reorderThreshold = 2;
 
     const input = {
@@ -177,7 +181,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
       setError(result.error || "Ocurrió un error desconocido.");
     }
 
-    setIsLoading(false);
+    setIsLoadingAI(false);
   };
   
   const getAIRecommendationFor = (itemName: string) => {
@@ -187,6 +191,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
   }
   
   const exportToCSV = () => {
+    if (!groupedItemsToReorder) return;
     let csvContent = "data:text/csv;charset=utf-8,Artículo;Stock Actual;Total Requerido en Máquinas;Stock de Seguridad;Cantidad a Comprar (Calculado);Cantidad a Comprar (IA)\n";
     
     for (const items of groupedItemsToReorder.values()) {
@@ -206,6 +211,82 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
     document.body.removeChild(link);
   }
 
+  const renderContent = () => {
+    if (isLoadingMachines || groupedItemsToReorder === null) {
+      return (
+        <div className="space-y-4">
+          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-20 w-full" />
+        </div>
+      );
+    }
+    
+    if (totalItemsToReorderCount > 0) {
+      return (
+        <Accordion type="multiple" className="w-full">
+          {Array.from(groupedItemsToReorder.entries()).map(([series, items]) => (
+            <AccordionItem value={series} key={series}>
+              <AccordionTrigger className="text-lg font-semibold sticky top-0 bg-card z-10 px-4 py-3 border-b">
+                {series}
+              </AccordionTrigger>
+              <AccordionContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Artículo</TableHead>
+                      <TableHead className="text-right">Stock Actual</TableHead>
+                      <TableHead className="text-right">Requerido (Máquinas)</TableHead>
+                      <TableHead className="text-right">Stock de Seguridad</TableHead>
+                      <TableHead className="text-right font-bold text-primary">Cantidad a Comprar</TableHead>
+                      <TableHead className="text-right font-bold">Sugerencia IA</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {items.map((itemInfo) => {
+                      const { item, totalRequired, toBuy } = itemInfo;
+                      const aiRecommendation = getAIRecommendationFor(item.name);
+                      return (
+                        <TableRow key={item.id} className="bg-amber-500/5">
+                          <TableCell className="font-medium">{item.name}</TableCell>
+                          <TableCell className="text-right text-destructive font-semibold">{item.stock}</TableCell>
+                          <TableCell className="text-right">{totalRequired}</TableCell>
+                          <TableCell className="text-right">{item.threshold}</TableCell>
+                          <TableCell className="text-right font-bold text-primary">{toBuy}</TableCell>
+                          <TableCell className="text-right font-bold">
+                            {aiRecommendation !== null ? (
+                              <div className="flex items-center justify-end gap-2">
+                                <BrainCircuit size={16} className="text-blue-500" />
+                                <span>{aiRecommendation}</span>
+                              </div>
+                            ) : recommendations ? '-' : ''}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
+      );
+    }
+
+    return (
+      <div className="h-48 text-center flex flex-col items-center justify-center gap-2 text-muted-foreground">
+         <CheckCircle className="h-10 w-10 text-green-500"/>
+         <p className="text-lg font-semibold">¡Todo en orden!</p>
+         <p className="text-sm">
+             {selectedSectors.length > 0
+             ? "No hay artículos que necesiten reposición en los sectores seleccionados."
+             : "Seleccione al menos un sector para ver la lista de compras."
+             }
+         </p>
+     </div>
+    );
+  };
+
+
   return (
     <div className="grid auto-rows-max items-start gap-4 md:gap-8">
       <Card>
@@ -223,9 +304,9 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                 <div className="flex gap-2">
                     <Button
                         onClick={handleGetAIRecommendations}
-                        disabled={isLoading || totalItemsToReorderCount === 0}
+                        disabled={isLoadingAI || totalItemsToReorderCount === 0}
                     >
-                        {isLoading ? (
+                        {isLoadingAI ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         ) : (
                         <BrainCircuit className="mr-2 h-4 w-4" />
@@ -246,7 +327,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
             <div className="mt-4">
                 <Popover open={isFilterOpen} onOpenChange={setIsFilterOpen}>
                     <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-full sm:w-auto">
+                        <Button variant="outline" className="w-full sm:w-auto" disabled={isLoadingMachines}>
                             <Filter className="mr-2 h-4 w-4" />
                             Filtrar por Sector ({selectedSectors.length} / {sectors.length})
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -302,65 +383,8 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
             </Alert>
           )}
 
-          {totalItemsToReorderCount > 0 ? (
-            <Accordion type="multiple" className="w-full">
-              {Array.from(groupedItemsToReorder.entries()).map(([series, items]) => (
-                <AccordionItem value={series} key={series}>
-                  <AccordionTrigger className="text-lg font-semibold sticky top-0 bg-card z-10 px-4 py-3 border-b">
-                    {series}
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Artículo</TableHead>
-                          <TableHead className="text-right">Stock Actual</TableHead>
-                          <TableHead className="text-right">Requerido (Máquinas)</TableHead>
-                          <TableHead className="text-right">Stock de Seguridad</TableHead>
-                          <TableHead className="text-right font-bold text-primary">Cantidad a Comprar</TableHead>
-                          <TableHead className="text-right font-bold">Sugerencia IA</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {items.map((itemInfo) => {
-                          const { item, totalRequired, toBuy } = itemInfo;
-                          const aiRecommendation = getAIRecommendationFor(item.name);
-                          return (
-                            <TableRow key={item.id} className="bg-amber-500/5">
-                              <TableCell className="font-medium">{item.name}</TableCell>
-                              <TableCell className="text-right text-destructive font-semibold">{item.stock}</TableCell>
-                              <TableCell className="text-right">{totalRequired}</TableCell>
-                              <TableCell className="text-right">{item.threshold}</TableCell>
-                              <TableCell className="text-right font-bold text-primary">{toBuy}</TableCell>
-                              <TableCell className="text-right font-bold">
-                                {aiRecommendation !== null ? (
-                                  <div className="flex items-center justify-end gap-2">
-                                    <BrainCircuit size={16} className="text-blue-500" />
-                                    <span>{aiRecommendation}</span>
-                                  </div>
-                                ) : recommendations ? '-' : ''}
-                              </TableCell>
-                            </TableRow>
-                          )
-                        })}
-                      </TableBody>
-                    </Table>
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
-          ) : (
-             <div className="h-48 text-center flex flex-col items-center justify-center gap-2 text-muted-foreground">
-                <CheckCircle className="h-10 w-10 text-green-500"/>
-                <p className="text-lg font-semibold">¡Todo en orden!</p>
-                <p className="text-sm">
-                    {selectedSectors.length > 0
-                    ? "No hay artículos que necesiten reposición en los sectores seleccionados."
-                    : "Seleccione al menos un sector para ver la lista de compras."
-                    }
-                </p>
-            </div>
-          )}
+          {renderContent()}
+
         </CardContent>
         {recommendations && (
         <CardFooter>
