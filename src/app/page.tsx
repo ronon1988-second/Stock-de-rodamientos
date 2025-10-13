@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -146,7 +147,8 @@ function useAllMachines(sectors: Sector[] | null) {
 
   useEffect(() => {
     if (!firestore || !sectors || sectors.length === 0) {
-      setIsLoading(false);
+      if(!sectors) setIsLoading(true); // remain loading if sectors are not yet loaded
+      else setIsLoading(false);
       return;
     }
 
@@ -214,7 +216,7 @@ function AppContent() {
       }
     };
     fetchAndSetUserRole();
-  }, [user, firestore, userRole]); // Added userRole to dependencies to prevent re-fetch
+  }, [user, firestore, userRole]); 
 
   const isAdmin = userRole === 'admin';
   const isEditor = userRole === 'admin' || userRole === 'editor';
@@ -588,7 +590,6 @@ function AppContent() {
       return <Skeleton className="h-full w-full" />;
     }
     
-    // Fallback screen if user is not an admin, but the UI thinks they should be.
     if (!isAdmin && (view === 'users')) {
       setView('dashboard'); // Force back to a safe view
       return (
@@ -648,6 +649,7 @@ function AppContent() {
           machineAssignments={sortedAssignments}
           sectors={sortedSectors}
           machinesBySector={machinesBySector}
+          isLoading={isAssignmentsLoading || isInventoryLoading || isSectorsLoading || isLoadingMachines}
         />
       );
     }
@@ -658,7 +660,8 @@ function AppContent() {
         />
       );
     }
-    if (view === 'users' && isAdmin && allUsers) {
+    if (view === 'users' && isAdmin) {
+      // Only render UserManagementView if user is admin and data is ready
       return <UserManagementView users={allUsers} />;
     }
     if (view.startsWith('machine-')) {

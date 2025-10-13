@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -11,9 +11,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BrainCircuit, Loader2, Info, ShoppingCart, FileDown, Check, ChevronsUpDown, XCircle } from "lucide-react";
+import { BrainCircuit, Loader2, Info, ShoppingCart, FileDown, Check, ChevronsUpDown, XCircle, FileSearch } from "lucide-react";
 import { getAIReorderRecommendations } from "@/app/actions";
-import type { InventoryItem, MachineAssignment, Sector, Machine, MachinesBySector } from "@/lib/types";
+import type { InventoryItem, MachineAssignment, Sector, MachinesBySector } from "@/lib/types";
 import { ReorderRecommendationsOutput } from "@/ai/flows/reorder-recommendations";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -28,12 +28,14 @@ import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../ui/command";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "../ui/skeleton";
 
 type ToBuyViewProps = {
   inventory: InventoryItem[];
   machineAssignments: MachineAssignment[];
   sectors: Sector[];
   machinesBySector: MachinesBySector;
+  isLoading: boolean;
 };
 
 type ReorderInfo = {
@@ -42,24 +44,29 @@ type ReorderInfo = {
     toBuy: number;
 }
 
-// Multi-select popover component
-const MultiSelect = ({ title, options, selectedValues, onSelect }: { title: string, options: {value: string, label: string}[], selectedValues: string[], onSelect: (values: string[]) => void }) => {
+const MultiSelect = ({ title, options, selectedValues, onSelect, disabled }: { title: string, options: {value: string, label: string}[], selectedValues: string[], onSelect: (values: string[]) => void, disabled?: boolean }) => {
   const [open, setOpen] = useState(false);
-  const selectedLabels = selectedValues.map(val => options.find(o => o.value === val)?.label).filter(Boolean);
+
+  const handleSelect = (value: string) => {
+    const newSelection = selectedValues.includes(value)
+      ? selectedValues.filter((v) => v !== value)
+      : [...selectedValues, value];
+    onSelect(newSelection);
+  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" role="combobox" aria-expanded={open} className="justify-between w-full">
+        <Button variant="outline" role="combobox" aria-expanded={open} className="justify-between w-full" disabled={disabled}>
           <span className="truncate">
             {selectedValues.length > 0 
-              ? `${title}: ${selectedLabels.join(', ')}` 
+              ? `${title}: ${selectedValues.map(val => options.find(o => o.value === val)?.label).filter(Boolean).join(', ')}` 
               : `Todos los ${title.toLowerCase()}`}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[300px] p-0">
+      <PopoverContent className="w-[300px] p-0" onPointerDownOutside={() => setOpen(false)}>
         <Command>
           <CommandInput placeholder={`Buscar ${title.toLowerCase()}...`} />
           <CommandList>
@@ -68,15 +75,7 @@ const MultiSelect = ({ title, options, selectedValues, onSelect }: { title: stri
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
-                  onSelect={(currentValue) => {
-                    const value = options.find(o => o.label.toLowerCase() === currentValue.toLowerCase())?.value;
-                    if (!value) return;
-
-                    const newSelection = selectedValues.includes(value)
-                      ? selectedValues.filter((v) => v !== value)
-                      : [...selectedValues, value];
-                    onSelect(newSelection);
-                  }}
+                  onSelect={() => handleSelect(option.value)}
                 >
                   <Check
                     className={cn(
@@ -96,7 +95,7 @@ const MultiSelect = ({ title, options, selectedValues, onSelect }: { title: stri
 }
 
 
-export default function ToBuyView({ inventory, machineAssignments, sectors, machinesBySector }: ToBuyViewProps) {
+export default function ToBuyView({ inventory, machineAssignments, sectors, machinesBySector, isLoading }: ToBuyViewProps) {
   const [recommendations, setRecommendations] = useState<ReorderRecommendationsOutput | null>(null);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -104,6 +103,8 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
 
   const [selectedSectorIds, setSelectedSectorIds] = useState<string[]>([]);
   const [selectedMachineIds, setSelectedMachineIds] = useState<string[]>([]);
+  
+  const [itemsToReorder, setItemsToReorder] = useState<ReorderInfo[] | null>(null);
 
   const filteredMachines = useMemo(() => {
     if (selectedSectorIds.length === 0) {
@@ -112,66 +113,103 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
     return selectedSectorIds.flatMap(sectorId => machinesBySector[sectorId] || []).sort((a,b) => a.name.localeCompare(b.name));
   }, [selectedSectorIds, machinesBySector]);
 
-  const itemsToReorder = useMemo(() => {
-    const relevantMachineAssignments = machineAssignments.filter(assignment => {
-      const isSectorSelected = selectedSectorIds.length > 0;
-      const isMachineSelected = selectedMachineIds.length > 0;
 
-      // If no filters, include all assignments
-      if (!isSectorSelected && !isMachineSelected) {
-        return true;
-      }
-      // If machines are selected, filter by machine ID (highest priority)
-      if (isMachineSelected) {
-        return selectedMachineIds.includes(assignment.machineId);
-      }
-      // If only sectors are selected, filter by sector ID
-      if (isSectorSelected) {
-        return selectedSectorIds.includes(assignment.sectorId);
-      }
-      
-      return false; // Should not be reached
-    });
+  const calculateItemsToReorder = useCallback(() => {
+    const isFiltering = selectedSectorIds.length > 0 || selectedMachineIds.length > 0;
 
-    const requiredByItem: { [itemId: string]: number } = {};
-    relevantMachineAssignments.forEach(assignment => {
-        if (!requiredByItem[assignment.itemId]) {
-            requiredByItem[assignment.itemId] = 0;
+    let items: ReorderInfo[] = [];
+
+    if (isFiltering) {
+        // --- LOGIC FOR FILTERED VIEW ---
+        const relevantMachineAssignments = machineAssignments.filter(assignment => {
+            const isSectorSelected = selectedSectorIds.length > 0;
+            const isMachineSelected = selectedMachineIds.length > 0;
+
+            if (isMachineSelected) {
+                return selectedMachineIds.includes(assignment.machineId);
+            }
+            if (isSectorSelected) {
+                return selectedSectorIds.includes(assignment.sectorId);
+            }
+            return false;
+        });
+
+        const requiredByItem: { [itemId: string]: number } = {};
+        relevantMachineAssignments.forEach(assignment => {
+            if (!requiredByItem[assignment.itemId]) {
+                requiredByItem[assignment.itemId] = 0;
+            }
+            requiredByItem[assignment.itemId] += assignment.quantity;
+        });
+        
+        for (const itemId in requiredByItem) {
+            const item = inventory.find(i => i.id === itemId);
+            if (!item) continue;
+
+            const totalRequired = requiredByItem[itemId] || 0;
+            const toBuy = totalRequired - item.stock;
+
+            if (toBuy > 0) {
+                items.push({ item, totalRequired, toBuy });
+            }
         }
-        requiredByItem[assignment.itemId] += assignment.quantity;
-    });
+    } else {
+        // --- LOGIC FOR "ALL" VIEW (no filters) ---
+        // Include items based on assignments AND items below global threshold
+        const requiredByItem: { [itemId: string]: number } = {};
+        machineAssignments.forEach(assignment => {
+            if (!requiredByItem[assignment.itemId]) {
+                requiredByItem[assignment.itemId] = 0;
+            }
+            requiredByItem[assignment.itemId] += assignment.quantity;
+        });
 
-    const items: ReorderInfo[] = [];
-    // Important: We only consider items that are actually required by the filtered assignments
-    for (const itemId in requiredByItem) {
-        const item = inventory.find(i => i.id === itemId);
-        if (!item) continue;
+        inventory.forEach(item => {
+            const totalRequired = requiredByItem[item.id] || 0;
+            const safetyStock = item.threshold;
+            const totalDemand = totalRequired + safetyStock;
+            const toBuy = totalDemand - item.stock;
 
-        const totalRequired = requiredByItem[itemId] || 0;
-        const safetyStock = item.threshold;
-        const totalDemand = totalRequired + safetyStock;
-        const toBuy = totalDemand - item.stock;
-
-        if (toBuy > 0) {
-            items.push({
-                item,
-                totalRequired,
-                toBuy,
-            });
-        }
+            if (toBuy > 0) {
+                // Avoid duplicating items if already added
+                if (!items.some(i => i.item.id === item.id)) {
+                    items.push({ item, totalRequired, toBuy });
+                }
+            }
+        });
     }
 
-    return items.sort((a,b) => a.item.name.localeCompare(b.item.name));
+    return items.sort((a, b) => a.item.name.localeCompare(b.item.name));
   }, [inventory, machineAssignments, selectedSectorIds, selectedMachineIds]);
 
+  const handleGenerateList = () => {
+    setRecommendations(null); // Clear old AI recommendations
+    setError(null);
+    const calculatedItems = calculateItemsToReorder();
+    setItemsToReorder(calculatedItems);
+    if(calculatedItems.length === 0) {
+        toast({
+            title: "No hay artículos para reponer",
+            description: "La lista de compras para la selección actual está vacía."
+        });
+    }
+  };
+
+
   const handleGetAIRecommendations = async () => {
+    if (!itemsToReorder || itemsToReorder.length === 0) {
+      toast({
+        title: "Primero genere una lista",
+        description: "La lista de compras está vacía. Aplique filtros y genere una lista para analizar.",
+        variant: "default",
+      });
+      return;
+    }
+
     setIsLoadingAI(true);
     setError(null);
     setRecommendations(null);
     
-    const reorderThreshold = 2; // Can be made dynamic
-    const leadTime = 7; // Can be made dynamic
-
     const input = {
       bearingTypes: itemsToReorder.map((info) => info.item.name),
       historicalUsageData: "N/A", 
@@ -181,19 +219,9 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
           stock: info.item.stock,
         }))
       ),
-      reorderThreshold: reorderThreshold,
-      leadTimeDays: leadTime,
+      reorderThreshold: 2, // Hardcoded for now, can be dynamic
+      leadTimeDays: 7, // Hardcoded for now, can be dynamic
     };
-
-    if (input.bearingTypes.length === 0) {
-      toast({
-        title: "No hay artículos para analizar",
-        description: "La lista de compras para la selección actual está vacía.",
-        variant: "default",
-      });
-      setIsLoadingAI(false);
-      return;
-    }
 
     const result = await getAIReorderRecommendations(input);
     if (result.success && result.data) {
@@ -216,8 +244,8 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
   }
   
   const exportToCSV = () => {
-    if (itemsToReorder.length === 0) return;
-    let csvContent = "data:text/csv;charset=utf-8,Artículo;Stock Actual;Total Requerido en Máquinas;Stock de Seguridad;Cantidad a Comprar (Calculado);Cantidad a Comprar (IA)\n";
+    if (!itemsToReorder || itemsToReorder.length === 0) return;
+    let csvContent = "data:text/csv;charset=utf-8,Artículo;Stock Actual;Requerido (Filtro);Stock de Seguridad;Cantidad a Comprar (Calculado);Cantidad a Comprar (IA)\n";
     
     itemsToReorder.forEach(itemInfo => {
         const { item, totalRequired, toBuy } = itemInfo;
@@ -237,6 +265,26 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
   const handleClearFilters = () => {
     setSelectedSectorIds([]);
     setSelectedMachineIds([]);
+    setItemsToReorder(null);
+    setRecommendations(null);
+  }
+  
+  const hasActiveFilters = selectedSectorIds.length > 0 || selectedMachineIds.length > 0;
+
+  if (isLoading) {
+    return (
+        <div className="grid auto-rows-max items-start gap-4 md:gap-8">
+            <Card>
+                <CardHeader>
+                    <Skeleton className="h-8 w-1/2" />
+                    <Skeleton className="h-4 w-3/4" />
+                </CardHeader>
+                <CardContent>
+                    <Skeleton className="h-64 w-full" />
+                </CardContent>
+            </Card>
+        </div>
+    );
   }
 
   return (
@@ -250,13 +298,13 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                     Lista de Artículos para Comprar
                     </CardTitle>
                     <CardDescription>
-                    Use los filtros para generar una lista de compras basada en sectores o máquinas específicas.
+                    Filtre por sector/máquina y genere una lista de compras. Si no aplica filtros, se mostrarán todos los artículos que requieran reposición en el inventario general.
                     </CardDescription>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-shrink-0">
                     <Button
                         onClick={handleGetAIRecommendations}
-                        disabled={isLoadingAI}
+                        disabled={isLoadingAI || !itemsToReorder}
                     >
                         {isLoadingAI ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -267,7 +315,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                     </Button>
                     <Button 
                         onClick={exportToCSV}
-                        disabled={itemsToReorder.length === 0}
+                        disabled={!itemsToReorder || itemsToReorder.length === 0}
                         variant="outline"
                     >
                         <FileDown className="mr-2 h-4 w-4" />
@@ -276,7 +324,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                 </div>
             </div>
             <div className="border-t mt-4 pt-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
                   <div className="grid gap-1.5">
                     <label className="text-sm font-medium">Filtro por Sector</label>
                     <MultiSelect 
@@ -285,7 +333,6 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                       selectedValues={selectedSectorIds}
                       onSelect={(values) => {
                         setSelectedSectorIds(values);
-                        // Deselect machines that are not in the new selection of sectors
                         const newMachineIds = selectedMachineIds.filter(machineId => {
                           return values.some(sectorId => machinesBySector[sectorId]?.some(m => m.id === machineId));
                         });
@@ -300,19 +347,26 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                       options={filteredMachines.map(m => ({ value: m.id, label: m.name }))}
                       selectedValues={selectedMachineIds}
                       onSelect={setSelectedMachineIds}
+                      disabled={filteredMachines.length === 0}
                     />
                   </div>
-                  {(selectedSectorIds.length > 0 || selectedMachineIds.length > 0) && (
-                    <div className="md:self-end">
-                      <Button variant="ghost" onClick={handleClearFilters}>
-                          <XCircle className="mr-2 h-4 w-4" />
-                          Limpiar Filtros
+                   <div className="flex gap-2 md:self-end">
+                      <Button onClick={handleGenerateList}>
+                          <FileSearch className="mr-2 h-4 w-4" />
+                          Generar Lista
                       </Button>
+                      {hasActiveFilters && (
+                        <Button variant="ghost" onClick={handleClearFilters} size="icon">
+                            <XCircle className="h-5 w-5" />
+                            <span className="sr-only">Limpiar Filtros</span>
+                        </Button>
+                      )}
                     </div>
-                  )}
               </div>
             </div>
         </CardHeader>
+
+        {itemsToReorder &&
         <CardContent>
           {error && (
             <Alert variant="destructive" className="mb-4">
@@ -363,6 +417,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                   <TableRow>
                       <TableCell colSpan={recommendations ? 6 : 5} className="h-48 text-center text-muted-foreground">
                         <p>¡Todo en orden! No hay artículos que necesiten reposición para los filtros seleccionados.</p>
+                        <p className="text-xs">Pruebe con otros filtros o revise el inventario general.</p>
                       </TableCell>
                   </TableRow>
                 )}
@@ -370,6 +425,8 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
             </Table>
           </div>
         </CardContent>
+        }
+
         {recommendations && (
         <CardFooter>
             <Alert>
