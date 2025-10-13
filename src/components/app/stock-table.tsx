@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import AddItemDialog from "./add-item-dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { cn } from "@/lib/utils";
 
 type StockTableProps = {
   inventory: InventoryItem[];
@@ -84,6 +85,22 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [inventory, searchTerm]);
 
+  const getStatus = (item: InventoryItem) => {
+    if (item.stock === 0) return "Sin Stock";
+    if (item.stock < item.threshold) return "Stock Bajo";
+    return "En Stock";
+  };
+
+  const getGroupStatus = (items: InventoryItem[]) => {
+    if (items.some(item => item.stock === 0)) {
+      return 'out-of-stock'; // Most critical
+    }
+    if (items.some(item => item.stock < item.threshold)) {
+      return 'low-stock'; // Less critical
+    }
+    return 'in-stock'; // All good
+  };
+
   const groupedItems = useMemo(() => {
     const grouped = inventory.reduce((acc, item) => {
         const series = getItemSeries(item.name);
@@ -102,12 +119,6 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
 
   }, [inventory]);
 
-
-  const getStatus = (item: InventoryItem) => {
-    if (item.stock === 0) return "Sin Stock";
-    if (item.stock < item.threshold) return "Stock Bajo";
-    return "En Stock";
-  };
 
   const getStatusVariant = (status: string): "destructive" | "secondary" | "default" => {
     if (status === "Sin Stock") return "destructive";
@@ -282,10 +293,22 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
                 </Table>
             ) : (
                 <Accordion type="multiple" className="w-full">
-                    {Array.from(groupedItems.entries()).map(([series, items]) => (
+                    {Array.from(groupedItems.entries()).map(([series, items]) => {
+                        const groupStatus = getGroupStatus(items);
+                        return (
                         <AccordionItem value={series} key={series}>
-                            <AccordionTrigger className="text-base font-semibold sticky top-0 bg-card z-10 px-4 py-3 border-b">
-                                {series}
+                            <AccordionTrigger className="text-base font-semibold sticky top-0 bg-card z-10 px-4 py-3 border-b hover:no-underline">
+                                <div className="flex items-center gap-3">
+                                {groupStatus !== 'in-stock' && (
+                                    <span className={cn(
+                                        "h-2.5 w-2.5 rounded-full",
+                                        groupStatus === 'out-of-stock' && "bg-red-500",
+                                        groupStatus === 'low-stock' && "bg-amber-500"
+                                    )}></span>
+                                )}
+                                <span>{series}</span>
+                                <span className="text-sm font-normal text-muted-foreground">({items.length})</span>
+                                </div>
                             </AccordionTrigger>
                             <AccordionContent>
                                 <Table>
@@ -307,7 +330,8 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
                                 </Table>
                             </AccordionContent>
                         </AccordionItem>
-                    ))}
+                        )
+                    })}
                     {groupedItems.size === 0 && (
                         <div className="text-center py-10 text-muted-foreground">
                             No hay artículos en el inventario.
@@ -354,3 +378,5 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
     </>
   );
 }
+
+    
