@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -182,7 +181,7 @@ function AppContent() {
   const firestore = useFirestore();
   const [isSeeding, setIsSeeding] = useState(false);
   
-  const [userRole, setUserRole] = useState<UserRole['role'] | 'user' | null>(null);
+  const [userRole, setUserRole] = useState<UserRole['role'] | null>(null);
   
   useEffect(() => {
     const fetchAndSetUserRole = async () => {
@@ -569,7 +568,7 @@ function AppContent() {
   const renderContent = () => {
     const isDataLoading =
       isUserLoading ||
-      userRole === null || // Still fetching/determining role
+      userRole === null ||
       isInventoryLoading ||
       isAssignmentsLoading ||
       isUsageLogLoading ||
@@ -651,7 +650,8 @@ function AppContent() {
       );
     }
     if (view === 'users' && isAdmin) {
-        return <UserManagementView users={allUsers} />;
+      // Only render UserManagementView if user is admin AND the user data has been loaded
+      return <UserManagementView users={allUsers} />;
     }
     if (view.startsWith('machine-')) {
       const machineId = view.replace('machine-', '');
@@ -770,7 +770,6 @@ function AppContent() {
                 targetView="to-buy"
                 icon={<ShoppingCart className={iconClass} />}
                 label="Artículos a Comprar"
-                badgeCount={lowStockCount}
                 onClick={handleNavClick}
             />
             
