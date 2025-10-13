@@ -506,7 +506,6 @@ function AppContent() {
 
   const lowStockCount = useMemo(() => {
     if (!inventory) return 0;
-
     return inventory.filter(b => b.stock < b.threshold).length;
   }, [inventory]);
 
@@ -570,7 +569,7 @@ function AppContent() {
   const renderContent = () => {
     const isDataLoading =
       isUserLoading ||
-      userRole === undefined || // Still fetching/determining role
+      userRole === null || // Still fetching/determining role
       isInventoryLoading ||
       isAssignmentsLoading ||
       isUsageLogLoading ||
