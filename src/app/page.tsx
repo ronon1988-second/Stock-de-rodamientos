@@ -181,11 +181,14 @@ function AppContent() {
   const firestore = useFirestore();
   const [isSeeding, setIsSeeding] = useState(false);
   
-  const [userRole, setUserRole] = useState<UserRole['role'] | null>(null);
+  const [userRole, setUserRole] = useState<UserRole['role'] | 'user' | null>(null);
   
   useEffect(() => {
     const fetchAndSetUserRole = async () => {
       if (user && firestore) {
+        // Prevent re-fetching if role is already determined
+        if (userRole && userRole !== null) return;
+
         const roleRef = doc(firestore, 'roles', user.uid);
         try {
           const roleSnap = await getDoc(roleRef);
@@ -195,19 +198,23 @@ function AppContent() {
             console.log("🟢 Rol de usuario obtenido:", roleData.role);
             setUserRole(roleData.role);
           } else {
+            // This is a special case for a user that might exist in Auth but not in Firestore roles yet.
+            // Or if rules prevent reading the role doc. Defaulting to 'user' is a safe fallback.
             console.warn("🟡 Documento de rol no encontrado para el usuario. Asumiendo rol 'user'.");
             setUserRole('user');
           }
         } catch (error) {
            console.error("🔴 Error al obtener el documento de rol:", error);
+           // On error (e.g. permissions), we must assume the most restrictive role.
            setUserRole('user');
         }
-      } else {
+      } else if (!user) {
+        // If user logs out, reset the role
         setUserRole(null);
       }
     };
     fetchAndSetUserRole();
-  }, [user, firestore]);
+  }, [user, firestore, userRole]); // Added userRole to dependencies to prevent re-fetch
 
   const isAdmin = userRole === 'admin';
   const isEditor = userRole === 'admin' || userRole === 'editor';
@@ -568,7 +575,7 @@ function AppContent() {
   const renderContent = () => {
     const isDataLoading =
       isUserLoading ||
-      userRole === null ||
+      userRole === null || // Use null check for initial loading state
       isInventoryLoading ||
       isAssignmentsLoading ||
       isUsageLogLoading ||
@@ -639,6 +646,8 @@ function AppContent() {
         <ToBuyView
           inventory={sortedInventory}
           machineAssignments={sortedAssignments}
+          sectors={sortedSectors}
+          machinesBySector={machinesBySector}
         />
       );
     }
@@ -649,8 +658,7 @@ function AppContent() {
         />
       );
     }
-    if (view === 'users' && isAdmin) {
-      // Only render UserManagementView if user is admin AND the user data has been loaded
+    if (view === 'users' && isAdmin && allUsers) {
       return <UserManagementView users={allUsers} />;
     }
     if (view.startsWith('machine-')) {
@@ -713,7 +721,6 @@ function AppContent() {
   );
 
   const MainNav = ({ isMobile = false }) => {
-    const navItemClass = isMobile ? 'text-lg' : 'text-sm';
     const iconClass = isMobile ? 'h-5 w-5' : 'h-4 w-4';
 
     return (
@@ -907,4 +914,3 @@ export default function Page() {
 
   return <AppContent />;
 }
-    
