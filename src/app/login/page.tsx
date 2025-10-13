@@ -119,7 +119,7 @@ export default function LoginPage() {
             <div className="flex justify-center items-center mb-4">
               <Logo className="h-12 w-12 text-primary" />
             </div>
-          <CardTitle className="text-2xl">Bearing Balance</CardTitle>
+          <CardTitle className="text-2xl">Balance de Rodamientos</CardTitle>
           <CardDescription>
             Inicie sesión o cree una cuenta para continuar.
           </CardDescription>
@@ -168,3 +168,5 @@ export default function LoginPage() {
     </div>
   );
 }
+
+    
