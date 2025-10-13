@@ -75,7 +75,10 @@ const MultiSelect = ({ title, options, selectedValues, onSelect, disabled }: { t
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
-                  onSelect={() => handleSelect(option.value)}
+                  onSelect={(currentValue) => {
+                    const optionValue = options.find(o => o.label.toLowerCase() === currentValue)?.value;
+                    if(optionValue) handleSelect(optionValue);
+                  }}
                 >
                   <Check
                     className={cn(
@@ -324,8 +327,8 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                 </div>
             </div>
             <div className="border-t mt-4 pt-4">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
-                  <div className="grid gap-1.5">
+              <div className="flex flex-wrap items-end gap-4">
+                  <div className="grid gap-1.5 flex-grow min-w-[200px]">
                     <label className="text-sm font-medium">Filtro por Sector</label>
                     <MultiSelect 
                       title="Sectores"
@@ -340,7 +343,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                       }}
                     />
                   </div>
-                  <div className="grid gap-1.5">
+                  <div className="grid gap-1.5 flex-grow min-w-[200px]">
                     <label className="text-sm font-medium">Filtro por Máquina</label>
                     <MultiSelect 
                       title="Máquinas"
@@ -350,7 +353,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                       disabled={filteredMachines.length === 0}
                     />
                   </div>
-                   <div className="flex gap-2 md:self-end">
+                   <div className="flex gap-2">
                       <Button onClick={handleGenerateList}>
                           <FileSearch className="mr-2 h-4 w-4" />
                           Generar Lista
@@ -442,3 +445,4 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
     </div>
   );
 }
+ 
