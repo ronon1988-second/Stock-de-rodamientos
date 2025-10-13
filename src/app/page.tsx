@@ -641,9 +641,6 @@ function AppContent() {
         <ToBuyView
           inventory={sortedInventory}
           machineAssignments={sortedAssignments}
-          sectors={sortedSectors}
-          machinesBySector={machinesBySector}
-          isLoadingMachines={isLoadingMachines}
         />
       );
     }
@@ -774,6 +771,7 @@ function AppContent() {
                 targetView="to-buy"
                 icon={<ShoppingCart className={iconClass} />}
                 label="Artículos a Comprar"
+                badgeCount={lowStockCount}
                 onClick={handleNavClick}
             />
             
