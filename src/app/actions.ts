@@ -177,3 +177,30 @@ export async function deleteInventoryItem(itemId: string): Promise<{ success: bo
         return { success: false, error: error.message || 'Ocurrió un error inesperado al eliminar el artículo.' };
     }
 }
+
+export async function clearUsageLogs(): Promise<{ success: boolean; error?: string }> {
+    try {
+        const adminApp = getAdminApp();
+        const adminFirestore = getAdminFirestore(adminApp);
+        const usageLogRef = adminFirestore.collection('usageLog');
+        const snapshot = await usageLogRef.get();
+
+        if (snapshot.empty) {
+            console.log("No usage logs to delete.");
+            return { success: true };
+        }
+
+        const batch = adminFirestore.batch();
+        snapshot.docs.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+
+        await batch.commit();
+        console.log(`(Admin) Successfully deleted ${snapshot.size} usage log entries.`);
+        return { success: true };
+
+    } catch (error: any) {
+        console.error('Error clearing usage logs:', error);
+        return { success: false, error: error.message || 'An unexpected error occurred while clearing usage logs.' };
+    }
+}

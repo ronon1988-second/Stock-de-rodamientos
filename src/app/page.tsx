@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -78,7 +79,7 @@ import OrganizationView from '@/components/app/organization-view';
 import UserManagementView from '@/components/app/user-management';
 import { addDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { deleteInventoryItem } from './actions';
+import { deleteInventoryItem, clearUsageLogs } from './actions';
 
 type View =
   | 'dashboard'
@@ -371,6 +372,28 @@ function AppContent() {
     }
   };
 
+  const handleClearUsageLogs = async () => {
+    if (!isAdmin) {
+      toast({ title: 'Acceso denegado', description: 'No tiene permiso para borrar el historial.', variant: 'destructive' });
+      return;
+    }
+
+    const result = await clearUsageLogs();
+
+    if (result.success) {
+      toast({
+        title: 'Historial Borrado',
+        description: 'Se ha eliminado todo el historial de uso.',
+      });
+    } else {
+      toast({
+        title: 'Error al Borrar Historial',
+        description: result.error || 'No se pudo borrar el historial.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleAssignItemToMachine = (
     itemId: string,
     machineId: string,
@@ -605,9 +628,11 @@ function AppContent() {
     if (view === 'reports') {
       return (
         <Reports
-          usageLog={sortedUsageLog}
+          allUsageLogs={sortedUsageLog}
           sectors={sortedSectors}
           machinesBySector={machinesBySector}
+          onClearLogs={handleClearUsageLogs}
+          canClearLogs={isAdmin}
         />
       );
     }
@@ -855,7 +880,9 @@ function AppContent() {
           )}
         </header>
         <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-muted/40">
-          {renderContent()}
+          <div className="min-w-0 overflow-x-auto">
+            {renderContent()}
+          </div>
         </main>
       </div>
     </div>
