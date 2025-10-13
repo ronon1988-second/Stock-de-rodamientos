@@ -9,7 +9,7 @@ import { FirebaseClientProvider } from '@/firebase/client-provider';
 const inter = Inter({ subsets: ['latin'], variable: '--font-body' })
 
 export const metadata: Metadata = {
-  title: 'Balance de Rodamientos',
+  title: 'Bearing Balance',
   description: 'Gestiona tu inventario de rodamientos con facilidad e inteligencia.',
 };
 
