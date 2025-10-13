@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -11,9 +11,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BrainCircuit, Loader2, Info, ShoppingCart, FileDown, CheckCircle } from "lucide-react";
+import { BrainCircuit, Loader2, Info, ShoppingCart, FileDown, CheckCircle, ChevronsUpDown, Filter } from "lucide-react";
 import { getAIReorderRecommendations } from "@/app/actions";
-import type { InventoryItem, MachineAssignment } from "@/lib/types";
+import type { InventoryItem, MachineAssignment, Sector, MachinesBySector, Machine } from "@/lib/types";
 import { ReorderRecommendationsOutput } from "@/ai/flows/reorder-recommendations";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -26,11 +26,15 @@ import {
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../ui/command";
+import { Checkbox } from "../ui/checkbox";
 
 type ToBuyViewProps = {
   inventory: InventoryItem[];
   machineAssignments: MachineAssignment[];
+  sectors: Sector[];
+  machinesBySector: MachinesBySector;
 };
 
 type ReorderInfo = {
@@ -69,18 +73,36 @@ const getItemSeries = (name: string): string => {
 };
 
 
-export default function ToBuyView({ inventory, machineAssignments }: ToBuyViewProps) {
+export default function ToBuyView({ inventory, machineAssignments, sectors, machinesBySector }: ToBuyViewProps) {
   const [recommendations, setRecommendations] =
     useState<ReorderRecommendationsOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  
+  const [selectedSectors, setSelectedSectors] = useState<string[]>([]);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+  useEffect(() => {
+    // Initialize with all sectors selected
+    if (sectors) {
+      setSelectedSectors(sectors.map(s => s.id));
+    }
+  }, [sectors]);
 
   const leadTime = 7;
 
   const groupedItemsToReorder = useMemo(() => {
+    const machinesInSelectedSectors = new Set<string>();
+    selectedSectors.forEach(sectorId => {
+      const machines = machinesBySector[sectorId] || [];
+      machines.forEach(machine => machinesInSelectedSectors.add(machine.id));
+    });
+
+    const filteredAssignments = machineAssignments.filter(assignment => machinesInSelectedSectors.has(assignment.machineId));
+    
     const requiredByItem: { [itemId: string]: number } = {};
-    machineAssignments.forEach(item => {
+    filteredAssignments.forEach(item => {
         if (!requiredByItem[item.itemId]) {
             requiredByItem[item.itemId] = 0;
         }
@@ -116,7 +138,7 @@ export default function ToBuyView({ inventory, machineAssignments }: ToBuyViewPr
     grouped.forEach(items => items.sort((a, b) => a.item.name.localeCompare(b.item.name)));
     
     return new Map([...grouped.entries()].sort((a, b) => a[0].localeCompare(b[0])));
-  }, [inventory, machineAssignments]);
+  }, [inventory, machineAssignments, selectedSectors, machinesBySector]);
 
   const totalItemsToReorderCount = useMemo(() => {
     return Array.from(groupedItemsToReorder.values()).reduce((acc, items) => acc + items.length, 0);
@@ -128,6 +150,7 @@ export default function ToBuyView({ inventory, machineAssignments }: ToBuyViewPr
     setError(null);
     setRecommendations(null);
     
+    // The AI prompt is simpler and doesn't need filtered data, it can reason over the whole set
     const reorderThreshold = 2;
 
     const input = {
@@ -186,36 +209,88 @@ export default function ToBuyView({ inventory, machineAssignments }: ToBuyViewPr
   return (
     <div className="grid auto-rows-max items-start gap-4 md:gap-8">
       <Card>
-        <CardHeader className="flex-row justify-between items-start gap-4">
-            <div>
-                <CardTitle className="flex items-center gap-2">
-                <ShoppingCart className="text-primary" />
-                Lista de Artículos para Comprar
-                </CardTitle>
-                <CardDescription>
-                  Estos artículos se calculan en función de la demanda total de las máquinas más un stock de seguridad.
-                </CardDescription>
+        <CardHeader>
+            <div className="flex justify-between items-start gap-4">
+                <div>
+                    <CardTitle className="flex items-center gap-2">
+                    <ShoppingCart className="text-primary" />
+                    Lista de Artículos para Comprar
+                    </CardTitle>
+                    <CardDescription>
+                      Filtre por sector o calcule la necesidad total para generar la lista de compras.
+                    </CardDescription>
+                </div>
+                <div className="flex gap-2">
+                    <Button
+                        onClick={handleGetAIRecommendations}
+                        disabled={isLoading || totalItemsToReorderCount === 0}
+                    >
+                        {isLoading ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                        <BrainCircuit className="mr-2 h-4 w-4" />
+                        )}
+                        Sugerencias de IA
+                    </Button>
+                    <Button 
+                        onClick={exportToCSV}
+                        disabled={totalItemsToReorderCount === 0}
+                        variant="outline"
+                    >
+                        <FileDown className="mr-2 h-4 w-4" />
+                        Exportar
+                    </Button>
+                </div>
             </div>
-            <div className="flex gap-2">
-                <Button
-                    onClick={handleGetAIRecommendations}
-                    disabled={isLoading || totalItemsToReorderCount === 0}
-                >
-                    {isLoading ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                    <BrainCircuit className="mr-2 h-4 w-4" />
-                    )}
-                    Sugerencias de IA
-                </Button>
-                 <Button 
-                    onClick={exportToCSV}
-                    disabled={totalItemsToReorderCount === 0}
-                    variant="outline"
-                >
-                    <FileDown className="mr-2 h-4 w-4" />
-                    Exportar
-                </Button>
+
+            <div className="mt-4">
+                <Popover open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+                    <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full sm:w-auto">
+                            <Filter className="mr-2 h-4 w-4" />
+                            Filtrar por Sector ({selectedSectors.length} / {sectors.length})
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[300px] p-0" align="start">
+                        <Command>
+                            <CommandInput placeholder="Buscar sector..." />
+                            <CommandList>
+                                <CommandEmpty>No se encontraron sectores.</CommandEmpty>
+                                <CommandGroup>
+                                    {sectors.map((sector) => (
+                                        <CommandItem
+                                            key={sector.id}
+                                            onSelect={() => {
+                                                const isSelected = selectedSectors.includes(sector.id);
+                                                if (isSelected) {
+                                                    setSelectedSectors(selectedSectors.filter(id => id !== sector.id));
+                                                } else {
+                                                    setSelectedSectors([...selectedSectors, sector.id]);
+                                                }
+                                            }}
+                                            className="flex items-center"
+                                        >
+                                            <Checkbox
+                                                className="mr-2"
+                                                checked={selectedSectors.includes(sector.id)}
+                                                onCheckedChange={checked => {
+                                                    const isSelected = selectedSectors.includes(sector.id);
+                                                    if (checked && !isSelected) {
+                                                        setSelectedSectors([...selectedSectors, sector.id]);
+                                                    } else if (!checked && isSelected) {
+                                                        setSelectedSectors(selectedSectors.filter(id => id !== sector.id));
+                                                    }
+                                                }}
+                                            />
+                                            <span>{sector.name}</span>
+                                        </CommandItem>
+                                    ))}
+                                </CommandGroup>
+                            </CommandList>
+                        </Command>
+                    </PopoverContent>
+                </Popover>
             </div>
         </CardHeader>
         <CardContent>
@@ -232,7 +307,7 @@ export default function ToBuyView({ inventory, machineAssignments }: ToBuyViewPr
               {Array.from(groupedItemsToReorder.entries()).map(([series, items]) => (
                 <AccordionItem value={series} key={series}>
                   <AccordionTrigger className="text-lg font-semibold sticky top-0 bg-card z-10 px-4 py-3 border-b">
-                    {series} ({items.length})
+                    {series}
                   </AccordionTrigger>
                   <AccordionContent>
                     <Table>
@@ -278,7 +353,12 @@ export default function ToBuyView({ inventory, machineAssignments }: ToBuyViewPr
              <div className="h-48 text-center flex flex-col items-center justify-center gap-2 text-muted-foreground">
                 <CheckCircle className="h-10 w-10 text-green-500"/>
                 <p className="text-lg font-semibold">¡Todo en orden!</p>
-                <p className="text-sm">No hay artículos que necesiten reposición en este momento.</p>
+                <p className="text-sm">
+                    {selectedSectors.length > 0
+                    ? "No hay artículos que necesiten reposición en los sectores seleccionados."
+                    : "Seleccione al menos un sector para ver la lista de compras."
+                    }
+                </p>
             </div>
           )}
         </CardContent>

@@ -641,6 +641,8 @@ function AppContent() {
         <ToBuyView
           inventory={sortedInventory}
           machineAssignments={sortedAssignments}
+          sectors={sortedSectors}
+          machinesBySector={machinesBySector}
         />
       );
     }
