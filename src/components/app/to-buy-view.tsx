@@ -64,7 +64,6 @@ const MultiSelect = ({ title, options, selectedValues, onSelect, disabled }: { t
     return `${selectedValues.length} ${title.toLowerCase()} seleccionados`;
   };
 
-
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -336,7 +335,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
             </div>
             <div className="border-t mt-4 pt-4">
                <div className="flex flex-wrap items-end gap-4">
-                  <div className="grid gap-1.5 w-full sm:w-[300px]">
+                  <div className="grid gap-1.5 w-full sm:w-auto md:flex-1 md:max-w-[300px]">
                     <label className="text-sm font-medium">Filtro por Sector</label>
                     <MultiSelect 
                       title="Sectores"
@@ -351,7 +350,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                       }}
                     />
                   </div>
-                  <div className="grid gap-1.5 w-full sm:w-[300px]">
+                  <div className="grid gap-1.5 w-full sm:w-auto md:flex-1 md:max-w-[300px]">
                     <label className="text-sm font-medium">Filtro por Máquina</label>
                     <MultiSelect 
                       title="Máquinas"
@@ -392,10 +391,10 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
               <TableHeader>
                   <TableRow>
                   <TableHead>Artículo</TableHead>
-                  <TableHead className="text-right">Stock Actual</TableHead>
-                  <TableHead className="text-right">Requerido (Filtro)</TableHead>
-                  <TableHead className="text-right">Stock de Seguridad</TableHead>
-                  <TableHead className="text-right font-bold text-primary">Cantidad a Comprar</TableHead>
+                  <TableHead className="text-right">Stock</TableHead>
+                  <TableHead className="text-right">Requerido</TableHead>
+                  <TableHead className="text-right">Umbral</TableHead>
+                  <TableHead className="text-right font-bold text-primary">A Comprar</TableHead>
                   {recommendations && <TableHead className="text-right font-bold">Sugerencia IA</TableHead>}
                   </TableRow>
               </TableHeader>

@@ -148,9 +148,9 @@ function MachineDetails({ machine, allInventory, machineAssignments, onAssignIte
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Artículo</TableHead>
-                                    <TableHead className="text-right">Cantidad Asignada</TableHead>
-                                    <TableHead className="text-right">Stock General Actual</TableHead>
-                                    <TableHead className="w-[120px]">Acciones</TableHead>
+                                    <TableHead className="text-right">Asignado</TableHead>
+                                    <TableHead className="text-right">Stock</TableHead>
+                                    <TableHead className="text-right">Acciones</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -168,7 +168,7 @@ function MachineDetails({ machine, allInventory, machineAssignments, onAssignIte
                                                         disabled={(item.inventoryItem?.stock ?? 0) === 0}
                                                         onClick={() => item.inventoryItem && setLogUsageItem(item.inventoryItem)}
                                                     >
-                                                        Registrar Uso
+                                                        Usar
                                                     </Button>
                                                 )}
                                                 {canEdit && (
@@ -237,6 +237,3 @@ export default function MachineView({ machineId, ...props }: MachineViewProps) {
         </MachineLoader>
     );
 }
-
-
-    

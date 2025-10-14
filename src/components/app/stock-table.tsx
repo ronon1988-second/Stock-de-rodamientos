@@ -268,7 +268,7 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
           </div>
         </CardHeader>
         <CardContent>
-          <div className="max-h-[60vh] overflow-auto">
+          <div className="overflow-x-auto">
             {searchTerm ? (
                 <Table>
                     <TableHeader>
@@ -376,5 +376,3 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
     </>
   );
 }
-
-    
