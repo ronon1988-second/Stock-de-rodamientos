@@ -129,113 +129,118 @@ export default function Reports({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:flex lg:flex-wrap lg:items-end gap-4">
-            {/* Date Range Picker */}
-            <div className="grid gap-2 flex-1 min-w-[240px]">
-              <label className="text-sm font-medium">Rango de Fechas</label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    id="date"
-                    variant={"outline"}
-                    className={cn(
-                      "justify-start text-left font-normal w-full",
-                      !date && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {date?.from ? (
-                      date.to ? (
-                        <>
-                          {format(date.from, "LLL dd, y", { locale: es })} -{" "}
-                          {format(date.to, "LLL dd, y", { locale: es })}
-                        </>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-end">
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Date Range Picker */}
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Rango de Fechas</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="date"
+                      variant={"outline"}
+                      className={cn(
+                        "justify-start text-left font-normal w-full",
+                        !date && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {date?.from ? (
+                        date.to ? (
+                          <>
+                            {format(date.from, "LLL dd, y", { locale: es })} -{" "}
+                            {format(date.to, "LLL dd, y", { locale: es })}
+                          </>
+                        ) : (
+                          format(date.from, "LLL dd, y", { locale: es })
+                        )
                       ) : (
-                        format(date.from, "LLL dd, y", { locale: es })
-                      )
-                    ) : (
-                      <span>Seleccione un rango</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    initialFocus
-                    mode="range"
-                    defaultMonth={date?.from}
-                    selected={date}
-                    onSelect={setDate}
-                    numberOfMonths={2}
-                    locale={es}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
+                        <span>Seleccione un rango</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      initialFocus
+                      mode="range"
+                      defaultMonth={date?.from}
+                      selected={date}
+                      onSelect={setDate}
+                      numberOfMonths={2}
+                      locale={es}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
 
-            {/* Sector Selector */}
-            <div className="grid gap-2 flex-1 min-w-[200px]">
-              <label className="text-sm font-medium">Sector</label>
-              <Select value={selectedSector} onValueChange={setSelectedSector}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Seleccione un sector" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los Sectores</SelectItem>
-                  <SelectItem value="general">Uso General</SelectItem>
-                  {sectors.map((sector) => (
-                    <SelectItem key={sector.id} value={sector.id}>
-                      {sector.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {/* Sector Selector */}
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Sector</label>
+                <Select value={selectedSector} onValueChange={setSelectedSector}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Seleccione un sector" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los Sectores</SelectItem>
+                    <SelectItem value="general">Uso General</SelectItem>
+                    {sectors.map((sector) => (
+                      <SelectItem key={sector.id} value={sector.id}>
+                        {sector.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex gap-2">
-              <Button onClick={handleGenerateReport}>
-                <FileBarChart2 className="mr-2 h-4 w-4" />
-                Generar Reporte
-              </Button>
-              {hasActiveFilters && (
-                <Button variant="ghost" onClick={handleClearFilters}>
-                  <XCircle className="mr-2 h-4 w-4" />
-                  Limpiar
+            <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-end justify-start sm:justify-end">
+              <div className="flex gap-2">
+                <Button onClick={handleGenerateReport}>
+                  <FileBarChart2 className="mr-2 h-4 w-4" />
+                  Generar Reporte
                 </Button>
+                {hasActiveFilters && (
+                  <Button variant="ghost" onClick={handleClearFilters}>
+                    <XCircle className="mr-2 h-4 w-4" />
+                    Limpiar
+                  </Button>
+                )}
+              </div>
+              
+              {/* Clear Logs Button */}
+              {canClearLogs && (
+                <div className="mt-2 sm:mt-0">
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive">
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Borrar Historial
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>
+                          ¿Está absolutamente seguro?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Esta acción no se puede deshacer. Esto eliminará
+                          permanentemente **todo** el historial de uso. Los
+                          niveles de stock no se verán afectados.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={onClearLogs}>
+                          Sí, borrar todo
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               )}
             </div>
-            
-            {/* Clear Logs Button */}
-            {canClearLogs && (
-              <div className="lg:ml-auto">
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive">
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Borrar Historial
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>
-                        ¿Está absolutamente seguro?
-                      </AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Esta acción no se puede deshacer. Esto eliminará
-                        permanentemente **todo** el historial de uso. Los
-                        niveles de stock no se verán afectados.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction onClick={onClearLogs}>
-                        Sí, borrar todo
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-            )}
           </div>
         </CardContent>
       </Card>
@@ -314,5 +319,3 @@ export default function Reports({
     </div>
   );
 }
-
-    

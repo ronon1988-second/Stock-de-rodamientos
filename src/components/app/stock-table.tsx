@@ -261,7 +261,7 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
             <Input
               type="search"
               placeholder="Buscar por código de artículo..."
-              className="pl-8 sm:w-full"
+              className="w-full pl-8"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -376,5 +376,3 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
     </>
   );
 }
-
-    
