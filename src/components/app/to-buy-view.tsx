@@ -59,7 +59,7 @@ const MultiSelect = ({ title, options, selectedValues, onSelect, disabled }: { t
       return `Todos los ${title.toLowerCase()}`;
     }
     if (selectedValues.length === 1) {
-      return options.find(o => o.value === selectedValues[0])?.label || `1 ${title.slice(0, -1)} seleccionado`;
+      return `1 ${title.slice(0, -1)} seleccionado`;
     }
     return `${selectedValues.length} ${title.toLowerCase()} seleccionados`;
   };
