@@ -53,15 +53,24 @@ const MultiSelect = ({ title, options, selectedValues, onSelect, disabled }: { t
       : [...selectedValues, value];
     onSelect(newSelection);
   };
+  
+  const getButtonLabel = () => {
+    if (selectedValues.length === 0) {
+      return `Todos los ${title.toLowerCase()}`;
+    }
+    if (selectedValues.length === 1) {
+      return options.find(o => o.value === selectedValues[0])?.label || `1 ${title.slice(0, -1)} seleccionado`;
+    }
+    return `${selectedValues.length} ${title.toLowerCase()} seleccionados`;
+  };
+
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between" disabled={disabled}>
           <span className="block truncate">
-            {selectedValues.length > 0
-              ? `${selectedValues.map(val => options.find(o => o.value === val)?.label).filter(Boolean).join(', ')}`
-              : `Todos los ${title.toLowerCase()}`}
+            {getButtonLabel()}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -326,7 +335,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                 </div>
             </div>
             <div className="border-t mt-4 pt-4">
-              <div className="flex flex-wrap items-end gap-4">
+               <div className="flex flex-wrap items-end gap-4">
                   <div className="grid gap-1.5 w-full sm:w-[300px]">
                     <label className="text-sm font-medium">Filtro por Sector</label>
                     <MultiSelect 
