@@ -299,13 +299,12 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
                         <AccordionItem value={series} key={series}>
                             <AccordionTrigger className="text-base font-semibold sticky top-0 bg-card z-10 px-4 py-3 border-b hover:no-underline">
                                 <div className="flex items-center gap-3">
-                                {groupStatus !== 'in-stock' && (
-                                    <span className={cn(
-                                        "h-2.5 w-2.5 rounded-full",
-                                        groupStatus === 'out-of-stock' && "bg-red-500",
-                                        groupStatus === 'low-stock' && "bg-amber-500"
-                                    )}></span>
-                                )}
+                                <span className={cn(
+                                    "h-2.5 w-2.5 rounded-full",
+                                    groupStatus === 'out-of-stock' && "bg-red-500",
+                                    groupStatus === 'low-stock' && "bg-amber-500",
+                                    groupStatus === 'in-stock' && "bg-green-500"
+                                )}></span>
                                 <span>{series}</span>
                                 </div>
                             </AccordionTrigger>
