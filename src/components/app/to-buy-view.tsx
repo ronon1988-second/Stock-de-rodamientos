@@ -60,7 +60,7 @@ const MultiSelect = ({ title, options, selectedValues, onSelect, disabled }: { t
         <Button variant="outline" role="combobox" aria-expanded={open} className="justify-between w-full" disabled={disabled}>
           <span className="truncate">
             {selectedValues.length > 0 
-              ? `${title}: ${selectedValues.map(val => options.find(o => o.value === val)?.label).filter(Boolean).join(', ')}` 
+              ? `${selectedValues.map(val => options.find(o => o.value === val)?.label).filter(Boolean).join(', ')}` 
               : `Todos los ${title.toLowerCase()}`}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
