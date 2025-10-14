@@ -57,7 +57,7 @@ const MultiSelect = ({ title, options, selectedValues, onSelect, disabled }: { t
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" role="combobox" aria-expanded={open} className="justify-between w-full" disabled={disabled}>
+        <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between" disabled={disabled}>
           <span className="truncate">
             {selectedValues.length > 0
               ? `${selectedValues.map(val => options.find(o => o.value === val)?.label).filter(Boolean).join(', ')}`
@@ -66,11 +66,7 @@ const MultiSelect = ({ title, options, selectedValues, onSelect, disabled }: { t
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[300px] p-0" onPointerDownOutside={(e) => {
-          if (!e.target || !(e.target instanceof HTMLElement) || !e.target.closest('[cmdk-root]')) {
-              e.preventDefault();
-          }
-      }}>
+      <PopoverContent className="w-[300px] p-0">
         <Command>
           <CommandInput placeholder={`Buscar ${title.toLowerCase()}...`} />
           <CommandList>
@@ -331,7 +327,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
             </div>
             <div className="border-t mt-4 pt-4">
               <div className="flex flex-wrap items-end gap-4">
-                  <div className="grid gap-1.5 basis-full sm:basis-[250px]">
+                  <div className="grid gap-1.5 w-full sm:w-[300px]">
                     <label className="text-sm font-medium">Filtro por Sector</label>
                     <MultiSelect 
                       title="Sectores"
@@ -346,7 +342,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                       }}
                     />
                   </div>
-                  <div className="grid gap-1.5 basis-full sm:basis-[250px]">
+                  <div className="grid gap-1.5 w-full sm:w-[300px]">
                     <label className="text-sm font-medium">Filtro por Máquina</label>
                     <MultiSelect 
                       title="Máquinas"
@@ -448,3 +444,5 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
     </div>
   );
 }
+
+    
