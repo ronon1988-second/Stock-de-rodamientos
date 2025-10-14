@@ -59,10 +59,12 @@ const MultiSelect = ({ title, options, selectedValues, onSelect, disabled }: { t
       return `Todos los ${title.toLowerCase()}`;
     }
     if (selectedValues.length === 1) {
-      return `1 ${title.slice(0, -1)} seleccionado`;
+      const selectedOption = options.find(o => o.value === selectedValues[0]);
+      return selectedOption ? selectedOption.label : `1 ${title.slice(0, -1)} seleccionado`;
     }
     return `${selectedValues.length} ${title.toLowerCase()} seleccionados`;
   };
+
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -301,7 +303,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
     <div className="grid auto-rows-max items-start gap-4 md:gap-8">
       <Card>
         <CardHeader>
-            <div className="flex justify-between items-start gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                 <div>
                     <CardTitle className="flex items-center gap-2">
                     <ShoppingCart className="text-primary" />
@@ -311,7 +313,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                     Filtre por sector/máquina y genere una lista de compras. Si no aplica filtros, se mostrarán todos los artículos que requieran reposición en el inventario general.
                     </CardDescription>
                 </div>
-                <div className="flex gap-2 flex-shrink-0">
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                     <Button
                         onClick={handleGetAIRecommendations}
                         disabled={isLoadingAI || !itemsToReorder}
@@ -334,8 +336,8 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                 </div>
             </div>
             <div className="border-t mt-4 pt-4">
-               <div className="flex flex-wrap items-end gap-4">
-                  <div className="grid gap-1.5 w-full sm:w-auto md:flex-1 md:max-w-[300px]">
+               <div className="flex flex-col md:flex-row md:items-end gap-4">
+                  <div className="grid gap-1.5 w-full md:w-auto md:flex-1 md:max-w-[300px]">
                     <label className="text-sm font-medium">Filtro por Sector</label>
                     <MultiSelect 
                       title="Sectores"
@@ -350,7 +352,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                       }}
                     />
                   </div>
-                  <div className="grid gap-1.5 w-full sm:w-auto md:flex-1 md:max-w-[300px]">
+                  <div className="grid gap-1.5 w-full md:w-auto md:flex-1 md:max-w-[300px]">
                     <label className="text-sm font-medium">Filtro por Máquina</label>
                     <MultiSelect 
                       title="Máquinas"
@@ -386,7 +388,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
             </Alert>
           )}
 
-          <div className="border rounded-md">
+          <div className="border rounded-md overflow-x-auto">
             <Table>
               <TableHeader>
                   <TableRow>
@@ -409,8 +411,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                           <TableCell className="text-right text-destructive font-semibold">{item.stock}</TableCell>
                           <TableCell className="text-right">{totalRequired}</TableCell>
                           <TableCell className="text-right">{item.threshold}</TableCell>
-                          <TableCell className="text-right font-bold text-primary">{toBuy}</TableCell>
-                          {recommendations && (
+                          <TableCell className="text-right font-bold text-primary">{toBuy}</TableCell>                          {recommendations && (
                             <TableCell className="text-right font-bold">
                                 {aiRecommendation !== null ? (
                                     <div className="flex items-center justify-end gap-2">
@@ -452,3 +453,5 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
     </div>
   );
 }
+
+    

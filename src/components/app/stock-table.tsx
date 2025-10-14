@@ -234,14 +234,14 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
     <>
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-start">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>
               <CardTitle>{title || 'Inventario General'}</CardTitle>
               <CardDescription>
                 {description || 'Busca, visualiza y gestiona todo tu inventario.'}
               </CardDescription>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
               {canEdit && (
                 <>
                   <Button variant="outline" onClick={exportAllToCSV} disabled={inventory.length === 0}>
@@ -376,3 +376,5 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
     </>
   );
 }
+
+    

@@ -129,9 +129,9 @@ export default function Reports({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:flex lg:flex-wrap lg:items-end gap-4">
             {/* Date Range Picker */}
-            <div className="grid gap-2">
+            <div className="grid gap-2 flex-1 min-w-[240px]">
               <label className="text-sm font-medium">Rango de Fechas</label>
               <Popover>
                 <PopoverTrigger asChild>
@@ -139,7 +139,7 @@ export default function Reports({
                     id="date"
                     variant={"outline"}
                     className={cn(
-                      "justify-start text-left font-normal",
+                      "justify-start text-left font-normal w-full",
                       !date && "text-muted-foreground"
                     )}
                   >
@@ -173,10 +173,10 @@ export default function Reports({
             </div>
 
             {/* Sector Selector */}
-            <div className="grid gap-2">
+            <div className="grid gap-2 flex-1 min-w-[200px]">
               <label className="text-sm font-medium">Sector</label>
               <Select value={selectedSector} onValueChange={setSelectedSector}>
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Seleccione un sector" />
                 </SelectTrigger>
                 <SelectContent>
@@ -207,7 +207,7 @@ export default function Reports({
             
             {/* Clear Logs Button */}
             {canClearLogs && (
-              <div className="md:col-start-4 flex justify-end">
+              <div className="lg:ml-auto">
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive">
@@ -263,48 +263,50 @@ export default function Reports({
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Artículo</TableHead>
-                    <TableHead>Sector</TableHead>
-                    <TableHead>Máquina</TableHead>
-                    <TableHead className="text-right">Cantidad</TableHead>
-                    <TableHead>Fecha</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredLogs.length > 0 ? (
-                    filteredLogs.map((log) => {
-                      const { sectorName, machineName } =
-                        getMachineAndSectorName(log.machineId, log.sectorId);
-                      return (
-                        <TableRow key={log.id}>
-                          <TableCell className="font-medium">
-                            {log.itemName}
-                          </TableCell>
-                          <TableCell>{sectorName}</TableCell>
-                          <TableCell>{machineName}</TableCell>
-                          <TableCell className="text-right">
-                            {log.quantity}
-                          </TableCell>
-                          <TableCell>
-                            {format(new Date(log.date), "PPP p", {
-                              locale: es,
-                            })}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={5} className="h-24 text-center">
-                        No hay datos de uso disponibles para los filtros seleccionados.
-                      </TableCell>
+                      <TableHead>Artículo</TableHead>
+                      <TableHead>Sector</TableHead>
+                      <TableHead>Máquina</TableHead>
+                      <TableHead className="text-right">Cantidad</TableHead>
+                      <TableHead>Fecha</TableHead>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredLogs.length > 0 ? (
+                      filteredLogs.map((log) => {
+                        const { sectorName, machineName } =
+                          getMachineAndSectorName(log.machineId, log.sectorId);
+                        return (
+                          <TableRow key={log.id}>
+                            <TableCell className="font-medium">
+                              {log.itemName}
+                            </TableCell>
+                            <TableCell>{sectorName}</TableCell>
+                            <TableCell>{machineName}</TableCell>
+                            <TableCell className="text-right">
+                              {log.quantity}
+                            </TableCell>
+                            <TableCell>
+                              {format(new Date(log.date), "PPP p", {
+                                locale: es,
+                              })}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={5} className="h-24 text-center">
+                          No hay datos de uso disponibles para los filtros seleccionados.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </>
@@ -312,3 +314,5 @@ export default function Reports({
     </div>
   );
 }
+
+    
