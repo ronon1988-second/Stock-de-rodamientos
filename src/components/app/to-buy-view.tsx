@@ -454,3 +454,5 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
     </div>
   );
 }
+
+    

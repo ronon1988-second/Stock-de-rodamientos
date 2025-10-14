@@ -239,3 +239,5 @@ export default function MachineView({ machineId, ...props }: MachineViewProps) {
         </MachineLoader>
     );
 }
+
+    

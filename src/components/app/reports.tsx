@@ -129,9 +129,9 @@ export default function Reports({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-end">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:flex-1">
               {/* Date Range Picker */}
               <div className="grid gap-2">
                 <label className="text-sm font-medium">Rango de Fechas</label>
@@ -195,7 +195,7 @@ export default function Reports({
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-end justify-start sm:justify-end">
+            <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-end">
               <div className="flex gap-2">
                 <Button onClick={handleGenerateReport}>
                   <FileBarChart2 className="mr-2 h-4 w-4" />
@@ -319,3 +319,5 @@ export default function Reports({
     </div>
   );
 }
+
+    
