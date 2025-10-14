@@ -246,11 +246,11 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
                 <>
                   <Button variant="outline" onClick={exportAllToCSV} disabled={inventory.length === 0}>
                     <FileDown className="mr-2 h-4 w-4" />
-                    Exportar Todo
+                    Exportar
                   </Button>
                   <Button onClick={() => setAddingItem(true)}>
                     <PlusCircle className="mr-2 h-4 w-4" />
-                    Agregar Artículo
+                    Agregar
                   </Button>
                 </>
               )}

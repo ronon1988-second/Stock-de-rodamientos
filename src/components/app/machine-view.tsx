@@ -144,55 +144,57 @@ function MachineDetails({ machine, allInventory, machineAssignments, onAssignIte
                         )}
                     </CardHeader>
                     <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Artículo</TableHead>
-                                    <TableHead className="text-right">Asignado</TableHead>
-                                    <TableHead className="text-right">Stock</TableHead>
-                                    <TableHead className="text-right">Acciones</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {assignedItemsDetails.length > 0 ? (
-                                    assignedItemsDetails.map(item => (
-                                        <TableRow key={item.id}>
-                                            <TableCell className="font-medium">{item.itemName}</TableCell>
-                                            <TableCell className="text-right font-semibold">{item.quantity}</TableCell>
-                                            <TableCell className="text-right">{item.stock}</TableCell>
-                                            <TableCell className="flex justify-end gap-1">
-                                                {canLogUsage && (
-                                                    <Button 
-                                                        variant="outline" 
-                                                        size="sm" 
-                                                        disabled={(item.inventoryItem?.stock ?? 0) === 0}
-                                                        onClick={() => item.inventoryItem && setLogUsageItem(item.inventoryItem)}
-                                                    >
-                                                        Usar
-                                                    </Button>
-                                                )}
-                                                {canEdit && (
-                                                    <Button 
-                                                        variant="ghost" 
-                                                        size="icon" 
-                                                        onClick={() => onRemoveItem(item.id)}
-                                                        aria-label={`Quitar ${item.itemName}`}
-                                                    >
-                                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                                    </Button>
-                                                )}
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Artículo</TableHead>
+                                        <TableHead className="text-right">Asignado</TableHead>
+                                        <TableHead className="text-right">Stock</TableHead>
+                                        <TableHead className="text-right">Acciones</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {assignedItemsDetails.length > 0 ? (
+                                        assignedItemsDetails.map(item => (
+                                            <TableRow key={item.id}>
+                                                <TableCell className="font-medium">{item.itemName}</TableCell>
+                                                <TableCell className="text-right font-semibold">{item.quantity}</TableCell>
+                                                <TableCell className="text-right">{item.stock}</TableCell>
+                                                <TableCell className="flex justify-end gap-1">
+                                                    {canLogUsage && (
+                                                        <Button 
+                                                            variant="outline" 
+                                                            size="sm" 
+                                                            disabled={(item.inventoryItem?.stock ?? 0) === 0}
+                                                            onClick={() => item.inventoryItem && setLogUsageItem(item.inventoryItem)}
+                                                        >
+                                                            Usar
+                                                        </Button>
+                                                    )}
+                                                    {canEdit && (
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="icon" 
+                                                            onClick={() => onRemoveItem(item.id)}
+                                                            aria-label={`Quitar ${item.itemName}`}
+                                                        >
+                                                            <Trash2 className="h-4 w-4 text-destructive" />
+                                                        </Button>
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    ) : (
+                                        <TableRow>
+                                            <TableCell colSpan={4} className="h-24 text-center">
+                                                Aún no se han asignado artículos a esta máquina.
                                             </TableCell>
                                         </TableRow>
-                                    ))
-                                ) : (
-                                    <TableRow>
-                                        <TableCell colSpan={4} className="h-24 text-center">
-                                            Aún no se han asignado artículos a esta máquina.
-                                        </TableCell>TRow
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
                     </CardContent>
                 </Card>
             </div>

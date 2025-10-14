@@ -323,7 +323,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                         ) : (
                         <BrainCircuit className="mr-2 h-4 w-4" />
                         )}
-                        Sugerencias de IA
+                        Sugerencias IA
                     </Button>
                     <Button 
                         onClick={exportToCSV}
@@ -365,7 +365,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                    <div className="flex gap-2">
                       <Button onClick={handleGenerateList}>
                           <FileSearch className="mr-2 h-4 w-4" />
-                          Generar Lista
+                          Generar
                       </Button>
                       {hasActiveFilters && (
                         <Button variant="ghost" onClick={handleClearFilters} size="icon">
@@ -411,7 +411,8 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                           <TableCell className="text-right text-destructive font-semibold">{item.stock}</TableCell>
                           <TableCell className="text-right">{totalRequired}</TableCell>
                           <TableCell className="text-right">{item.threshold}</TableCell>
-                          <TableCell className="text-right font-bold text-primary">{toBuy}</TableCell>                          {recommendations && (
+                          <TableCell className="text-right font-bold text-primary">{toBuy}</TableCell>
+                          {recommendations && (
                             <TableCell className="text-right font-bold">
                                 {aiRecommendation !== null ? (
                                     <div className="flex items-center justify-end gap-2">
