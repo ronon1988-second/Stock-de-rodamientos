@@ -59,8 +59,8 @@ const MultiSelect = ({ title, options, selectedValues, onSelect, disabled }: { t
       <PopoverTrigger asChild>
         <Button variant="outline" role="combobox" aria-expanded={open} className="justify-between w-full" disabled={disabled}>
           <span className="truncate">
-            {selectedValues.length > 0 
-              ? `${selectedValues.map(val => options.find(o => o.value === val)?.label).filter(Boolean).join(', ')}` 
+            {selectedValues.length > 0
+              ? `${selectedValues.map(val => options.find(o => o.value === val)?.label).filter(Boolean).join(', ')}`
               : `Todos los ${title.toLowerCase()}`}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -331,7 +331,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
             </div>
             <div className="border-t mt-4 pt-4">
               <div className="flex flex-wrap items-end gap-4">
-                  <div className="grid gap-1.5 flex-1 min-w-[200px] sm:flex-auto sm:min-w-[250px]">
+                  <div className="grid gap-1.5 basis-full sm:basis-[250px]">
                     <label className="text-sm font-medium">Filtro por Sector</label>
                     <MultiSelect 
                       title="Sectores"
@@ -346,7 +346,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                       }}
                     />
                   </div>
-                  <div className="grid gap-1.5 flex-1 min-w-[200px] sm:flex-auto sm:min-w-[250px]">
+                  <div className="grid gap-1.5 basis-full sm:basis-[250px]">
                     <label className="text-sm font-medium">Filtro por Máquina</label>
                     <MultiSelect 
                       title="Máquinas"
