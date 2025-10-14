@@ -58,7 +58,7 @@ const MultiSelect = ({ title, options, selectedValues, onSelect, disabled }: { t
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between" disabled={disabled}>
-          <span className="truncate">
+          <span className="block truncate">
             {selectedValues.length > 0
               ? `${selectedValues.map(val => options.find(o => o.value === val)?.label).filter(Boolean).join(', ')}`
               : `Todos los ${title.toLowerCase()}`}
@@ -444,5 +444,3 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
     </div>
   );
 }
-
-    
