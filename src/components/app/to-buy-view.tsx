@@ -67,7 +67,9 @@ const MultiSelect = ({ title, options, selectedValues, onSelect, disabled }: { t
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[300px] p-0" onPointerDownOutside={(e) => {
-          e.preventDefault();
+          if (!e.target || !(e.target instanceof HTMLElement) || !e.target.closest('[cmdk-root]')) {
+              e.preventDefault();
+          }
       }}>
         <Command>
           <CommandInput placeholder={`Buscar ${title.toLowerCase()}...`} />
@@ -329,7 +331,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
             </div>
             <div className="border-t mt-4 pt-4">
               <div className="flex flex-wrap items-end gap-4">
-                  <div className="grid gap-1.5 flex-grow min-w-[200px]">
+                  <div className="grid gap-1.5 flex-1 min-w-[200px] sm:flex-auto sm:min-w-[250px]">
                     <label className="text-sm font-medium">Filtro por Sector</label>
                     <MultiSelect 
                       title="Sectores"
@@ -344,7 +346,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                       }}
                     />
                   </div>
-                  <div className="grid gap-1.5 flex-grow min-w-[200px]">
+                  <div className="grid gap-1.5 flex-1 min-w-[200px] sm:flex-auto sm:min-w-[250px]">
                     <label className="text-sm font-medium">Filtro por Máquina</label>
                     <MultiSelect 
                       title="Máquinas"
