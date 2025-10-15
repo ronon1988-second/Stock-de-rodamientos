@@ -31,14 +31,6 @@ type AddItemDialogProps = {
   existingNames: string[];
 };
 
-const CATEGORIES: { value: ItemCategory; label: string }[] = [
-  { value: 'rodamientos', label: 'Rodamientos' },
-  { value: 'pistones', label: 'Pistones' },
-  { value: 'lonas', label: 'Lonas' },
-  { value: 'correas', label: 'Correas' },
-  { value: 'otros', label: 'Otros' },
-];
-
 export default function AddItemDialog({ onClose, onConfirm, existingNames }: AddItemDialogProps) {
 
   const AddItemSchema = z.object({
@@ -48,9 +40,6 @@ export default function AddItemDialog({ onClose, onConfirm, existingNames }: Add
     ),
     stock: z.coerce.number().int().min(0, "El stock no puede ser negativo."),
     threshold: z.coerce.number().int().min(0, "El umbral no puede ser negativo."),
-    category: z.enum(['rodamientos', 'pistones', 'lonas', 'correas', 'otros'], {
-      required_error: "Debe seleccionar una categoría.",
-    }),
   });
 
   const form = useForm<z.infer<typeof AddItemSchema>>({
@@ -59,7 +48,6 @@ export default function AddItemDialog({ onClose, onConfirm, existingNames }: Add
       name: "",
       stock: 0,
       threshold: 2,
-      category: 'rodamientos',
     },
   });
 
@@ -88,28 +76,6 @@ export default function AddItemDialog({ onClose, onConfirm, existingNames }: Add
                   <FormControl>
                     <Input placeholder="Ej: 6205 ZZ" {...field} />
                   </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-             <FormField
-              control={form.control}
-              name="category"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Categoría</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccione una categoría" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {CATEGORIES.map(cat => (
-                        <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

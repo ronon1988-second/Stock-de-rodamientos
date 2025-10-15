@@ -26,7 +26,6 @@ export type InventoryItem = {
   name: string;
   stock: number;
   threshold: number;
-  category?: ItemCategory;
 };
 
 // Represents the usage of an item by a specific machine at a specific time.
