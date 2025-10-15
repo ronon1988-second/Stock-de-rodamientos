@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useCallback } from "react";
@@ -11,9 +10,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BrainCircuit, Loader2, Info, ShoppingCart, FileDown, FileSearch, XCircle } from "lucide-react";
+import { BrainCircuit, Loader2, Info, ShoppingCart, FileDown, Check, ChevronsUpDown, XCircle, FileSearch } from "lucide-react";
 import { getAIReorderRecommendations } from "@/app/actions";
-import type { InventoryItem, MachineAssignment, Sector, MachinesBySector, ItemCategory } from "@/lib/types";
+import type { InventoryItem, MachineAssignment, Sector, MachinesBySector } from "@/lib/types";
 import { ReorderRecommendationsOutput } from "@/ai/flows/reorder-recommendations";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -25,9 +24,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../ui/command";
+import { cn } from "@/lib/utils";
 import { Skeleton } from "../ui/skeleton";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
-
 
 type ToBuyViewProps = {
   inventory: InventoryItem[];
@@ -43,7 +43,67 @@ type ReorderInfo = {
     toBuy: number;
 }
 
-const itemCategories: (ItemCategory | 'all')[] = ['all', 'rodamientos', 'correas', 'lonas', 'pistones', 'otros'];
+const MultiSelect = ({ title, options, selectedValues, onSelect, disabled }: { title: string, options: {value: string, label: string}[], selectedValues: string[], onSelect: (values: string[]) => void, disabled?: boolean }) => {
+  const [open, setOpen] = useState(false);
+
+  const handleSelect = (value: string) => {
+    const newSelection = selectedValues.includes(value)
+      ? selectedValues.filter((v) => v !== value)
+      : [...selectedValues, value];
+    onSelect(newSelection);
+  };
+  
+  const getButtonLabel = () => {
+    if (selectedValues.length === 0) {
+      return `Todos los ${title.toLowerCase()}`;
+    }
+    if (selectedValues.length === 1) {
+      const selectedOption = options.find(o => o.value === selectedValues[0]);
+      return selectedOption ? selectedOption.label : `1 ${title.slice(0, -1)} seleccionado`;
+    }
+    return `${selectedValues.length} ${title.toLowerCase()} seleccionados`;
+  };
+
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between" disabled={disabled}>
+          <span className="block truncate">
+            {getButtonLabel()}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[300px] p-0">
+        <Command>
+          <CommandInput placeholder={`Buscar ${title.toLowerCase()}...`} />
+          <CommandList>
+            <CommandEmpty>No se encontraron resultados.</CommandEmpty>
+            <CommandGroup>
+              {options.map((option) => (
+                <CommandItem
+                  key={option.value}
+                  onSelect={() => {
+                    handleSelect(option.value);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      selectedValues.includes(option.value) ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  {option.label}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 
 export default function ToBuyView({ inventory, machineAssignments, sectors, machinesBySector, isLoading }: ToBuyViewProps) {
@@ -51,40 +111,87 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
-  const [categoryFilter, setCategoryFilter] = useState<ItemCategory | 'all'>('all');
 
+  const [selectedSectorIds, setSelectedSectorIds] = useState<string[]>([]);
+  const [selectedMachineIds, setSelectedMachineIds] = useState<string[]>([]);
+  
   const [itemsToReorder, setItemsToReorder] = useState<ReorderInfo[] | null>(null);
 
+  const filteredMachines = useMemo(() => {
+    if (selectedSectorIds.length === 0) {
+      return Object.values(machinesBySector).flat().sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return selectedSectorIds.flatMap(sectorId => machinesBySector[sectorId] || []).sort((a,b) => a.name.localeCompare(b.name));
+  }, [selectedSectorIds, machinesBySector]);
+
+
   const calculateItemsToReorder = useCallback(() => {
-    const requiredByItem: { [itemId: string]: number } = {};
-    machineAssignments.forEach(assignment => {
-        if (!requiredByItem[assignment.itemId]) {
-            requiredByItem[assignment.itemId] = 0;
-        }
-        requiredByItem[assignment.itemId] += assignment.quantity;
-    });
+    const isFiltering = selectedSectorIds.length > 0 || selectedMachineIds.length > 0;
 
     let items: ReorderInfo[] = [];
 
-    const filteredInventory = inventory.filter(item => {
-        if (categoryFilter === 'all') return true;
-        if (!item.category && categoryFilter === 'otros') return true;
-        return item.category === categoryFilter;
-    });
+    if (isFiltering) {
+        // --- LOGIC FOR FILTERED VIEW ---
+        const relevantMachineAssignments = machineAssignments.filter(assignment => {
+            const isSectorSelected = selectedSectorIds.length > 0;
+            const isMachineSelected = selectedMachineIds.length > 0;
 
-    filteredInventory.forEach(item => {
-        const totalRequired = requiredByItem[item.id] || 0;
-        const safetyStock = item.threshold;
-        const totalDemand = totalRequired + safetyStock;
-        const toBuy = totalDemand - item.stock;
+            if (isMachineSelected) {
+                return selectedMachineIds.includes(assignment.machineId);
+            }
+            if (isSectorSelected) {
+                return selectedSectorIds.includes(assignment.sectorId);
+            }
+            return false;
+        });
 
-        if (toBuy > 0) {
-            items.push({ item, totalRequired, toBuy });
+        const requiredByItem: { [itemId: string]: number } = {};
+        relevantMachineAssignments.forEach(assignment => {
+            if (!requiredByItem[assignment.itemId]) {
+                requiredByItem[assignment.itemId] = 0;
+            }
+            requiredByItem[assignment.itemId] += assignment.quantity;
+        });
+        
+        for (const itemId in requiredByItem) {
+            const item = inventory.find(i => i.id === itemId);
+            if (!item) continue;
+
+            const totalRequired = requiredByItem[itemId] || 0;
+            const toBuy = totalRequired - item.stock;
+
+            if (toBuy > 0) {
+                items.push({ item, totalRequired, toBuy });
+            }
         }
-    });
+    } else {
+        // --- LOGIC FOR "ALL" VIEW (no filters) ---
+        // Include items based on assignments AND items below global threshold
+        const requiredByItem: { [itemId: string]: number } = {};
+        machineAssignments.forEach(assignment => {
+            if (!requiredByItem[assignment.itemId]) {
+                requiredByItem[assignment.itemId] = 0;
+            }
+            requiredByItem[assignment.itemId] += assignment.quantity;
+        });
+
+        inventory.forEach(item => {
+            const totalRequired = requiredByItem[item.id] || 0;
+            const safetyStock = item.threshold;
+            const totalDemand = totalRequired + safetyStock;
+            const toBuy = totalDemand - item.stock;
+
+            if (toBuy > 0) {
+                // Avoid duplicating items if already added
+                if (!items.some(i => i.item.id === item.id)) {
+                    items.push({ item, totalRequired, toBuy });
+                }
+            }
+        });
+    }
 
     return items.sort((a, b) => a.item.name.localeCompare(b.item.name));
-  }, [inventory, machineAssignments, categoryFilter]);
+  }, [inventory, machineAssignments, selectedSectorIds, selectedMachineIds]);
 
   const handleGenerateList = () => {
     setRecommendations(null); // Clear old AI recommendations
@@ -94,7 +201,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
     if(calculatedItems.length === 0) {
         toast({
             title: "No hay artículos para reponer",
-            description: `No se encontraron artículos para reponer en la categoría seleccionada.`,
+            description: "La lista de compras para la selección actual está vacía."
         });
     }
   };
@@ -104,7 +211,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
     if (!itemsToReorder || itemsToReorder.length === 0) {
       toast({
         title: "Primero genere una lista",
-        description: "La lista de compras está vacía. Genere una lista para analizar.",
+        description: "La lista de compras está vacía. Aplique filtros y genere una lista para analizar.",
         variant: "default",
       });
       return;
@@ -149,28 +256,31 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
   
   const exportToCSV = () => {
     if (!itemsToReorder || itemsToReorder.length === 0) return;
-    let csvContent = "data:text/csv;charset=utf-8,Artículo;Categoría;Stock Actual;Requerido (Máquinas);Umbral Seguridad;A Comprar (Calculado);A Comprar (IA)\n";
+    let csvContent = "data:text/csv;charset=utf-8,Artículo;Stock Actual;Requerido (Filtro);Stock de Seguridad;Cantidad a Comprar (Calculado);Cantidad a Comprar (IA)\n";
     
     itemsToReorder.forEach(itemInfo => {
         const { item, totalRequired, toBuy } = itemInfo;
         const aiQty = getAIRecommendationFor(item.name) ?? "";
-        csvContent += `${item.name};${item.category || 'Sin categoría'};${item.stock};${totalRequired};${item.threshold};${toBuy};${aiQty}\n`;
+        csvContent += `${item.name};${item.stock};${totalRequired};${item.threshold};${toBuy};${aiQty}\n`;
     });
 
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `orden_de_compra_${categoryFilter}.csv`);
+    link.setAttribute("download", "orden_de_compra_filtrada.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   }
 
-  const handleClear = () => {
+  const handleClearFilters = () => {
+    setSelectedSectorIds([]);
+    setSelectedMachineIds([]);
     setItemsToReorder(null);
     setRecommendations(null);
-    setCategoryFilter('all');
   }
+  
+  const hasActiveFilters = selectedSectorIds.length > 0 || selectedMachineIds.length > 0;
 
   if (isLoading) {
     return (
@@ -199,10 +309,10 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                     Lista de Artículos para Comprar
                     </CardTitle>
                     <CardDescription>
-                    Genere una lista de artículos que necesitan reposición basados en el stock actual, el umbral de seguridad y las asignaciones a máquinas.
+                    Filtre por sector/máquina y genere una lista de compras. Si no aplica filtros, se mostrarán todos los artículos que requieran reposición en el inventario general.
                     </CardDescription>
                 </div>
-                 <div className="flex flex-col gap-2 w-full sm:w-auto sm:flex-row">
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                     <Button
                         onClick={handleGetAIRecommendations}
                         disabled={isLoadingAI || !itemsToReorder}
@@ -224,34 +334,46 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                     </Button>
                 </div>
             </div>
-             <div className="border-t mt-4 pt-4 flex flex-col sm:flex-row gap-4 sm:items-end">
-                <div className="grid gap-2 sm:w-1/3">
-                    <label className="text-sm font-medium">Filtrar por Categoría</label>
-                    <Select value={categoryFilter} onValueChange={(value) => setCategoryFilter(value as any)}>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Filtrar por categoría" />
-                        </SelectTrigger>
-                        <SelectContent>
-                             {itemCategories.map(cat => (
-                                <SelectItem key={cat} value={cat} className="capitalize">
-                                    {cat === 'all' ? 'Todas las Categorías' : cat}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-               <div className="flex items-center gap-2">
-                    <Button onClick={handleGenerateList}>
-                        <FileSearch className="mr-2 h-4 w-4" />
-                        Generar Lista
-                    </Button>
-                    {itemsToReorder && (
-                        <Button variant="ghost" onClick={handleClear}>
-                            <XCircle className="mr-2 h-4 w-4" />
-                            Limpiar
+            <div className="border-t mt-4 pt-4">
+               <div className="flex flex-col md:flex-row md:items-end gap-4">
+                  <div className="grid gap-1.5 w-full md:w-auto md:flex-1 md:max-w-[300px]">
+                    <label className="text-sm font-medium">Filtro por Sector</label>
+                    <MultiSelect 
+                      title="Sectores"
+                      options={sectors.sort((a,b) => a.name.localeCompare(b.name)).map(s => ({ value: s.id, label: s.name }))}
+                      selectedValues={selectedSectorIds}
+                      onSelect={(values) => {
+                        setSelectedSectorIds(values);
+                        const newMachineIds = selectedMachineIds.filter(machineId => {
+                          return values.some(sectorId => machinesBySector[sectorId]?.some(m => m.id === machineId));
+                        });
+                        setSelectedMachineIds(newMachineIds);
+                      }}
+                    />
+                  </div>
+                  <div className="grid gap-1.5 w-full md:w-auto md:flex-1 md:max-w-[300px]">
+                    <label className="text-sm font-medium">Filtro por Máquina</label>
+                    <MultiSelect 
+                      title="Máquinas"
+                      options={filteredMachines.map(m => ({ value: m.id, label: m.name }))}
+                      selectedValues={selectedMachineIds}
+                      onSelect={setSelectedMachineIds}
+                      disabled={filteredMachines.length === 0}
+                    />
+                  </div>
+                   <div className="flex gap-2">
+                      <Button onClick={handleGenerateList}>
+                          <FileSearch className="mr-2 h-4 w-4" />
+                          Generar
+                      </Button>
+                      {hasActiveFilters && (
+                        <Button variant="ghost" onClick={handleClearFilters} size="icon">
+                            <XCircle className="h-5 w-5" />
+                            <span className="sr-only">Limpiar Filtros</span>
                         </Button>
-                    )}
-                </div>
+                      )}
+                    </div>
+              </div>
             </div>
         </CardHeader>
 
@@ -270,9 +392,8 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
               <TableHeader>
                   <TableRow>
                   <TableHead>Artículo</TableHead>
-                  <TableHead>Categoría</TableHead>
                   <TableHead className="text-right">Stock</TableHead>
-                  <TableHead className="text-right">Requerido (Máq.)</TableHead>
+                  <TableHead className="text-right">Requerido</TableHead>
                   <TableHead className="text-right">Umbral</TableHead>
                   <TableHead className="text-right font-bold text-primary">A Comprar</TableHead>
                   {recommendations && <TableHead className="text-right font-bold">Sugerencia IA</TableHead>}
@@ -286,7 +407,6 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                       return (
                       <TableRow key={item.id} className="bg-amber-500/5">
                           <TableCell className="font-medium">{item.name}</TableCell>
-                          <TableCell className="text-muted-foreground capitalize">{item.category || 'Sin categoría'}</TableCell>
                           <TableCell className="text-right text-destructive font-semibold">{item.stock}</TableCell>
                           <TableCell className="text-right">{totalRequired}</TableCell>
                           <TableCell className="text-right">{item.threshold}</TableCell>
@@ -299,15 +419,16 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                                       <span>{aiRecommendation}</span>
                                     </div>
                                 ) : '-'}
-                            </TableCell>                          
+                            </TableCell>
                           )}
                       </TableRow>
                       )
                   })
                 ) : (
                   <TableRow>
-                      <TableCell colSpan={recommendations ? 7 : 6} className="h-48 text-center text-muted-foreground">
-                        <p>¡Todo en orden! No hay artículos que necesiten reposición en la categoría seleccionada.</p>
+                      <TableCell colSpan={recommendations ? 6 : 5} className="h-48 text-center text-muted-foreground">
+                        <p>¡Todo en orden! No hay artículos que necesiten reposición para los filtros seleccionados.</p>
+                        <p className="text-xs">Pruebe con otros filtros o revise el inventario general.</p>
                       </TableCell>
                   </TableRow>
                 )}
