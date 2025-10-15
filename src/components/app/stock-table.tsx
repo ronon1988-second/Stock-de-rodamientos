@@ -24,9 +24,7 @@ import { MoreHorizontal, Search, PlusCircle, FileDown, Trash2 } from "lucide-rea
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import AddItemDialog from "./add-item-dialog";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 
 type StockTableProps = {
@@ -75,42 +73,13 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
     return "En Stock";
   };
 
-  const getGroupStatus = (items: InventoryItem[]) => {
-    if (items.some(item => item.stock === 0)) {
-      return 'out-of-stock'; // Most critical
-    }
-    if (items.some(item => item.stock < item.threshold)) {
-      return 'low-stock'; // Less critical
-    }
-    return 'in-stock'; // All good
-  };
-
-  const groupedItems = useMemo(() => {
-    const itemsToGroup = searchTerm ? filteredItems : inventory.filter(item => selectedCategory === 'all' || item.category === selectedCategory);
-    
-    const grouped = itemsToGroup.reduce((acc, item) => {
-        const series = item.category || 'otros';
-        if (!acc.has(series)) {
-            acc.set(series, []);
-        }
-        acc.get(series)!.push(item);
-        return acc;
-    }, new Map<string, InventoryItem[]>());
-
-    grouped.forEach(items => items.sort((a, b) => a.name.localeCompare(b.name)));
-    
-    return new Map([...grouped.entries()].sort((a, b) => a[0].localeCompare(b[0])));
-
-  }, [inventory, searchTerm, selectedCategory, filteredItems]);
-
-
   const getStatusVariant = (status: string): "destructive" | "secondary" | "default" => {
     if (status === "Sin Stock") return "destructive";
     if (status === "Stock Bajo") return "secondary";
     return "default";
   };
-
-  const exportAllToCSV = () => {
+  
+  const exportFilteredToCSV = () => {
     let csvContent = "data:text/csv;charset=utf-8,Artículo;Categoría;Stock Actual;Umbral de Seguridad\n";
     
     filteredItems.forEach(item => {
@@ -121,100 +90,12 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "inventario_filtrado.csv");
+    link.setAttribute("download", `inventario_filtrado.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   }
   
-  const renderItemRow = (item: InventoryItem) => {
-    const status = getStatus(item);
-    return (
-        <TableRow
-        key={item.id}
-        className={
-            status === "Stock Bajo"
-            ? "bg-amber-500/10"
-            : status === "Sin Stock"
-            ? "bg-destructive/10"
-            : ""
-        }
-        >
-        <TableCell className="font-medium">
-            {item.name}
-        </TableCell>
-        <TableCell className="text-right">{item.stock}</TableCell>
-        <TableCell className="text-center">
-            <Badge variant={getStatusVariant(status)}>{status}</Badge>
-        </TableCell>
-        {(canEdit || canDelete) &&
-            <TableCell>
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                <Button
-                    aria-haspopup="true"
-                    size="icon"
-                    variant="ghost"
-                >
-                    <MoreHorizontal className="h-4 w-4" />
-                    <span className="sr-only">Alternar menú</span>
-                </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                    {canEdit && (
-                      <>
-                        <DropdownMenuItem
-                            onSelect={() => setLogUsageItem(item)}
-                            disabled={item.stock === 0}
-                        >
-                            Registrar Uso
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                            onSelect={() => setEditingItem(item)}
-                        >
-                            Actualizar/Editar
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                    {canDelete && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <DropdownMenuItem
-                              onSelect={(e) => e.preventDefault()}
-                              className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Eliminar Artículo
-                            </DropdownMenuItem>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>¿Está absolutamente seguro?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Esta acción no se puede deshacer. Esto eliminará permanentemente el artículo <strong>{item.name}</strong> del inventario.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => onDeleteItem(item.id, item.name)}>
-                                Sí, eliminar artículo
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </>
-                    )}
-                </DropdownMenuContent>
-            </DropdownMenu>
-            </TableCell>
-        }
-        </TableRow>
-    );
-  }
-
   const handleUpdate = (itemId: string, stock: number, threshold?: number, machineId?: string | null, sectorId?: string | null, category?: ItemCategory) => {
     if (!editingItem) return;
     onUpdateItem({ ...editingItem, stock: stock, threshold: threshold!, category: category! });
@@ -234,7 +115,7 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
             <div className="flex flex-col gap-2 w-full sm:w-auto sm:flex-row">
               {canEdit && (
                 <>
-                  <Button variant="outline" onClick={exportAllToCSV} disabled={inventory.length === 0}>
+                  <Button variant="outline" onClick={exportFilteredToCSV} disabled={inventory.length === 0}>
                     <FileDown className="mr-2 h-4 w-4" />
                     Exportar
                   </Button>
@@ -270,76 +151,118 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
           </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            {searchTerm ? (
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Nombre</TableHead>
-                            <TableHead className="text-right">Stock</TableHead>
-                            <TableHead className="text-center">Estado</TableHead>
-                            {(canEdit || canDelete) && <TableHead><span className="sr-only">Acciones</span></TableHead>}
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {filteredItems.length > 0 ? (
-                            filteredItems.map(renderItemRow)
-                        ) : (
-                            <TableRow>
-                                <TableCell colSpan={canEdit || canDelete ? 4 : 3} className="h-24 text-center">
-                                    No se encontraron artículos que coincidan con la búsqueda.
-                                </TableCell>
-                            </TableRow>
-                        )}
-                    </TableBody>
-                </Table>
-            ) : (
-                <Accordion type="multiple" className="w-full">
-                    {Array.from(groupedItems.entries()).map(([series, items]) => {
-                        const groupStatus = getGroupStatus(items);
-                        const categoryLabel = CATEGORIES.find(c => c.value === series)?.label || series;
-                        return (
-                        <AccordionItem value={series} key={series}>
-                            <AccordionTrigger className="text-base font-semibold sticky top-0 bg-card z-10 px-4 py-3 border-b hover:no-underline">
-                                <div className="flex items-center gap-3">
-                                <span className={cn(
-                                    "h-2.5 w-2.5 rounded-full",
-                                    groupStatus === 'out-of-stock' && "bg-red-500",
-                                    groupStatus === 'low-stock' && "bg-amber-500",
-                                    groupStatus === 'in-stock' && "bg-green-500"
-                                )}></span>
-                                <span>{categoryLabel}</span>
-                                </div>
-                            </AccordionTrigger>
-                            <AccordionContent>
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                        <TableHead>Nombre</TableHead>
-                                        <TableHead className="text-right">Stock</TableHead>
-                                        <TableHead className="text-center">Estado</TableHead>
-                                        {(canEdit || canDelete) && 
-                                            <TableHead>
-                                            <span className="sr-only">Acciones</span>
-                                            </TableHead>
-                                        }
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {items.map(renderItemRow)}
-                                    </TableBody>
-                                </Table>
-                            </AccordionContent>
-                        </AccordionItem>
-                        )
-                    })}
-                    {groupedItems.size === 0 && (
-                        <div className="text-center py-10 text-muted-foreground">
-                            No hay artículos para la categoría seleccionada.
-                        </div>
-                    )}
-                </Accordion>
-            )}
+          <div className="border rounded-md overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nombre</TableHead>
+                  <TableHead>Categoría</TableHead>
+                  <TableHead className="text-right">Stock</TableHead>
+                  <TableHead className="text-center">Estado</TableHead>
+                  {(canEdit || canDelete) && <TableHead><span className="sr-only">Acciones</span></TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredItems.length > 0 ? (
+                  filteredItems.map(item => {
+                    const status = getStatus(item);
+                    return (
+                      <TableRow
+                        key={item.id}
+                        className={
+                          status === "Stock Bajo"
+                            ? "bg-amber-500/10"
+                            : status === "Sin Stock"
+                            ? "bg-destructive/10"
+                            : ""
+                        }
+                      >
+                        <TableCell className="font-medium">
+                          {item.name}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {CATEGORIES.find(c => c.value === item.category)?.label || 'Sin categoría'}
+                        </TableCell>
+                        <TableCell className="text-right">{item.stock}</TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant={getStatusVariant(status)}>{status}</Badge>
+                        </TableCell>
+                        {(canEdit || canDelete) &&
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  aria-haspopup="true"
+                                  size="icon"
+                                  variant="ghost"
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                  <span className="sr-only">Alternar menú</span>
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                                {canEdit && (
+                                  <>
+                                    <DropdownMenuItem
+                                      onSelect={() => setLogUsageItem(item)}
+                                      disabled={item.stock === 0}
+                                    >
+                                      Registrar Uso
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onSelect={() => setEditingItem(item)}
+                                    >
+                                      Actualizar/Editar
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                                {canDelete && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <DropdownMenuItem
+                                          onSelect={(e) => e.preventDefault()}
+                                          className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                        >
+                                          <Trash2 className="mr-2 h-4 w-4" />
+                                          Eliminar Artículo
+                                        </DropdownMenuItem>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>¿Está absolutamente seguro?</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            Esta acción no se puede deshacer. Esto eliminará permanentemente el artículo <strong>{item.name}</strong> del inventario.
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                          <AlertDialogAction onClick={() => onDeleteItem(item.id, item.name)}>
+                                            Sí, eliminar artículo
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        }
+                      </TableRow>
+                    );
+                  })
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={canEdit || canDelete ? 5 : 4} className="h-24 text-center">
+                      No se encontraron artículos para los filtros seleccionados.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
           </div>
         </CardContent>
       </Card>
