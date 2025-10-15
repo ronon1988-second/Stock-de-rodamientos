@@ -26,6 +26,7 @@ export type InventoryItem = {
   name: string;
   stock: number;
   threshold: number;
+  category?: ItemCategory;
 };
 
 // Represents the usage of an item by a specific machine at a specific time.
@@ -62,5 +63,3 @@ export type UserRole = {
     id: string; // The id of this doc is the user's UID
     role: 'admin' | 'editor' | 'user';
 }
-
-    

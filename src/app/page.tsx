@@ -23,6 +23,7 @@ import {
   getDocs,
   getDoc,
   setDoc,
+  updateDoc,
 } from 'firebase/firestore';
 
 import { Badge } from '@/components/ui/badge';
@@ -345,19 +346,31 @@ function AppContent() {
     });
   };
 
-  const handleUpdateItem = (updatedItem: InventoryItem) => {
+  const handleUpdateItem = async (updatedItem: InventoryItem) => {
     if (!canEditAnything || !firestore) {
         toast({ title: "Acceso denegado", variant: "destructive" });
         return;
     }
     const itemRef = doc(firestore, 'inventory', updatedItem.id);
     const { id, ...data } = updatedItem;
-    setDocumentNonBlocking(itemRef, data, { merge: true });
-    toast({
-      title: 'Artículo Actualizado',
-      description: `Se ha actualizado el artículo ${updatedItem.name}.`,
-    });
-  };
+    // We use a standard updateDoc here because it's a direct user action.
+    // Non-blocking updates are for fire-and-forget scenarios.
+    try {
+        await updateDoc(itemRef, data);
+        toast({
+          title: 'Artículo Actualizado',
+          description: `Se ha actualizado el artículo ${updatedItem.name}.`,
+        });
+    } catch (error) {
+        console.error("Error updating item:", error);
+        toast({
+          title: 'Error al Actualizar',
+          description: 'No se pudo guardar los cambios en la base de datos.',
+          variant: 'destructive',
+        });
+    }
+};
+
 
   const handleDeleteItem = async (itemId: string, itemName: string) => {
     if (!isAdmin) {
@@ -570,6 +583,13 @@ function AppContent() {
     if (view === 'organization') return 'Organización de Planta';
     if (view === 'users') return 'Gestionar Usuarios';
     if (view.startsWith('machine-')) {
+       const machineId = view.replace('machine-', '');
+       for (const sectorId in machinesBySector) {
+           const machine = machinesBySector[sectorId].find(m => m.id === machineId);
+           if (machine) {
+               return `Máquina: ${machine.name}`;
+           }
+       }
        return 'Máquina';
     }
     return 'Panel de control';

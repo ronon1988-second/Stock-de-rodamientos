@@ -31,6 +31,8 @@ type AddItemDialogProps = {
   existingNames: string[];
 };
 
+const itemCategories: ItemCategory[] = ['rodamientos', 'correas', 'lonas', 'pistones', 'otros'];
+
 export default function AddItemDialog({ onClose, onConfirm, existingNames }: AddItemDialogProps) {
 
   const AddItemSchema = z.object({
@@ -40,6 +42,7 @@ export default function AddItemDialog({ onClose, onConfirm, existingNames }: Add
     ),
     stock: z.coerce.number().int().min(0, "El stock no puede ser negativo."),
     threshold: z.coerce.number().int().min(0, "El umbral no puede ser negativo."),
+    category: z.enum(itemCategories, { required_error: "La categoría es requerida."}),
   });
 
   const form = useForm<z.infer<typeof AddItemSchema>>({
@@ -48,6 +51,7 @@ export default function AddItemDialog({ onClose, onConfirm, existingNames }: Add
       name: "",
       stock: 0,
       threshold: 2,
+      category: "rodamientos",
     },
   });
 
@@ -76,6 +80,28 @@ export default function AddItemDialog({ onClose, onConfirm, existingNames }: Add
                   <FormControl>
                     <Input placeholder="Ej: 6205 ZZ" {...field} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+             <FormField
+              control={form.control}
+              name="category"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Categoría</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccione una categoría" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {itemCategories.map(cat => (
+                        <SelectItem key={cat} value={cat} className="capitalize">{cat}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

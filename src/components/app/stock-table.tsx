@@ -19,12 +19,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import UpdateStockDialog from "./update-stock-dialog";
-import type { InventoryItem, MachinesBySector, Sector } from "@/lib/types";
+import type { InventoryItem, ItemCategory, MachinesBySector, Sector } from "@/lib/types";
 import { MoreHorizontal, Search, PlusCircle, FileDown, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import AddItemDialog from "./add-item-dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+
 
 type StockTableProps = {
   inventory: InventoryItem[];
@@ -40,17 +42,27 @@ type StockTableProps = {
   machinesBySector: MachinesBySector;
 };
 
+const itemCategories: (ItemCategory | 'all')[] = ['all', 'rodamientos', 'correas', 'lonas', 'pistones', 'otros'];
+
 export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUsage, onDeleteItem, canEdit, canDelete, title, description, sectors, machinesBySector }: StockTableProps) {
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [logUsageItem, setLogUsageItem] = useState<InventoryItem | null>(null);
   const [addingItem, setAddingItem] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<ItemCategory | 'all'>('all');
+
 
   const filteredItems = useMemo(() => {
     return inventory
-      .filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()))
+      .filter(item => {
+        const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter;
+        // Show items without a category only when 'all' or 'otros' is selected
+        const matchesUncategorized = !item.category && (categoryFilter === 'all' || categoryFilter === 'otros');
+        return matchesSearch && (matchesCategory || matchesUncategorized);
+      })
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [inventory, searchTerm]);
+  }, [inventory, searchTerm, categoryFilter]);
 
   const getStatus = (item: InventoryItem) => {
     if (item.stock === 0) return "Sin Stock";
@@ -65,10 +77,10 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
   };
   
   const exportFilteredToCSV = () => {
-    let csvContent = "data:text/csv;charset=utf-8,Artículo;Stock Actual;Umbral de Seguridad\n";
+    let csvContent = "data:text/csv;charset=utf-8,Artículo;Categoría;Stock Actual;Umbral de Seguridad\n";
     
     filteredItems.forEach(item => {
-        csvContent += `${item.name};${item.stock};${item.threshold}\n`;
+        csvContent += `${item.name};${item.category || 'Sin categoría'};${item.stock};${item.threshold}\n`;
     });
 
     const encodedUri = encodeURI(csvContent);
@@ -80,10 +92,12 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
     document.body.removeChild(link);
   }
   
-  const handleUpdate = (itemId: string, stock: number, threshold?: number) => {
+  const handleUpdate = (itemId: string, stock: number, threshold?: number, _: any, __: any, category?: ItemCategory) => {
     if (!editingItem) return;
-    onUpdateItem({ ...editingItem, stock: stock, threshold: threshold! });
-  };
+    const updatedItem = { ...editingItem, stock: stock, threshold: threshold!, category: category! };
+    onUpdateItem(updatedItem);
+};
+
 
   return (
     <>
@@ -111,15 +125,31 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
               )}
             </div>
           </div>
-          <div className="relative mt-4">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Buscar por código de artículo..."
-              className="w-full pl-8"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+          <div className="flex flex-col sm:flex-row gap-2 mt-4">
+             <div className="relative flex-grow">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                type="search"
+                placeholder="Buscar por código de artículo..."
+                className="w-full pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                />
+            </div>
+            <div className="sm:w-1/3">
+                <Select value={categoryFilter} onValueChange={(value) => setCategoryFilter(value as any)}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Filtrar por categoría" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {itemCategories.map(cat => (
+                            <SelectItem key={cat} value={cat} className="capitalize">
+                                {cat === 'all' ? 'Todas las Categorías' : cat}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -128,6 +158,7 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
               <TableHeader>
                 <TableRow>
                   <TableHead>Nombre</TableHead>
+                  <TableHead>Categoría</TableHead>
                   <TableHead className="text-right">Stock</TableHead>
                   <TableHead className="text-right">Umbral</TableHead>
                   <TableHead className="text-center">Estado</TableHead>
@@ -151,6 +182,9 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
                       >
                         <TableCell className="font-medium">
                           {item.name}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground capitalize">
+                            {item.category || 'Sin categoría'}
                         </TableCell>
                         <TableCell className="text-right">{item.stock}</TableCell>
                         <TableCell className="text-right">{item.threshold}</TableCell>
@@ -226,7 +260,7 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={canEdit || canDelete ? 5 : 4} className="h-24 text-center">
+                    <TableCell colSpan={canEdit || canDelete ? 6 : 5} className="h-24 text-center">
                       No se encontraron artículos.
                     </TableCell>
                   </TableRow>
