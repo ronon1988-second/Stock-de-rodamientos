@@ -22,14 +22,14 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { InventoryItem, Machine, Sector } from "@/lib/types";
+import { InventoryItem, Machine, Sector, ItemCategory } from "@/lib/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import React from "react";
 
 type UpdateStockDialogProps = {
   item: InventoryItem;
   onClose: () => void;
-  onConfirm: (itemId: string, quantityOrStock: number, threshold?: number, machineId?: string | null, sectorId?: string | null) => void;
+  onConfirm: (itemId: string, quantityOrStock: number, threshold?: number, machineId?: string | null, sectorId?: string | null, category?: ItemCategory) => void;
   mode: "logUsage" | "updateStock";
   sectors?: Sector[];
   machinesBySector?: Record<string, Machine[]>;
@@ -38,6 +38,14 @@ type UpdateStockDialogProps = {
     machineId?: string;
   };
 };
+
+const CATEGORIES: { value: ItemCategory; label: string }[] = [
+  { value: 'rodamientos', label: 'Rodamientos' },
+  { value: 'pistones', label: 'Pistones' },
+  { value: 'lonas', label: 'Lonas' },
+  { value: 'correas', label: 'Correas' },
+  { value: 'otros', label: 'Otros' },
+];
 
 const GENERAL_USAGE_ID = "general";
 
@@ -64,6 +72,9 @@ export default function UpdateStockDialog({
   const updateStockSchema = z.object({
     stock: z.coerce.number().int().min(0, "El stock no puede ser negativo."),
     threshold: z.coerce.number().int().min(0, "El umbral no puede ser negativo."),
+    category: z.enum(['rodamientos', 'pistones', 'lonas', 'correas', 'otros'], {
+      required_error: "Debe seleccionar una categoría.",
+    }),
   });
 
   const formSchema = mode === 'logUsage' ? logUsageSchema : updateStockSchema;
@@ -77,6 +88,7 @@ export default function UpdateStockDialog({
     } : {
       stock: item.stock,
       threshold: item.threshold,
+      category: item.category || 'otros',
     },
   });
 
@@ -98,8 +110,8 @@ export default function UpdateStockDialog({
       const finalMachineId = machineId === GENERAL_USAGE_ID ? null : machineId;
       onConfirm(item.id, quantity, undefined, finalMachineId, finalSectorId);
     } else {
-      const { stock, threshold } = values as z.infer<typeof updateStockSchema>;
-      onConfirm(item.id, stock, threshold);
+      const { stock, threshold, category } = values as z.infer<typeof updateStockSchema>;
+      onConfirm(item.id, stock, threshold, undefined, undefined, category);
     }
     onClose();
   }
@@ -118,7 +130,7 @@ export default function UpdateStockDialog({
           <DialogDescription>
              {isLogUsage 
                 ? 'Seleccione la máquina e ingrese la cantidad utilizada.' 
-                : 'Ingrese el nuevo total de stock y el umbral de seguridad para este artículo.'}
+                : 'Ingrese el nuevo total de stock, umbral y categoría para este artículo.'}
              <br />
              Stock actual: <strong>{item.stock} unidades</strong>
           </DialogDescription>
@@ -193,6 +205,29 @@ export default function UpdateStockDialog({
                 </>
             )}
             {!isLogUsage && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Categoría</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccione una categoría" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {CATEGORIES.map(cat => (
+                            <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <div className="grid grid-cols-2 gap-4">
                  <FormField
                   control={form.control}
@@ -221,6 +256,7 @@ export default function UpdateStockDialog({
                   )}
                 />
                 </div>
+              </>
             )}
            
             <DialogFooter>
@@ -233,10 +269,3 @@ export default function UpdateStockDialog({
     </Dialog>
   );
 }
-
-
-    
-
-
-
-    

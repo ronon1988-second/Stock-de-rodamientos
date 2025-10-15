@@ -22,13 +22,22 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import type { InventoryItem } from "@/lib/types";
+import type { InventoryItem, ItemCategory } from "@/lib/types";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type AddItemDialogProps = {
   onClose: () => void;
   onConfirm: (item: Omit<InventoryItem, 'id'>) => void;
   existingNames: string[];
 };
+
+const CATEGORIES: { value: ItemCategory; label: string }[] = [
+  { value: 'rodamientos', label: 'Rodamientos' },
+  { value: 'pistones', label: 'Pistones' },
+  { value: 'lonas', label: 'Lonas' },
+  { value: 'correas', label: 'Correas' },
+  { value: 'otros', label: 'Otros' },
+];
 
 export default function AddItemDialog({ onClose, onConfirm, existingNames }: AddItemDialogProps) {
 
@@ -39,6 +48,9 @@ export default function AddItemDialog({ onClose, onConfirm, existingNames }: Add
     ),
     stock: z.coerce.number().int().min(0, "El stock no puede ser negativo."),
     threshold: z.coerce.number().int().min(0, "El umbral no puede ser negativo."),
+    category: z.enum(['rodamientos', 'pistones', 'lonas', 'correas', 'otros'], {
+      required_error: "Debe seleccionar una categoría.",
+    }),
   });
 
   const form = useForm<z.infer<typeof AddItemSchema>>({
@@ -47,6 +59,7 @@ export default function AddItemDialog({ onClose, onConfirm, existingNames }: Add
       name: "",
       stock: 0,
       threshold: 2,
+      category: 'rodamientos',
     },
   });
 
@@ -79,32 +92,56 @@ export default function AddItemDialog({ onClose, onConfirm, existingNames }: Add
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="stock"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Stock Inicial</FormLabel>
-                  <FormControl>
-                    <Input type="number" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
              <FormField
               control={form.control}
-              name="threshold"
+              name="category"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Umbral de Stock de Seguridad</FormLabel>
-                  <FormControl>
-                    <Input type="number" {...field} />
-                  </FormControl>
+                  <FormLabel>Categoría</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccione una categoría" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {CATEGORIES.map(cat => (
+                        <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
             />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="stock"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Stock Inicial</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="threshold"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Umbral de Stock</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={onClose}>

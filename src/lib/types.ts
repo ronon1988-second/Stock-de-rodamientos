@@ -18,12 +18,15 @@ export type MachinesBySector = {
   [sectorId: string]: Machine[];
 };
 
+export type ItemCategory = 'rodamientos' | 'pistones' | 'lonas' | 'correas' | 'otros';
+
 // Represents a single item in the shared inventory. The 'id' is the Firestore document ID.
 export type InventoryItem = {
   id: string;
   name: string;
   stock: number;
   threshold: number;
+  category?: ItemCategory;
 };
 
 // Represents the usage of an item by a specific machine at a specific time.

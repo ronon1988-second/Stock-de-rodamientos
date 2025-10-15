@@ -19,7 +19,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import UpdateStockDialog from "./update-stock-dialog";
-import type { InventoryItem, MachinesBySector, Sector } from "@/lib/types";
+import type { InventoryItem, MachinesBySector, Sector, ItemCategory } from "@/lib/types";
 import { MoreHorizontal, Search, PlusCircle, FileDown, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,7 @@ import AddItemDialog from "./add-item-dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 
 type StockTableProps = {
   inventory: InventoryItem[];
@@ -42,48 +43,31 @@ type StockTableProps = {
   machinesBySector: MachinesBySector;
 };
 
-// Function to determine item series
-const getItemSeries = (name: string): string => {
-  const normalizedName = name.toUpperCase().trim();
-  if (normalizedName.startsWith('HTD')) return 'Correas';
-  if (normalizedName.startsWith('H')) return 'Manguitos de Montaje';
-  if (normalizedName.startsWith('6')) {
-    const series = normalizedName.substring(0, 2);
-    if (['60', '62', '63', '68', '69'].includes(series)) {
-      return `Rodamientos ${series}xx`;
-    }
-  }
-  if (normalizedName.startsWith('UC')) return 'Rodamientos UC (Insertos)';
-  if (normalizedName.startsWith('12') || normalizedName.startsWith('13') || normalizedName.startsWith('22') || normalizedName.startsWith('23')) {
-    const series = normalizedName.substring(0, 2);
-    if (['12', '13', '22', '23'].includes(series)) {
-        return `Rodamientos ${series}xx (Autoalineables)`;
-    }
-  }
-  if (normalizedName.startsWith('30') || normalizedName.startsWith('32') || normalizedName.startsWith('33')) {
-      const series = normalizedName.substring(0, 2);
-      return `Rodamientos ${series}xxx (Rodillos Cónicos)`;
-  }
-  if (normalizedName.startsWith('NK') || normalizedName.startsWith('RNA') || normalizedName.startsWith('HK')) return 'Rodamientos de Agujas';
-  if (normalizedName.startsWith('PHS') || normalizedName.startsWith('POS')) return 'Terminales de Rótula';
-  if (normalizedName.startsWith('AEVU')) return 'Pistones';
-  if (normalizedName.startsWith('FL')) return 'Soportes';
-  
-  return 'Otros';
-};
-
+const CATEGORIES: { value: ItemCategory | 'all'; label: string }[] = [
+  { value: 'all', label: 'Todas las Categorías' },
+  { value: 'rodamientos', label: 'Rodamientos' },
+  { value: 'pistones', label: 'Pistones' },
+  { value: 'lonas', label: 'Lonas' },
+  { value: 'correas', label: 'Correas' },
+  { value: 'otros', label: 'Otros' },
+];
 
 export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUsage, onDeleteItem, canEdit, canDelete, title, description, sectors, machinesBySector }: StockTableProps) {
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [logUsageItem, setLogUsageItem] = useState<InventoryItem | null>(null);
   const [addingItem, setAddingItem] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<ItemCategory | 'all'>('all');
 
   const filteredItems = useMemo(() => {
     return inventory
-      .filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()))
+      .filter(item => {
+        const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
+        const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
+        return matchesCategory && matchesSearch;
+      })
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [inventory, searchTerm]);
+  }, [inventory, searchTerm, selectedCategory]);
 
   const getStatus = (item: InventoryItem) => {
     if (item.stock === 0) return "Sin Stock";
@@ -102,8 +86,10 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
   };
 
   const groupedItems = useMemo(() => {
-    const grouped = inventory.reduce((acc, item) => {
-        const series = getItemSeries(item.name);
+    const itemsToGroup = searchTerm ? filteredItems : inventory.filter(item => selectedCategory === 'all' || item.category === selectedCategory);
+    
+    const grouped = itemsToGroup.reduce((acc, item) => {
+        const series = item.category || 'otros';
         if (!acc.has(series)) {
             acc.set(series, []);
         }
@@ -111,13 +97,11 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
         return acc;
     }, new Map<string, InventoryItem[]>());
 
-    // Sort items within each group
     grouped.forEach(items => items.sort((a, b) => a.name.localeCompare(b.name)));
     
-    // Sort groups by name
     return new Map([...grouped.entries()].sort((a, b) => a[0].localeCompare(b[0])));
 
-  }, [inventory]);
+  }, [inventory, searchTerm, selectedCategory, filteredItems]);
 
 
   const getStatusVariant = (status: string): "destructive" | "secondary" | "default" => {
@@ -127,16 +111,17 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
   };
 
   const exportAllToCSV = () => {
-    let csvContent = "data:text/csv;charset=utf-8,Artículo;Stock Actual;Umbral de Seguridad\n";
+    let csvContent = "data:text/csv;charset=utf-8,Artículo;Categoría;Stock Actual;Umbral de Seguridad\n";
     
-    inventory.sort((a,b) => a.name.localeCompare(b.name)).forEach(item => {
-        csvContent += `${item.name};${item.stock};${item.threshold}\n`;
+    filteredItems.forEach(item => {
+        const categoryLabel = CATEGORIES.find(c => c.value === item.category)?.label || 'Otros';
+        csvContent += `${item.name};${categoryLabel};${item.stock};${item.threshold}\n`;
     });
 
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "inventario_completo.csv");
+    link.setAttribute("download", "inventario_filtrado.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -188,7 +173,7 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
                         <DropdownMenuItem
                             onSelect={() => setEditingItem(item)}
                         >
-                            Actualizar Stock
+                            Actualizar/Editar
                         </DropdownMenuItem>
                       </>
                     )}
@@ -230,6 +215,11 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
     );
   }
 
+  const handleUpdate = (itemId: string, stock: number, threshold?: number, machineId?: string | null, sectorId?: string | null, category?: ItemCategory) => {
+    if (!editingItem) return;
+    onUpdateItem({ ...editingItem, stock: stock, threshold: threshold!, category: category! });
+  };
+
   return (
     <>
       <Card>
@@ -241,7 +231,7 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
                 {description || 'Busca, visualiza y gestiona todo tu inventario.'}
               </CardDescription>
             </div>
-            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <div className="flex flex-col gap-2 w-full sm:w-auto sm:flex-row">
               {canEdit && (
                 <>
                   <Button variant="outline" onClick={exportAllToCSV} disabled={inventory.length === 0}>
@@ -256,15 +246,27 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
               )}
             </div>
           </div>
-          <div className="relative mt-4">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Buscar por código de artículo..."
-              className="w-full pl-8"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+          <div className="flex flex-col sm:flex-row gap-2 mt-4">
+            <div className="relative flex-grow">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Buscar por código de artículo..."
+                className="w-full pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <Select value={selectedCategory} onValueChange={(value) => setSelectedCategory(value as ItemCategory | 'all')}>
+              <SelectTrigger className="w-full sm:w-[200px]">
+                <SelectValue placeholder="Filtrar por categoría" />
+              </SelectTrigger>
+              <SelectContent>
+                {CATEGORIES.map(cat => (
+                  <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardHeader>
         <CardContent>
@@ -295,6 +297,7 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
                 <Accordion type="multiple" className="w-full">
                     {Array.from(groupedItems.entries()).map(([series, items]) => {
                         const groupStatus = getGroupStatus(items);
+                        const categoryLabel = CATEGORIES.find(c => c.value === series)?.label || series;
                         return (
                         <AccordionItem value={series} key={series}>
                             <AccordionTrigger className="text-base font-semibold sticky top-0 bg-card z-10 px-4 py-3 border-b hover:no-underline">
@@ -305,7 +308,7 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
                                     groupStatus === 'low-stock' && "bg-amber-500",
                                     groupStatus === 'in-stock' && "bg-green-500"
                                 )}></span>
-                                <span>{series}</span>
+                                <span>{categoryLabel}</span>
                                 </div>
                             </AccordionTrigger>
                             <AccordionContent>
@@ -332,7 +335,7 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
                     })}
                     {groupedItems.size === 0 && (
                         <div className="text-center py-10 text-muted-foreground">
-                            No hay artículos en el inventario.
+                            No hay artículos para la categoría seleccionada.
                         </div>
                     )}
                 </Accordion>
@@ -354,9 +357,7 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
             key={`edit-${editingItem.id}`}
             item={editingItem}
             onClose={() => setEditingItem(null)}
-            onConfirm={(_, stock, threshold) => {
-              onUpdateItem({ ...editingItem, stock: stock, threshold: threshold! });
-            }}
+            onConfirm={handleUpdate}
             mode="updateStock"
         />
       )}
@@ -376,5 +377,3 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
     </>
   );
 }
-
-    

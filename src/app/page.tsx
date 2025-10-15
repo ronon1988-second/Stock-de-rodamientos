@@ -49,7 +49,8 @@ import {
   MachineAssignment,
   UserProfile,
   MachinesBySector,
-  UserRole
+  UserRole,
+  ItemCategory,
 } from '@/lib/types';
 import { initialInventory, initialSectors, initialMachines } from '@/lib/data';
 import Dashboard from '@/components/app/dashboard';
@@ -617,10 +618,7 @@ function AppContent() {
       return (
         <Dashboard
           inventory={sortedInventory}
-          onUpdateItem={(item) => {
-            const { id, stock, threshold } = item;
-            handleUpdateItem({ ...item, stock, threshold });
-          }}
+          onUpdateItem={handleUpdateItem}
           onAddItem={handleAddItem}
           onLogUsage={handleLogUsage}
           canEdit={canEditAnything}
@@ -685,10 +683,7 @@ function AppContent() {
     return (
         <Dashboard
             inventory={sortedInventory}
-            onUpdateItem={(item) => {
-                const { id, stock, threshold } = item;
-                handleUpdateItem({ ...item, stock, threshold });
-            }}
+            onUpdateItem={handleUpdateItem}
             onAddItem={handleAddItem}
             onLogUsage={handleLogUsage}
             canEdit={canEditAnything}
