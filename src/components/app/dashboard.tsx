@@ -33,33 +33,12 @@ export default function Dashboard({
   sectors,
   machinesBySector,
 }: DashboardProps) {
-  const totalStock = inventory.reduce((sum, b) => sum + b.stock, 0);
   const lowStockCount = inventory.filter((b) => b.stock < b.threshold).length;
   const outOfStockCount = inventory.filter((b) => b.stock === 0).length;
 
   return (
     <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-2">
-      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4">
-            <CardTitle className="text-sm font-medium">Stock Total</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="p-4 pt-0">
-            <div className="text-2xl font-bold">{totalStock}</div>
-            <p className="text-xs text-muted-foreground">Unidades totales en inventario</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4">
-            <CardTitle className="text-sm font-medium">Tipos de Artículo</CardTitle>
-            <Truck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="p-4 pt-0">
-            <div className="text-2xl font-bold">{inventory.length}</div>
-             <p className="text-xs text-muted-foreground">Códigos únicos gestionados</p>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
         <Card className={`${lowStockCount > 0 ? "border-amber-500/50" : ""}`}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4">
             <CardTitle className="text-sm font-medium">Necesitan Reposición</CardTitle>
