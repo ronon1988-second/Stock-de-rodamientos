@@ -43,6 +43,7 @@ export type MachineAssignment = {
   itemId: string;
   itemName: string;
   quantity: number;
+  usageDescription?: string; // Optional field for usage description
 };
 
 // Represents a user profile stored in Firestore.

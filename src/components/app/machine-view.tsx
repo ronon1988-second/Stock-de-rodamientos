@@ -6,18 +6,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { InventoryItem, Sector, Machine, MachineAssignment } from '@/lib/types';
-import { PackagePlus, Trash2 } from 'lucide-react';
+import { PackagePlus, Trash2, Edit } from 'lucide-react';
 import AssignItemDialog from './assign-item-dialog';
 import UpdateStockDialog from './update-stock-dialog';
 import { useDoc, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, collection, query, where, getDoc } from 'firebase/firestore';
+import { doc, collection, query, where, getDoc, updateDoc } from 'firebase/firestore';
 import { Skeleton } from '../ui/skeleton';
+import EditAssignmentDialog from './edit-assignment-dialog'; // Import the new dialog
 
 type MachineViewProps = {
     machineId: string;
     allInventory: InventoryItem[];
     machineAssignments: MachineAssignment[];
-    onAssignItem: (itemId: string, machineId: string, sectorId: string, quantity: number) => void;
+    onAssignItem: (itemId: string, machineId: string, sectorId: string, quantity: number, usageDescription: string) => void;
     onRemoveItem: (assignmentId: string) => void;
     onLogUsage: (itemId: string, quantity: number, machineId: string | null, sectorId: string | null) => void;
     canEdit: boolean;
@@ -86,9 +87,10 @@ function MachineLoader({ machineId, children }: { machineId: string, children: (
 }
 
 
-function MachineDetails({ machine, allInventory, machineAssignments, onAssignItem, onRemoveItem, onLogUsage, canEdit, canLogUsage }: { machine: Machine, allInventory: InventoryItem[], machineAssignments: MachineAssignment[], onAssignItem: (itemId: string, machineId: string, sectorId: string, quantity: number) => void, onRemoveItem: (assignmentId: string) => void, onLogUsage: (itemId: string, quantity: number, machineId: string | null, sectorId: string | null) => void, canEdit: boolean, canLogUsage: boolean }) {
+function MachineDetails({ machine, allInventory, machineAssignments, onAssignItem, onRemoveItem, onLogUsage, canEdit, canLogUsage }: { machine: Machine, allInventory: InventoryItem[], machineAssignments: MachineAssignment[], onAssignItem: (itemId: string, machineId: string, sectorId: string, quantity: number, usageDescription: string) => void, onRemoveItem: (assignmentId: string) => void, onLogUsage: (itemId: string, quantity: number, machineId: string | null, sectorId: string | null) => void, canEdit: boolean, canLogUsage: boolean }) {
     const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
     const [logUsageItem, setLogUsageItem] = useState<InventoryItem | null>(null);
+    const [editingAssignment, setEditingAssignment] = useState<MachineAssignment | null>(null);
     const firestore = useFirestore();
 
     const sectorRef = useMemoFirebase(() => {
@@ -98,6 +100,15 @@ function MachineDetails({ machine, allInventory, machineAssignments, onAssignIte
         return null;
     }, [firestore, machine]);
     const { data: sector, isLoading: isSectorLoading } = useDoc<Sector>(sectorRef);
+
+    const handleUpdateAssignment = async (assignmentId: string, newQuantity: number, newDescription: string) => {
+        if (!firestore) return;
+        const assignmentRef = doc(firestore, 'machineAssignments', assignmentId);
+        await updateDoc(assignmentRef, {
+            quantity: newQuantity,
+            usageDescription: newDescription
+        });
+    };
 
     const assignedItemsDetails = machineAssignments.map(item => {
         const itemDetails = allInventory.find(b => b.id === item.itemId);
@@ -149,6 +160,7 @@ function MachineDetails({ machine, allInventory, machineAssignments, onAssignIte
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Artículo</TableHead>
+                                        <TableHead>Descripción de Uso</TableHead>
                                         <TableHead className="text-right">Asignado</TableHead>
                                         <TableHead className="text-right">Stock</TableHead>
                                         <TableHead className="text-right">Acciones</TableHead>
@@ -159,6 +171,7 @@ function MachineDetails({ machine, allInventory, machineAssignments, onAssignIte
                                         assignedItemsDetails.map(item => (
                                             <TableRow key={item.id}>
                                                 <TableCell className="font-medium">{item.itemName}</TableCell>
+                                                <TableCell className="text-muted-foreground">{item.usageDescription || '-'}</TableCell>
                                                 <TableCell className="text-right font-semibold">{item.quantity}</TableCell>
                                                 <TableCell className="text-right">{item.stock}</TableCell>
                                                 <TableCell className="flex justify-end gap-1">
@@ -173,21 +186,31 @@ function MachineDetails({ machine, allInventory, machineAssignments, onAssignIte
                                                         </Button>
                                                     )}
                                                     {canEdit && (
-                                                        <Button 
-                                                            variant="ghost" 
-                                                            size="icon" 
-                                                            onClick={() => onRemoveItem(item.id)}
-                                                            aria-label={`Quitar ${item.itemName}`}
-                                                        >
-                                                            <Trash2 className="h-4 w-4 text-destructive" />
-                                                        </Button>
+                                                        <>
+                                                            <Button 
+                                                                variant="ghost" 
+                                                                size="icon" 
+                                                                onClick={() => setEditingAssignment(item)}
+                                                                aria-label={`Editar ${item.itemName}`}
+                                                            >
+                                                                <Edit className="h-4 w-4" />
+                                                            </Button>
+                                                            <Button 
+                                                                variant="ghost" 
+                                                                size="icon" 
+                                                                onClick={() => onRemoveItem(item.id)}
+                                                                aria-label={`Quitar ${item.itemName}`}
+                                                            >
+                                                                <Trash2 className="h-4 w-4 text-destructive" />
+                                                            </Button>
+                                                        </>
                                                     )}
                                                 </TableCell>
                                             </TableRow>
                                         ))
                                     ) : (
                                         <TableRow>
-                                            <TableCell colSpan={4} className="h-24 text-center">
+                                            <TableCell colSpan={5} className="h-24 text-center">
                                                 Aún no se han asignado artículos a esta máquina.
                                             </TableCell>
                                         </TableRow>
@@ -205,6 +228,13 @@ function MachineDetails({ machine, allInventory, machineAssignments, onAssignIte
                     allInventory={allInventory}
                     onClose={() => setIsAssignDialogOpen(false)}
                     onAssign={onAssignItem}
+                />
+            )}
+            {editingAssignment && canEdit && (
+                <EditAssignmentDialog
+                    assignment={editingAssignment}
+                    onClose={() => setEditingAssignment(null)}
+                    onConfirm={handleUpdateAssignment}
                 />
             )}
              {logUsageItem && canLogUsage && (
@@ -239,5 +269,3 @@ export default function MachineView({ machineId, ...props }: MachineViewProps) {
         </MachineLoader>
     );
 }
-
-    

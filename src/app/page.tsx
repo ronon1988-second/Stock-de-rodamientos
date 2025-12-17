@@ -51,7 +51,6 @@ import {
   UserProfile,
   MachinesBySector,
   UserRole,
-  ItemCategory,
 } from '@/lib/types';
 import { initialInventory, initialSectors, initialMachines } from '@/lib/data';
 import Dashboard from '@/components/app/dashboard';
@@ -420,7 +419,8 @@ function AppContent() {
     itemId: string,
     machineId: string,
     sectorId: string,
-    quantity: number
+    quantity: number,
+    usageDescription: string
   ) => {
     if (!canManageOrg || !inventory || !firestore) { // Only admins/editors can assign
         toast({ title: "Acceso denegado", variant: "destructive" });
@@ -435,6 +435,7 @@ function AppContent() {
       itemId,
       itemName: item.name,
       quantity: quantity,
+      usageDescription: usageDescription,
     };
 
     addDocumentNonBlocking(collection(firestore, 'machineAssignments'), newAssignment);

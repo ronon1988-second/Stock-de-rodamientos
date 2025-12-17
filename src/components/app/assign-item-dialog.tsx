@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -46,7 +47,7 @@ type AssignItemDialogProps = {
   machine: Machine;
   allInventory: InventoryItem[];
   onClose: () => void;
-  onAssign: (itemId: string, machineId: string, sectorId: string, quantity: number) => void;
+  onAssign: (itemId: string, machineId: string, sectorId: string, quantity: number, usageDescription: string) => void;
 };
 
 const AssignItemSchema = z.object({
@@ -54,6 +55,7 @@ const AssignItemSchema = z.object({
     required_error: "Por favor seleccione un artículo.",
   }),
   quantity: z.coerce.number().int().positive("La cantidad debe ser mayor que cero."),
+  usageDescription: z.string().optional(),
 });
 
 export default function AssignItemDialog({
@@ -68,11 +70,12 @@ export default function AssignItemDialog({
     resolver: zodResolver(AssignItemSchema),
     defaultValues: {
       quantity: 1,
+      usageDescription: "",
     }
   });
 
   function onSubmit(values: z.infer<typeof AssignItemSchema>) {
-    onAssign(values.itemId, machine.id, sector.id, values.quantity);
+    onAssign(values.itemId, machine.id, sector.id, values.quantity, values.usageDescription || "");
     onClose();
   }
 
@@ -87,7 +90,7 @@ export default function AssignItemDialog({
         <DialogHeader>
           <DialogTitle>Asignar Artículo a {machine.name}</DialogTitle>
           <DialogDescription>
-            Seleccione un artículo y la cantidad a asignar a esta máquina en el sector {sector.name}.
+            Seleccione un artículo, la cantidad y una descripción de su uso en la máquina.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -161,6 +164,19 @@ export default function AssignItemDialog({
                   <FormLabel>Cantidad a Asignar</FormLabel>
                   <FormControl>
                     <Input type="number" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+             <FormField
+              control={form.control}
+              name="usageDescription"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Descripción de Uso (Opcional)</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Ej: Rodillo de cama centradora" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
