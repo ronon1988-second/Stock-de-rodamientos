@@ -11,7 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BrainCircuit, Loader2, Info, ShoppingCart, FileDown, Check, ChevronsUpDown, XCircle, FileSearch, Warehouse, SlidersHorizontal } from "lucide-react";
+import { BrainCircuit, Loader2, Info, ShoppingCart, FileDown, Check, ChevronsUpDown, XCircle, SlidersHorizontal, Warehouse } from "lucide-react";
 import { getAIReorderRecommendations } from "@/app/actions";
 import type { InventoryItem, MachineAssignment, Sector, MachinesBySector } from "@/lib/types";
 import { ReorderRecommendationsOutput } from "@/ai/flows/reorder-recommendations";
@@ -272,9 +272,6 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
   const handleClearFilters = () => {
     setSelectedSectorIds([]);
     setSelectedMachineIds([]);
-    setItemsToReorder(null);
-    setRecommendations(null);
-    setCalculationMode(null);
   }
   
   const hasActiveFilters = selectedSectorIds.length > 0 || selectedMachineIds.length > 0;
@@ -295,174 +292,189 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
     );
   }
 
+  const topLevelButtons = (
+     <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+        <Button
+            onClick={handleGetAIRecommendations}
+            disabled={isLoadingAI || !itemsToReorder}
+        >
+            {isLoadingAI ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+            <BrainCircuit className="mr-2 h-4 w-4" />
+            )}
+            Sugerencias IA
+        </Button>
+        <Button 
+            onClick={exportToCSV}
+            disabled={!itemsToReorder || itemsToReorder.length === 0}
+            variant="outline"
+        >
+            <FileDown className="mr-2 h-4 w-4" />
+            Exportar
+        </Button>
+    </div>
+  )
+
   return (
     <div className="grid auto-rows-max items-start gap-4 md:gap-8">
-      <Card>
-        <CardHeader>
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                <div>
+      {/* Container for the two generator cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Card for Plant Shutdown */}
+        <Card>
+            <CardHeader>
+                <CardTitle>Parada de Planta</CardTitle>
+                <CardDescription>
+                   Calcular en base a asignaciones. Filtre o genere para toda la planta.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                 <div className="grid gap-1.5 w-full">
+                    <label className="text-sm font-medium">Filtro por Sector</label>
+                    <MultiSelect 
+                    title="Sectores"
+                    options={sectors.sort((a,b) => a.name.localeCompare(b.name)).map(s => ({ value: s.id, label: s.name }))}
+                    selectedValues={selectedSectorIds}
+                    onSelect={(values) => {
+                        setSelectedSectorIds(values);
+                        const newMachineIds = selectedMachineIds.filter(machineId => {
+                        return values.some(sectorId => machinesBySector[sectorId]?.some(m => m.id === machineId));
+                        });
+                        setSelectedMachineIds(newMachineIds);
+                    }}
+                    />
+                </div>
+                <div className="grid gap-1.5 w-full">
+                    <label className="text-sm font-medium">Filtro por Máquina</label>
+                    <MultiSelect 
+                    title="Máquinas"
+                    options={filteredMachines.map(m => ({ value: m.id, label: m.name }))}
+                    selectedValues={selectedMachineIds}
+                    onSelect={setSelectedMachineIds}
+                    disabled={filteredMachines.length === 0}
+                    />
+                </div>
+            </CardContent>
+            <CardFooter className="flex-col items-start gap-2">
+                 <Button onClick={() => handleGenerateList('filter')} className="w-full">
+                    <SlidersHorizontal className="mr-2 h-4 w-4" />
+                    Generar para Parada de Planta
+                </Button>
+                {hasActiveFilters && (
+                    <Button variant="ghost" onClick={handleClearFilters} className="w-full">
+                        <XCircle className="mr-2 h-4 w-4" />
+                        Limpiar Filtros
+                    </Button>
+                )}
+            </CardFooter>
+        </Card>
+
+        {/* Card for General Replenishment */}
+        <Card className="flex flex-col">
+            <CardHeader>
+                <CardTitle>Reposición de Almacén</CardTitle>
+                <CardDescription>
+                    Calcular en base al stock de seguridad (umbral) de cada artículo.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="flex-grow flex items-center justify-center">
+                 <Button onClick={() => handleGenerateList('general')} size="lg" className="w-full">
+                    <Warehouse className="mr-2 h-4 w-4" />
+                    Generar Reposición General
+                </Button>
+            </CardContent>
+        </Card>
+      </div>
+
+      {/* Results Card */}
+      {itemsToReorder && calculationMode &&
+        <Card>
+            <CardHeader className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                 <div>
                     <CardTitle className="flex items-center gap-2">
-                    <ShoppingCart className="text-primary" />
-                    Lista de Artículos para Comprar
+                        <ShoppingCart className="text-primary" />
+                        Lista de Artículos para Comprar
                     </CardTitle>
                     <CardDescription>
-                    Genere una lista de compras para una parada de planta (filtrada o completa) o para la reposición general del almacén.
+                        {calculationMode === 'filter' ? 'Resultados para Parada de Planta' : 'Resultados para Reposición General'}
                     </CardDescription>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                    <Button
-                        onClick={handleGetAIRecommendations}
-                        disabled={isLoadingAI || !itemsToReorder}
-                    >
-                        {isLoadingAI ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                        <BrainCircuit className="mr-2 h-4 w-4" />
-                        )}
-                        Sugerencias IA
-                    </Button>
-                    <Button 
-                        onClick={exportToCSV}
-                        disabled={!itemsToReorder || itemsToReorder.length === 0}
-                        variant="outline"
-                    >
-                        <FileDown className="mr-2 h-4 w-4" />
-                        Exportar
-                    </Button>
-                </div>
-            </div>
-            <div className="border-t mt-4 pt-4">
-               <div className="grid gap-6">
-                 <div className="flex flex-col md:flex-row md:items-end gap-4">
-                    <div className="grid gap-1.5 w-full md:w-auto md:flex-1 md:max-w-[300px]">
-                        <label className="text-sm font-medium">Filtro por Sector</label>
-                        <MultiSelect 
-                        title="Sectores"
-                        options={sectors.sort((a,b) => a.name.localeCompare(b.name)).map(s => ({ value: s.id, label: s.name }))}
-                        selectedValues={selectedSectorIds}
-                        onSelect={(values) => {
-                            setSelectedSectorIds(values);
-                            const newMachineIds = selectedMachineIds.filter(machineId => {
-                            return values.some(sectorId => machinesBySector[sectorId]?.some(m => m.id === machineId));
-                            });
-                            setSelectedMachineIds(newMachineIds);
-                        }}
-                        />
-                    </div>
-                    <div className="grid gap-1.5 w-full md:w-auto md:flex-1 md:max-w-[300px]">
-                        <label className="text-sm font-medium">Filtro por Máquina</label>
-                        <MultiSelect 
-                        title="Máquinas"
-                        options={filteredMachines.map(m => ({ value: m.id, label: m.name }))}
-                        selectedValues={selectedMachineIds}
-                        onSelect={setSelectedMachineIds}
-                        disabled={filteredMachines.length === 0}
-                        />
-                    </div>
-                    <div className="flex gap-2 items-center">
-                        <Button onClick={() => handleGenerateList('filter')}>
-                            <SlidersHorizontal className="mr-2 h-4 w-4" />
-                            Generar para Parada de Planta
-                        </Button>
-                        {hasActiveFilters && (
-                            <Button variant="ghost" onClick={handleClearFilters} size="icon">
-                                <XCircle className="h-5 w-5" />
-                                <span className="sr-only">Limpiar Filtros</span>
-                            </Button>
-                        )}
-                    </div>
                  </div>
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t" />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-card px-2 text-muted-foreground">O</span>
-                    </div>
-                 </div>
-                 <div>
-                    <Button onClick={() => handleGenerateList('general')} className="w-full md:w-auto">
-                        <Warehouse className="mr-2 h-4 w-4" />
-                        Generar Reposición General
-                    </Button>
-                 </div>
-              </div>
-            </div>
-        </CardHeader>
+                 {topLevelButtons}
+            </CardHeader>
+            <CardContent>
+            {error && (
+                <Alert variant="destructive" className="mb-4">
+                <Info className="h-4 w-4" />
+                <AlertTitle>Error de IA</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+                </Alert>
+            )}
 
-        {itemsToReorder && calculationMode &&
-        <CardContent>
-          {error && (
-            <Alert variant="destructive" className="mb-4">
-              <Info className="h-4 w-4" />
-              <AlertTitle>Error de IA</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          <div className="border rounded-md overflow-x-auto">
-            <Table>
-              <TableHeader>
-                  <TableRow>
-                  <TableHead>Artículo</TableHead>
-                  <TableHead className="text-right">Stock</TableHead>
-                  {calculationMode === 'filter' && <TableHead className="text-right">Requerido</TableHead>}
-                  <TableHead className="text-right">Umbral</TableHead>
-                  <TableHead className="text-right font-bold text-primary">A Comprar</TableHead>
-                  {recommendations && <TableHead className="text-right font-bold">Sugerencia IA</TableHead>}
-                  </TableRow>
-              </TableHeader>
-              <TableBody>
-                {itemsToReorder.length > 0 ? (
-                  itemsToReorder.map((itemInfo) => {
-                      const { item, totalRequired, toBuy } = itemInfo;
-                      const aiRecommendation = getAIRecommendationFor(item.name);
-                      return (
-                      <TableRow key={item.id} className="bg-amber-500/5">
-                          <TableCell className="font-medium">{item.name}</TableCell>
-                          <TableCell className="text-right text-destructive font-semibold">{item.stock}</TableCell>
-                          {calculationMode === 'filter' && <TableCell className="text-right">{totalRequired}</TableCell>}
-                          <TableCell className="text-right">{item.threshold}</TableCell>
-                          <TableCell className="text-right font-bold text-primary">{toBuy}</TableCell>
-                          {recommendations && (
-                            <TableCell className="text-right font-bold">
-                                {aiRecommendation !== null ? (
-                                    <div className="flex items-center justify-end gap-2">
-                                      <BrainCircuit size={16} className="text-blue-500" />
-                                      <span>{aiRecommendation}</span>
-                                    </div>
-                                ) : '-'}
-                            </TableCell>
-                          )}
-                      </TableRow>
-                      )
-                  })
-                ) : (
-                  <TableRow>
-                      <TableCell colSpan={recommendations ? 6 : (calculationMode === 'filter' ? 5 : 4)} className="h-48 text-center text-muted-foreground">
-                        <p>¡Todo en orden! No hay artículos que necesiten reposición para este modo de cálculo.</p>
-                        <p className="text-xs">Pruebe con otros filtros o revise el inventario general.</p>
-                      </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
+            <div className="border rounded-md overflow-x-auto">
+                <Table>
+                <TableHeader>
+                    <TableRow>
+                    <TableHead>Artículo</TableHead>
+                    <TableHead className="text-right">Stock</TableHead>
+                    {calculationMode === 'filter' && <TableHead className="text-right">Requerido</TableHead>}
+                    <TableHead className="text-right">Umbral</TableHead>
+                    <TableHead className="text-right font-bold text-primary">A Comprar</TableHead>
+                    {recommendations && <TableHead className="text-right font-bold">Sugerencia IA</TableHead>}
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {itemsToReorder.length > 0 ? (
+                    itemsToReorder.map((itemInfo) => {
+                        const { item, totalRequired, toBuy } = itemInfo;
+                        const aiRecommendation = getAIRecommendationFor(item.name);
+                        return (
+                        <TableRow key={item.id} className="bg-amber-500/5">
+                            <TableCell className="font-medium">{item.name}</TableCell>
+                            <TableCell className="text-right text-destructive font-semibold">{item.stock}</TableCell>
+                            {calculationMode === 'filter' && <TableCell className="text-right">{totalRequired}</TableCell>}
+                            <TableCell className="text-right">{item.threshold}</TableCell>
+                            <TableCell className="text-right font-bold text-primary">{toBuy}</TableCell>
+                            {recommendations && (
+                                <TableCell className="text-right font-bold">
+                                    {aiRecommendation !== null ? (
+                                        <div className="flex items-center justify-end gap-2">
+                                        <BrainCircuit size={16} className="text-blue-500" />
+                                        <span>{aiRecommendation}</span>
+                                        </div>
+                                    ) : '-'}
+                                </TableCell>
+                            )}
+                        </TableRow>
+                        )
+                    })
+                    ) : (
+                    <TableRow>
+                        <TableCell colSpan={recommendations ? 6 : (calculationMode === 'filter' ? 5 : 4)} className="h-48 text-center text-muted-foreground">
+                            <p>¡Todo en orden! No hay artículos que necesiten reposición para este modo de cálculo.</p>
+                            <p className="text-xs">Pruebe con otros filtros o revise el inventario general.</p>
+                        </TableCell>
+                    </TableRow>
+                    )}
+                </TableBody>
+                </Table>
+            </div>
+            </CardContent>
+            
+            {recommendations && (
+            <CardFooter>
+                <Alert>
+                    <BrainCircuit className="h-4 w-4" />
+                    <AlertTitle>Recomendación Total de la IA</AlertTitle>
+                    <AlertDescription>
+                        El valor total estimado para la reposición sugerida por la IA es de <strong>${recommendations.totalValue.toLocaleString()}</strong> (asumiendo $10 por unidad).
+                    </AlertDescription>
+                </Alert>
+            </CardFooter>
+            )}
+        </Card>
         }
-
-        {recommendations && (
-        <CardFooter>
-            <Alert>
-                <BrainCircuit className="h-4 w-4" />
-                <AlertTitle>Recomendación Total de la IA</AlertTitle>
-                <AlertDescription>
-                    El valor total estimado para la reposición sugerida por la IA es de <strong>${recommendations.totalValue.toLocaleString()}</strong> (asumiendo $10 por unidad).
-                </AlertDescription>
-            </Alert>
-        </CardFooter>
-        )}
-      </Card>
     </div>
   );
 }
+
+    
