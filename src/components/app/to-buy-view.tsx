@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useCallback } from "react";
@@ -361,7 +362,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                     <div className="flex gap-2 items-center">
                         <Button onClick={() => handleGenerateList('filter')}>
                             <SlidersHorizontal className="mr-2 h-4 w-4" />
-                            {hasActiveFilters ? "Generar por Filtro" : "Generar para Planta Completa"}
+                            Generar para Parada de Planta
                         </Button>
                         {hasActiveFilters && (
                             <Button variant="ghost" onClick={handleClearFilters} size="icon">
@@ -380,9 +381,9 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                     </div>
                  </div>
                  <div>
-                    <Button onClick={() => handleGenerateList('general')} variant="secondary" className="w-full md:w-auto">
+                    <Button onClick={() => handleGenerateList('general')} className="w-full md:w-auto">
                         <Warehouse className="mr-2 h-4 w-4" />
-                        Generar Reposición General (por Umbral)
+                        Generar Reposición General
                     </Button>
                  </div>
               </div>
@@ -465,3 +466,5 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
     </div>
   );
 }
+
+    
