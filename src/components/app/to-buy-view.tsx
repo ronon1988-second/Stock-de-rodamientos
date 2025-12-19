@@ -132,14 +132,22 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
     let items: ReorderInfo[] = [];
 
     if (mode === 'filter') {
-        const relevantMachineAssignments = machineAssignments.filter(assignment => {
-            const isMachineSelected = selectedMachineIds.length > 0;
-            if (isMachineSelected) {
-                return selectedMachineIds.includes(assignment.machineId);
-            }
-            return selectedSectorIds.includes(assignment.sectorId);
-        });
+        const isFiltering = selectedSectorIds.length > 0 || selectedMachineIds.length > 0;
+        
+        let relevantMachineAssignments = machineAssignments;
 
+        // If there are filters, apply them. Otherwise, use all assignments.
+        if (isFiltering) {
+          relevantMachineAssignments = machineAssignments.filter(assignment => {
+              const isMachineSelected = selectedMachineIds.length > 0;
+              if (isMachineSelected) {
+                  return selectedMachineIds.includes(assignment.machineId);
+              }
+              // If only sectors are selected, filter by that.
+              return selectedSectorIds.includes(assignment.sectorId);
+          });
+        }
+        
         const requiredByItem: { [itemId: string]: number } = {};
         relevantMachineAssignments.forEach(assignment => {
             if (!requiredByItem[assignment.itemId]) {
@@ -162,8 +170,6 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
     } else { // mode === 'general'
         inventory.forEach(item => {
             if (item.stock < item.threshold) {
-                // For general replenishment, 'toBuy' could be just enough to reach the threshold,
-                // or a fixed reorder quantity. We'll use (threshold - stock) for simplicity.
                 const toBuy = item.threshold - item.stock;
                 items.push({ item, totalRequired: 0, toBuy });
             }
@@ -239,7 +245,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
     if (!itemsToReorder || itemsToReorder.length === 0) return;
     const isGeneralMode = calculationMode === 'general';
     let headers = "Artículo;Stock Actual;";
-    if (!isGeneralMode) headers += "Requerido (Filtro);";
+    if (!isGeneralMode) headers += "Requerido (Asignaciones);";
     headers += "Umbral de Seguridad;A Comprar (Calculado);A Comprar (IA)\n";
 
     let csvContent = `data:text/csv;charset=utf-8,${headers}`;
@@ -299,7 +305,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                     Lista de Artículos para Comprar
                     </CardTitle>
                     <CardDescription>
-                    Genere una lista de compras para una parada de planta (filtrada) o para la reposición general del almacén.
+                    Genere una lista de compras para una parada de planta (filtrada o completa) o para la reposición general del almacén.
                     </CardDescription>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
@@ -352,10 +358,10 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                         disabled={filteredMachines.length === 0}
                         />
                     </div>
-                    <div className="flex gap-2">
-                        <Button onClick={() => handleGenerateList('filter')} disabled={!hasActiveFilters}>
+                    <div className="flex gap-2 items-center">
+                        <Button onClick={() => handleGenerateList('filter')}>
                             <SlidersHorizontal className="mr-2 h-4 w-4" />
-                            Generar por Filtro
+                            {hasActiveFilters ? "Generar por Filtro" : "Generar para Planta Completa"}
                         </Button>
                         {hasActiveFilters && (
                             <Button variant="ghost" onClick={handleClearFilters} size="icon">
@@ -432,7 +438,7 @@ export default function ToBuyView({ inventory, machineAssignments, sectors, mach
                   })
                 ) : (
                   <TableRow>
-                      <TableCell colSpan={recommendations ? 6 : 5} className="h-48 text-center text-muted-foreground">
+                      <TableCell colSpan={recommendations ? 6 : (calculationMode === 'filter' ? 5 : 4)} className="h-48 text-center text-muted-foreground">
                         <p>¡Todo en orden! No hay artículos que necesiten reposición para este modo de cálculo.</p>
                         <p className="text-xs">Pruebe con otros filtros o revise el inventario general.</p>
                       </TableCell>
