@@ -43,10 +43,6 @@ type StockTableProps = {
   machinesBySector: MachinesBySector;
 };
 
-/**
- * PASO 5: Reemplazo de la función getItemSeries.
- * Ahora simplemente retorna la categoría asignada o "Otros".
- */
 const getItemSeries = (item: InventoryItem): string => {
   return item.category ?? "Otros";
 };
@@ -57,9 +53,8 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
   const [logUsageItem, setLogUsageItem] = useState<InventoryItem | null>(null);
   const [addingItem, setAddingItem] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("all"); // Paso 7: Estado de filtro
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
-  // Filtrado de artículos
   const filteredItems = useMemo(() => {
     return inventory
       .filter(item => {
@@ -82,9 +77,7 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
     return 'in-stock';
   };
 
-  // Agrupamiento por categorías para la vista de acordeón
   const groupedItems = useMemo(() => {
-    // Si hay búsqueda o filtro de categoría específica, no agrupamos (usamos tabla plana)
     if (searchTerm || selectedCategory !== "all") return new Map<string, InventoryItem[]>();
 
     const grouped = inventory.reduce((acc, item) => {
@@ -136,7 +129,6 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
         >
         <TableCell className="font-medium">
             {item.name}
-            {/* Pequeña etiqueta de categoría si estamos en vista de búsqueda */}
             {(searchTerm || selectedCategory !== "all") && (
               <div className="text-[10px] text-muted-foreground font-normal">{getItemSeries(item)}</div>
             )}
@@ -241,7 +233,6 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            {/* Buscador */}
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -253,7 +244,6 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
               />
             </div>
 
-            {/* Paso 7: Filtro por categoría */}
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
@@ -360,8 +350,8 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
             key={`edit-${editingItem.id}`}
             item={editingItem}
             onClose={() => setEditingItem(null)}
-            onConfirm={(itemId, stock, threshold, category) => {
-              onUpdateItem({ ...editingItem, stock, threshold: threshold!, category });
+            onConfirm={(itemId, stock, threshold, category, _, __, newName) => {
+              onUpdateItem({ ...editingItem, name: newName || editingItem.name, stock, threshold: threshold!, category });
             }}
             mode="updateStock"
         />

@@ -29,7 +29,7 @@ import React from "react";
 type UpdateStockDialogProps = {
   item: InventoryItem;
   onClose: () => void;
-  onConfirm: (itemId: string, quantityOrStock: number, threshold?: number, category?: string, machineId?: string | null, sectorId?: string | null) => void;
+  onConfirm: (itemId: string, quantityOrStock: number, threshold?: number, category?: string, machineId?: string | null, sectorId?: string | null, newName?: string) => void;
   mode: "logUsage" | "updateStock";
   sectors?: Sector[];
   machinesBySector?: Record<string, Machine[]>;
@@ -62,9 +62,10 @@ export default function UpdateStockDialog({
   });
 
   const updateStockSchema = z.object({
+    name: z.string().trim().min(1, "El nombre es requerido."),
     stock: z.coerce.number().int().min(0, "El stock no puede ser negativo."),
     threshold: z.coerce.number().int().min(0, "El umbral no puede ser negativo."),
-    category: z.string().min(1, "La categoría es requerida."), // Paso 4: Campo obligatorio en edición
+    category: z.string().min(1, "La categoría es requerida."),
   });
 
   const formSchema = mode === 'logUsage' ? logUsageSchema : updateStockSchema;
@@ -76,6 +77,7 @@ export default function UpdateStockDialog({
       sectorId: defaultValues.sectorId ?? undefined,
       machineId: defaultValues.machineId ?? undefined,
     } : {
+      name: item.name,
       stock: item.stock,
       threshold: item.threshold,
       category: item.category || "Otros",
@@ -99,8 +101,8 @@ export default function UpdateStockDialog({
       const finalMachineId = machineId === GENERAL_USAGE_ID ? null : machineId;
       onConfirm(item.id, quantity, undefined, undefined, finalMachineId, finalSectorId);
     } else {
-      const { stock, threshold, category } = values as z.infer<typeof updateStockSchema>;
-      onConfirm(item.id, stock, threshold, category);
+      const { name, stock, threshold, category } = values as z.infer<typeof updateStockSchema>;
+      onConfirm(item.id, stock, threshold, category, undefined, undefined, name);
     }
     onClose();
   }
@@ -195,7 +197,19 @@ export default function UpdateStockDialog({
             )}
             {!isLogUsage && (
                 <>
-                 {/* Paso 4: Selector de categoría en edición */}
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nombre / Código</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <FormField
                   control={form.control}
                   name="category"
