@@ -295,20 +295,23 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
                     </TableBody>
                 </Table>
             ) : (
-                <Accordion type="multiple" className="w-full" defaultValue={Array.from(groupedItems.keys())}>
+                <Accordion type="multiple" className="w-full">
                     {Array.from(groupedItems.entries()).map(([series, items]) => {
                         const groupStatus = getGroupStatus(items);
                         return (
                         <AccordionItem value={series} key={series}>
                             <AccordionTrigger className="text-base font-semibold sticky top-0 bg-card z-10 px-4 py-3 border-b hover:no-underline">
-                                <div className="flex items-center gap-3">
-                                <span className={cn(
-                                    "h-2.5 w-2.5 rounded-full",
-                                    groupStatus === 'out-of-stock' && "bg-red-500",
-                                    groupStatus === 'low-stock' && "bg-amber-500",
-                                    groupStatus === 'in-stock' && "bg-green-500"
-                                )}></span>
-                                <span>{series}</span>
+                                <div className="flex items-center gap-3 w-full">
+                                  <span className={cn(
+                                      "h-2.5 w-2.5 rounded-full",
+                                      groupStatus === 'out-of-stock' && "bg-red-500",
+                                      groupStatus === 'low-stock' && "bg-amber-500",
+                                      groupStatus === 'in-stock' && "bg-green-500"
+                                  )}></span>
+                                  <span className="flex-1 text-left">{series}</span>
+                                  <Badge variant="secondary" className="mr-2 h-5 min-w-[2rem] justify-center text-[10px] font-bold">
+                                      {items.length}
+                                  </Badge>
                                 </div>
                             </AccordionTrigger>
                             <AccordionContent>
