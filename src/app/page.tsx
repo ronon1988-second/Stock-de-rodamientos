@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -52,7 +51,7 @@ import {
   MachinesBySector,
   UserRole,
 } from '@/lib/types';
-import { initialInventory, initialSectors, initialMachines } from '@/lib/data';
+import { initialInventory, initialSectors, initialMachines, migrateCategories } from '@/lib/data';
 import Dashboard from '@/components/app/dashboard';
 import Reports from '@/components/app/reports';
 import { useToast } from '@/hooks/use-toast';
@@ -243,6 +242,16 @@ function AppContent() {
   const { data: usageLog, isLoading: isUsageLogLoading } = useCollection<UsageLog>(usageLogRef);
 
   const { machinesBySector, isLoading: isLoadingMachines } = useAllMachines(sectors);
+
+  /**
+   * PASO 6: Ejecución de migración de categorías al iniciar.
+   */
+  useEffect(() => {
+    if (firestore && isAdmin) {
+      // Comenta la línea de abajo una vez ejecutado con éxito
+      migrateCategories(firestore); 
+    }
+  }, [firestore, isAdmin]);
 
 
   useEffect(() => {

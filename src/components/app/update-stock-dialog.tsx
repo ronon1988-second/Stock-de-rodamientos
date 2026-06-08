@@ -23,12 +23,13 @@ import {
 } from "@/components/ui/form";
 import { InventoryItem, Machine, Sector } from "@/lib/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ITEM_CATEGORIES } from "@/lib/constants";
 import React from "react";
 
 type UpdateStockDialogProps = {
   item: InventoryItem;
   onClose: () => void;
-  onConfirm: (itemId: string, quantityOrStock: number, threshold?: number, machineId?: string | null, sectorId?: string | null) => void;
+  onConfirm: (itemId: string, quantityOrStock: number, threshold?: number, category?: string, machineId?: string | null, sectorId?: string | null) => void;
   mode: "logUsage" | "updateStock";
   sectors?: Sector[];
   machinesBySector?: Record<string, Machine[]>;
@@ -63,6 +64,7 @@ export default function UpdateStockDialog({
   const updateStockSchema = z.object({
     stock: z.coerce.number().int().min(0, "El stock no puede ser negativo."),
     threshold: z.coerce.number().int().min(0, "El umbral no puede ser negativo."),
+    category: z.string().min(1, "La categoría es requerida."), // Paso 4: Campo obligatorio en edición
   });
 
   const formSchema = mode === 'logUsage' ? logUsageSchema : updateStockSchema;
@@ -76,6 +78,7 @@ export default function UpdateStockDialog({
     } : {
       stock: item.stock,
       threshold: item.threshold,
+      category: item.category || "Otros",
     },
   });
 
@@ -92,13 +95,12 @@ export default function UpdateStockDialog({
   function onSubmit(values: z.infer<typeof formSchema>) {
     if (mode === 'logUsage') {
       let { quantity, machineId, sectorId } = values as z.infer<typeof logUsageSchema>;
-      // Handle "General Usage" selection
       const finalSectorId = sectorId === GENERAL_USAGE_ID ? null : sectorId;
       const finalMachineId = machineId === GENERAL_USAGE_ID ? null : machineId;
-      onConfirm(item.id, quantity, undefined, finalMachineId, finalSectorId);
+      onConfirm(item.id, quantity, undefined, undefined, finalMachineId, finalSectorId);
     } else {
-      const { stock, threshold } = values as z.infer<typeof updateStockSchema>;
-      onConfirm(item.id, stock, threshold);
+      const { stock, threshold, category } = values as z.infer<typeof updateStockSchema>;
+      onConfirm(item.id, stock, threshold, category);
     }
     onClose();
   }
@@ -113,11 +115,11 @@ export default function UpdateStockDialog({
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{isLogUsage ? 'Registrar Uso' : 'Actualizar Artículo'} de {item.name}</DialogTitle>
+          <DialogTitle>{isLogUsage ? 'Registrar Uso' : 'Editar Artículo'} de {item.name}</DialogTitle>
           <DialogDescription>
              {isLogUsage 
                 ? 'Seleccione la máquina e ingrese la cantidad utilizada.' 
-                : 'Ingrese el nuevo total de stock y el umbral de seguridad para este artículo.'}
+                : 'Actualice los detalles del artículo en el inventario.'}
              <br />
              Stock actual: <strong>{item.stock} unidades</strong>
           </DialogDescription>
@@ -192,13 +194,39 @@ export default function UpdateStockDialog({
                 </>
             )}
             {!isLogUsage && (
+                <>
+                 {/* Paso 4: Selector de categoría en edición */}
+                <FormField
+                  control={form.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Categoría</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccione una categoría" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {ITEM_CATEGORIES.map((cat) => (
+                            <SelectItem key={cat} value={cat}>
+                              {cat}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <div className="grid grid-cols-2 gap-4">
                  <FormField
                   control={form.control}
                   name="stock"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Nuevo Stock Total</FormLabel>
+                      <FormLabel>Stock Total</FormLabel>
                       <FormControl>
                         <Input type="number" {...field} />
                       </FormControl>
@@ -220,11 +248,12 @@ export default function UpdateStockDialog({
                   )}
                 />
                 </div>
+                </>
             )}
            
-            <DialogFooter>
+            <DialogFooter className="pt-4">
                 <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
-                <Button type="submit">Confirmar</Button>
+                <Button type="submit">Guardar Cambios</Button>
             </DialogFooter>
           </form>
         </Form>

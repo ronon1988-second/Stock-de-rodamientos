@@ -1,4 +1,6 @@
 import { InventoryItem, Sector, Machine } from './types';
+import { collection, getDocs, doc, writeBatch } from 'firebase/firestore';
+import { Firestore } from 'firebase/firestore';
 
 // This data is now only used for one-time seeding if the database is empty.
 // The main application will read from Firestore directly.
@@ -128,3 +130,48 @@ export const initialInventory: Omit<InventoryItem, 'id'>[] = [
   { name: 'POS 10A (5)', stock: 0, threshold: 2 },
   { name: 'POS 10LA (5)', stock: 0, threshold: 2 },
 ];
+
+/**
+ * PASO 6: Función de migración automática de categorías.
+ */
+export async function migrateCategories(firestore: Firestore) {
+  console.log("Iniciando migración de categorías...");
+  const inventoryRef = collection(firestore, 'inventory');
+  const snapshot = await getDocs(inventoryRef);
+  
+  const batch = writeBatch(firestore);
+  let updatedCount = 0;
+
+  snapshot.docs.forEach((docSnap) => {
+    const data = docSnap.data() as InventoryItem;
+    
+    // Solo actualizamos si no tiene categoría definida
+    if (!data.category) {
+      const name = data.name.toUpperCase().trim();
+      let category = "Otros";
+
+      if (name.startsWith("60")) category = "Rodamientos 60xx";
+      else if (name.startsWith("62")) category = "Rodamientos 62xx";
+      else if (name.startsWith("63")) category = "Rodamientos 63xx";
+      else if (name.startsWith("12") || name.startsWith("22")) category = "Rodamientos Autoalineables";
+      else if (name.startsWith("30") || name.startsWith("32") || name.startsWith("33")) category = "Rodamientos Cónicos";
+      else if (name.startsWith("UC")) category = "Rodamientos UC (Insertos)";
+      else if (name.startsWith("NK") || name.startsWith("RNA") || name.startsWith("HK")) category = "Rodamientos de Aguja";
+      else if (name.startsWith("PHS") || name.startsWith("POS")) category = "Terminales de Rótula";
+      else if (name.startsWith("AEVU")) category = "Pistones";
+      else if (name.startsWith("FL")) category = "Soportes";
+      else if (name.startsWith("HTD")) category = "Correas";
+      else if (name.startsWith("H")) category = "Manguitos de Montaje";
+
+      batch.update(docSnap.ref, { category });
+      updatedCount++;
+    }
+  });
+
+  if (updatedCount > 0) {
+    await batch.commit();
+    console.log(`Migración completada. Se actualizaron ${updatedCount} artículos.`);
+  } else {
+    console.log("No se encontraron artículos para migrar.");
+  }
+}

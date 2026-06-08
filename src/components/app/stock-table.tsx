@@ -19,13 +19,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import UpdateStockDialog from "./update-stock-dialog";
 import type { InventoryItem, MachinesBySector, Sector } from "@/lib/types";
-import { MoreHorizontal, Search, PlusCircle, FileDown, Trash2 } from "lucide-react";
+import { MoreHorizontal, Search, PlusCircle, FileDown, Trash2, Filter } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import AddItemDialog from "./add-item-dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { ITEM_CATEGORIES } from "@/lib/constants";
 
 type StockTableProps = {
   inventory: InventoryItem[];
@@ -41,34 +43,12 @@ type StockTableProps = {
   machinesBySector: MachinesBySector;
 };
 
-// Function to determine item series
-const getItemSeries = (name: string): string => {
-  const normalizedName = name.toUpperCase().trim();
-  if (normalizedName.startsWith('HTD')) return 'Correas';
-  if (normalizedName.startsWith('H')) return 'Manguitos de Montaje';
-  if (normalizedName.startsWith('6')) {
-    const series = normalizedName.substring(0, 2);
-    if (['60', '62', '63', '68', '69'].includes(series)) {
-      return `Rodamientos ${series}xx`;
-    }
-  }
-  if (normalizedName.startsWith('UC')) return 'Rodamientos UC (Insertos)';
-  if (normalizedName.startsWith('12') || normalizedName.startsWith('13') || normalizedName.startsWith('22') || normalizedName.startsWith('23')) {
-    const series = normalizedName.substring(0, 2);
-    if (['12', '13', '22', '23'].includes(series)) {
-        return `Rodamientos ${series}xx (Autoalineables)`;
-    }
-  }
-  if (normalizedName.startsWith('30') || normalizedName.startsWith('32') || normalizedName.startsWith('33')) {
-      const series = normalizedName.substring(0, 2);
-      return `Rodamientos ${series}xxx (Rodillos Cónicos)`;
-  }
-  if (normalizedName.startsWith('NK') || normalizedName.startsWith('RNA') || normalizedName.startsWith('HK')) return 'Rodamientos de Agujas';
-  if (normalizedName.startsWith('PHS') || normalizedName.startsWith('POS')) return 'Terminales de Rótula';
-  if (normalizedName.startsWith('AEVU')) return 'Pistones';
-  if (normalizedName.startsWith('FL')) return 'Soportes';
-  
-  return 'Otros';
+/**
+ * PASO 5: Reemplazo de la función getItemSeries.
+ * Ahora simplemente retorna la categoría asignada o "Otros".
+ */
+const getItemSeries = (item: InventoryItem): string => {
+  return item.category ?? "Otros";
 };
 
 
@@ -77,12 +57,18 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
   const [logUsageItem, setLogUsageItem] = useState<InventoryItem | null>(null);
   const [addingItem, setAddingItem] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all"); // Paso 7: Estado de filtro
 
+  // Filtrado de artículos
   const filteredItems = useMemo(() => {
     return inventory
-      .filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()))
+      .filter(item => {
+        const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesCategory = selectedCategory === "all" || getItemSeries(item) === selectedCategory;
+        return matchesSearch && matchesCategory;
+      })
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [inventory, searchTerm]);
+  }, [inventory, searchTerm, selectedCategory]);
 
   const getStatus = (item: InventoryItem) => {
     if (item.stock === 0) return "Sin Stock";
@@ -91,18 +77,18 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
   };
 
   const getGroupStatus = (items: InventoryItem[]) => {
-    if (items.some(item => item.stock === 0)) {
-      return 'out-of-stock'; // Most critical
-    }
-    if (items.some(item => item.stock < item.threshold)) {
-      return 'low-stock'; // Less critical
-    }
-    return 'in-stock'; // All good
+    if (items.some(item => item.stock === 0)) return 'out-of-stock';
+    if (items.some(item => item.stock < item.threshold)) return 'low-stock';
+    return 'in-stock';
   };
 
+  // Agrupamiento por categorías para la vista de acordeón
   const groupedItems = useMemo(() => {
+    // Si hay búsqueda o filtro de categoría específica, no agrupamos (usamos tabla plana)
+    if (searchTerm || selectedCategory !== "all") return new Map<string, InventoryItem[]>();
+
     const grouped = inventory.reduce((acc, item) => {
-        const series = getItemSeries(item.name);
+        const series = getItemSeries(item);
         if (!acc.has(series)) {
             acc.set(series, []);
         }
@@ -110,13 +96,9 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
         return acc;
     }, new Map<string, InventoryItem[]>());
 
-    // Sort items within each group
     grouped.forEach(items => items.sort((a, b) => a.name.localeCompare(b.name)));
-    
-    // Sort groups by name
     return new Map([...grouped.entries()].sort((a, b) => a[0].localeCompare(b[0])));
-
-  }, [inventory]);
+  }, [inventory, searchTerm, selectedCategory]);
 
 
   const getStatusVariant = (status: string): "destructive" | "secondary" | "default" => {
@@ -126,12 +108,10 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
   };
 
   const exportAllToCSV = () => {
-    let csvContent = "data:text/csv;charset=utf-8,Artículo;Stock Actual;Umbral de Seguridad\n";
-    
+    let csvContent = "data:text/csv;charset=utf-8,Artículo;Categoría;Stock Actual;Umbral de Seguridad\n";
     inventory.sort((a,b) => a.name.localeCompare(b.name)).forEach(item => {
-        csvContent += `${item.name};${item.stock};${item.threshold}\n`;
+        csvContent += `${item.name};${getItemSeries(item)};${item.stock};${item.threshold}\n`;
     });
-
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -156,6 +136,10 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
         >
         <TableCell className="font-medium">
             {item.name}
+            {/* Pequeña etiqueta de categoría si estamos en vista de búsqueda */}
+            {(searchTerm || selectedCategory !== "all") && (
+              <div className="text-[10px] text-muted-foreground font-normal">{getItemSeries(item)}</div>
+            )}
         </TableCell>
         <TableCell className="text-right">{item.stock}</TableCell>
         <TableCell className="text-center">
@@ -187,7 +171,7 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
                         <DropdownMenuItem
                             onSelect={() => setEditingItem(item)}
                         >
-                            Actualizar Stock
+                            Editar Artículo
                         </DropdownMenuItem>
                       </>
                     )}
@@ -237,7 +221,7 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
             <div>
               <CardTitle>{title || 'Inventario General'}</CardTitle>
               <CardDescription>
-                {description || 'Busca, visualiza y gestiona todo tu inventario.'}
+                {description || 'Gestione las categorías y stock de sus artículos.'}
               </CardDescription>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
@@ -255,20 +239,40 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
               )}
             </div>
           </div>
-          <div className="relative mt-4">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Buscar por código de artículo..."
-              className="w-full pl-8"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            {/* Buscador */}
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Buscar por código..."
+                className="w-full pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            {/* Paso 7: Filtro por categoría */}
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Todas las categorías" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas las categorías</SelectItem>
+                  {ITEM_CATEGORIES.map(cat => (
+                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            {searchTerm ? (
+            {(searchTerm || selectedCategory !== "all") ? (
                 <Table>
                     <TableHeader>
                         <TableRow>
@@ -284,14 +288,14 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
                         ) : (
                             <TableRow>
                                 <TableCell colSpan={canEdit || canDelete ? 4 : 3} className="h-24 text-center">
-                                    No se encontraron artículos que coincidan con la búsqueda.
+                                    No se encontraron artículos que coincidan con los filtros.
                                 </TableCell>
                             </TableRow>
                         )}
                     </TableBody>
                 </Table>
             ) : (
-                <Accordion type="multiple" className="w-full">
+                <Accordion type="multiple" className="w-full" defaultValue={Array.from(groupedItems.keys())}>
                     {Array.from(groupedItems.entries()).map(([series, items]) => {
                         const groupStatus = getGroupStatus(items);
                         return (
@@ -353,8 +357,8 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
             key={`edit-${editingItem.id}`}
             item={editingItem}
             onClose={() => setEditingItem(null)}
-            onConfirm={(_, stock, threshold) => {
-              onUpdateItem({ ...editingItem, stock: stock, threshold: threshold! });
+            onConfirm={(itemId, stock, threshold, category) => {
+              onUpdateItem({ ...editingItem, stock, threshold: threshold!, category });
             }}
             mode="updateStock"
         />
@@ -364,7 +368,7 @@ export default function StockTable({ inventory, onUpdateItem, onAddItem, onLogUs
             key={`log-${logUsageItem.id}`}
             item={logUsageItem}
             onClose={() => setLogUsageItem(null)}
-            onConfirm={(itemId, quantity, _, machineId, sectorId) => {
+            onConfirm={(itemId, quantity, _, __, machineId, sectorId) => {
               onLogUsage(itemId, quantity, machineId, sectorId);
             }}
             mode="logUsage"

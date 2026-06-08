@@ -22,6 +22,7 @@ export type InventoryItem = {
   name: string;
   stock: number;
   threshold: number;
+  category?: string; // Paso 1: Campo opcional para categorías
 };
 
 // Represents the usage of an item by a specific machine at a specific time.

@@ -21,7 +21,15 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { InventoryItem } from "@/lib/types";
+import { ITEM_CATEGORIES } from "@/lib/constants";
 
 type AddItemDialogProps = {
   onClose: () => void;
@@ -38,6 +46,7 @@ export default function AddItemDialog({ onClose, onConfirm, existingNames }: Add
     ),
     stock: z.coerce.number().int().min(0, "El stock no puede ser negativo."),
     threshold: z.coerce.number().int().min(0, "El umbral no puede ser negativo."),
+    category: z.string().min(1, "La categoría es requerida."), // Paso 3: Campo obligatorio
   });
 
   const form = useForm<z.infer<typeof AddItemSchema>>({
@@ -46,6 +55,7 @@ export default function AddItemDialog({ onClose, onConfirm, existingNames }: Add
       name: "",
       stock: 0,
       threshold: 2,
+      category: "Otros",
     },
   });
 
@@ -78,34 +88,63 @@ export default function AddItemDialog({ onClose, onConfirm, existingNames }: Add
                 </FormItem>
               )}
             />
+
+            {/* Paso 3: Selector de categoría */}
             <FormField
               control={form.control}
-              name="stock"
+              name="category"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Stock Inicial</FormLabel>
-                  <FormControl>
-                    <Input type="number" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-             <FormField
-              control={form.control}
-              name="threshold"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Umbral de Stock de Seguridad</FormLabel>
-                  <FormControl>
-                    <Input type="number" {...field} />
-                  </FormControl>
+                  <FormLabel>Categoría</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccione una categoría" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {ITEM_CATEGORIES.map((cat) => (
+                        <SelectItem key={cat} value={cat}>
+                          {cat}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            <DialogFooter>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="stock"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Stock Inicial</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="threshold"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Umbral de Seguridad</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <DialogFooter className="pt-4">
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancelar
               </Button>
